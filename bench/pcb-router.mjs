@@ -6,7 +6,7 @@
 // its own pad cells and any free cell; vias cost `viaCost` cells. Nets are grown as
 // trees with A* (multi-source from the tree) and negotiated with present/history
 // congestion costs until no cell is shared or `maxRounds` is reached.
-import { rotateQuarter } from '../src/problem.js';
+import { rotateQuarter, localPin } from '../src/problem.js';
 
 class MinHeap {
   constructor(cap = 1024) { this.k = new Float64Array(cap); this.v = new Int32Array(cap); this.n = 0; }
@@ -36,7 +36,8 @@ class MinHeap {
  *        component body frame; rot = pad angle relative to the footprint (degrees);
  *        net = routed net index, or -1 for pads that only obstruct.
  * @param board.netCount number of routed nets
- * @param layout [{x,y,rotation}] and sides [+1 top | -1 bottom] per component
+ * @param layout [{x,y,rotation,side?}]; pads are mirrored for side 1. Without a
+ *        `side`, `sides` (+1 top | -1 bottom) only chooses the SMD layer.
  */
 export function routeBoard(board, layout, sides, options = {}) {
   const cell = options.cell ?? 0.3, viaCost = options.viaCost ?? 6, maxRounds = options.maxRounds ?? 12;
@@ -46,7 +47,7 @@ export function routeBoard(board, layout, sides, options = {}) {
 
   // Rasterize pads (nearest-centre wins shared cells).
   const padCenter = board.pads.map((pad) => {
-    const pl = layout[pad.comp], [rx, ry] = rotateQuarter(pad.lx, pad.ly, pl.rotation);
+    const pl = layout[pad.comp], [rx, ry] = rotateQuarter(...localPin(pad.lx, pad.ly, pl.side), pl.rotation);
     return [pl.x + rx, pl.y + ry];
   });
   const padBox = board.pads.map((pad, pi) => {
@@ -57,7 +58,8 @@ export function routeBoard(board, layout, sides, options = {}) {
     const [cx, cy] = padCenter[pi];
     return [Math.max(0, Math.floor((cx - hx) / cell)), Math.max(0, Math.floor((cy - hy) / cell)), Math.min(W - 1, Math.floor((cx + hx) / cell)), Math.min(H - 1, Math.floor((cy + hy) / cell))];
   });
-  const padLayers = board.pads.map((pad) => pad.tht || pad.hole ? [0, 1] : [sides[pad.comp] < 0 ? 1 : 0]);
+  const bottom = (c) => layout[c].side === undefined ? sides[c] < 0 : layout[c].side === 1;
+  const padLayers = board.pads.map((pad) => pad.tht || pad.hole ? [0, 1] : [bottom(pad.comp) ? 1 : 0]);
   board.pads.forEach((pad, pi) => {
     const [x0, y0, x1, y1] = padBox[pi], [cx, cy] = padCenter[pi];
     for (const l of padLayers[pi]) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {

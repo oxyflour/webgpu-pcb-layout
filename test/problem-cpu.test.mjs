@@ -28,3 +28,19 @@ test('augmented graph contains component hubs, pins and net vertices',()=>{
 test('a pin cannot belong to multiple nets',()=>{
   assert.throws(()=>normalizeProblem({...input,nets:[...input.nets,{id:'N2',pins:[{componentId:'A',pinId:'p'},{componentId:'B',pinId:'p'}]}]}),/multiple nets/);
 });
+
+test('bottom-side parts mirror their pins and only overlap parts on the same side', async () => {
+  const { normalizeProblem: norm, worldPin: wp, scoreLayoutCpu: score } = await import('../src/index.js');
+  const p = norm({ canvas: { width: 50, height: 50 }, components: [
+    { id: 'A', width: 10, height: 10, sides: 'any', pins: [{ id: 'a', x: 4, y: 1 }] },
+    { id: 'B', width: 10, height: 10, sides: 'any', pins: [{ id: 'b', x: 0, y: 0 }] },
+    { id: 'T', width: 4, height: 4, twoSided: true, pins: [] },
+  ], nets: [{ id: 'N', pins: [{ componentId: 'A', pinId: 'a' }, { componentId: 'B', pinId: 'b' }] }] });
+  const top = [{ x: 20, y: 20, rotation: 0 }, { x: 25, y: 20, rotation: 0 }, { x: 40, y: 40, rotation: 0 }];
+  const flipped = [{ ...top[0], side: 1 }, top[1], top[2]];
+  assert.deepEqual(wp(p, flipped, 0), [16, 21]);
+  assert.ok(score(p, top).overlap > 0);
+  assert.equal(score(p, flipped).overlap, 0);
+  // A through-hole part collides with parts on either side.
+  assert.ok(score(p, [{ ...top[0], side: 1 }, top[1], { x: 20, y: 20, rotation: 0 }]).overlap > 0);
+});

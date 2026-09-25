@@ -11,6 +11,7 @@ export class GpuLnsOptimizer {
       movesPerCandidate:options.movesPerCandidate ?? 3,
       translationScale:options.translationScale ?? 0.08*Math.min(problem.canvas.width,problem.canvas.height),
       rotationProbability:options.rotationProbability ?? 0.15,
+      flipProbability:options.flipProbability ?? 0.08,
       temperature:options.temperature ?? 0.05,
       cooling:options.cooling ?? 0.97,
       seed:options.seed ?? 1
@@ -25,6 +26,7 @@ export class GpuLnsOptimizer {
       const c=movable[Math.floor(rnd()*movable.length)],p=out[c.index];
       p.x += normal(rnd)*scale; p.y += normal(rnd)*scale;
       if(c.rotatable && rnd()<this.options.rotationProbability)p.rotation=(p.rotation+(rnd()<.5?1:3))&3;
+      if(c.sides==='any' && rnd()<this.options.flipProbability)p.side=p.side?0:1;
     }
     return out;
   }
@@ -36,17 +38,18 @@ export class GpuLnsOptimizer {
     const {x,y,r}=this.slabs;
     for(let k=0;k<pop;k++) {
       const off=k*n;
-      for(let i=0;i<n;i++){x[off+i]=current[i].x;y[off+i]=current[i].y;r[off+i]=current[i].rotation&3;}
+      for(let i=0;i<n;i++){x[off+i]=current[i].x;y[off+i]=current[i].y;r[off+i]=(current[i].rotation&3)|(current[i].side?4:0);}
       if(k===0||!movable.length)continue;
       for(let m=0;m<this.options.movesPerCandidate;m++) {
         const c=movable[Math.floor(rnd()*movable.length)],q=off+c.index;
         x[q]+=normal(rnd)*scale; y[q]+=normal(rnd)*scale;
-        if(c.rotatable && rnd()<this.options.rotationProbability)r[q]=(r[q]+(rnd()<.5?1:3))&3;
+        if(c.rotatable && rnd()<this.options.rotationProbability)r[q]=(r[q]&4)|((r[q]+(rnd()<.5?1:3))&3);
+        if(c.sides==='any' && rnd()<this.options.flipProbability)r[q]^=4;
       }
     }
     const scores=await this.scorer.scoreSlabs(x,y,r,pop);
     let bi=0;for(let k=1;k<pop;k++)if(scores[k].total<scores[bi].total)bi=k;
-    const layout=bi===0?current:Array.from({length:n},(_,i)=>({x:x[bi*n+i],y:y[bi*n+i],rotation:r[bi*n+i]}));
+    const layout=bi===0?current:Array.from({length:n},(_,i)=>({x:x[bi*n+i],y:y[bi*n+i],rotation:r[bi*n+i]&3,side:(r[bi*n+i]>>2)&1}));
     return {layout,score:scores[bi]};
   }
 

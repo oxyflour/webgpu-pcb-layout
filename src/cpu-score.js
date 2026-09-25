@@ -1,4 +1,4 @@
-import { worldPin, rotatedSize } from './problem.js';
+import { worldPin, rotatedSize, sharesSide } from './problem.js';
 
 export function coarseCongestionCpu(problem, layout, options={}) {
   const gridW=options.gridWidth ?? 32,gridH=options.gridHeight ?? 32,capacity=options.capacity ?? 1;
@@ -40,6 +40,7 @@ export function scoreLayoutCpu(problem, layout, weights = {}, coarse = {}) {
     const a = problem.components[i], pa = layout[i];
     const [aw, ah] = rotatedSize(a, pa.rotation);
     for (let j = i + 1; j < problem.components.length; j++) {
+      if (!sharesSide(problem, i, pa, j, layout[j])) continue;
       const b = problem.components[j], pb = layout[j];
       const [bw, bh] = rotatedSize(b, pb.rotation);
       const ox = Math.max(0, Math.min(pa.x + aw / 2, pb.x + bw / 2) - Math.max(pa.x - aw / 2, pb.x - bw / 2));

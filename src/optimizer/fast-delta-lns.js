@@ -1,4 +1,4 @@
-import { CompiledPlacementModel } from './compiled-placement-model.js';
+import { CompiledPlacementModel, packOrientation } from './compiled-placement-model.js';
 
 function rng32(seed){let x=seed>>>0||1;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;};}
 function normal(rnd){const u=Math.max(1e-12,rnd()),v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
@@ -20,6 +20,8 @@ export class FastDeltaLnsOptimizer {
       movesPerCandidate:options.movesPerCandidate??2,
       translationScale:options.translationScale??3.2,
       rotationProbability:options.rotationProbability??0.12,
+      // Probability of moving a part to the other board side (parts with sides:'any').
+      flipProbability:options.flipProbability??0.08,
       temperature:options.temperature??0.035,
       cooling:options.cooling??0.975,
       seed:options.seed??1,
@@ -42,7 +44,7 @@ export class FastDeltaLnsOptimizer {
       // Copy current once into each contiguous candidate slice, then mutate in place.
       for(let k=0;k<pop;k++){
         const off=k*n;
-        for(let i=0;i<n;i++){slabX[off+i]=current[i].x;slabY[off+i]=current[i].y;slabR[off+i]=current[i].rotation&3;}
+        for(let i=0;i<n;i++){slabX[off+i]=current[i].x;slabY[off+i]=current[i].y;slabR[off+i]=packOrientation(current[i]);}
         if(k===0)continue;
         for(let m=0;m<o.movesPerCandidate;m++){
           const ci=this.movable[Math.floor(rnd()*this.movable.length)],c=this.problem.components[ci];
@@ -50,7 +52,8 @@ export class FastDeltaLnsOptimizer {
           const rr=slabR[off+ci]&3;const w=(rr&1)?c.height:c.width,h=(rr&1)?c.width:c.height;
           slabX[off+ci]=Math.max(w/2,Math.min(this.problem.canvas.width-w/2,slabX[off+ci]));
           slabY[off+ci]=Math.max(h/2,Math.min(this.problem.canvas.height-h/2,slabY[off+ci]));
-          if(c.rotatable&&rnd()<o.rotationProbability)slabR[off+ci]=(rr+(rnd()<.5?1:3))&3;
+          if(c.rotatable&&rnd()<o.rotationProbability)slabR[off+ci]=(slabR[off+ci]&4)|((rr+(rnd()<.5?1:3))&3);
+          if(c.sides==='any'&&rnd()<o.flipProbability)slabR[off+ci]^=4;
         }
       }
       let cand,candScore,exact;

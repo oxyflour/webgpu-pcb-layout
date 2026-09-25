@@ -3,8 +3,12 @@
 // geometry is re-read from the file with KiCad's own transform (y-down, rotation
 // counter-clockwise on screen, bottom-side pads stored already mirrored).
 //
-// All footprints share one placement plane because this package has no notion of
-// board sides; bottom-side parts therefore compete for area with top-side parts.
+// Board sides (options.sides):
+//   'single'   every footprint on one plane (legacy; bottom parts compete with top ones)
+//   'original' each footprint stays on its KiCad side
+//   'free'     SMD footprints may use either side; through-hole parts keep their side
+//              and block both. Pins are expressed as seen from the top, so a bottom
+//              placement mirrors them (KiCad stores bottom pads already mirrored).
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -74,6 +78,8 @@ export function isPowerNet(name) {
  */
 export function designToProblem(design, options = {}) {
   const bodyMargin = options.bodyMargin ?? 0.25;
+  const sideMode = options.sides ?? 'single';
+  if (!['single', 'original', 'free'].includes(sideMode)) throw new Error(`unknown sides mode ${sideMode}`);
   const skipPower = options.skipPowerNets ?? true;
   const maxDegree = options.maxNetDegree ?? Infinity;
   const b = design.board;
@@ -108,16 +114,24 @@ export function designToProblem(design, options = {}) {
     const dx = (x0 + x1) / 2, dy = (y0 + y1) / 2;
     bodyOffset.push([dx, dy]);
     const [rx, ry] = kicadRotate(dx, dy, raw.deg);
-    const place = { x: raw.x + rx - ox, y: raw.y + ry - oy, rotation: quarter(raw.deg) };
+    const bottom = f.side < 0 && sideMode !== 'single';
+    const place = { x: raw.x + rx - ox, y: raw.y + ry - oy, rotation: quarter(raw.deg), ...(sideMode !== 'single' ? { side: bottom ? 1 : 0 } : {}) };
     originalLayout.push(place);
     const width = Math.max(0.4, x1 - x0 + 2 * bodyMargin), height = Math.max(0.4, y1 - y0 + 2 * bodyMargin);
     const pins = [];
-    raw.pads.forEach((p, k) => { const pi = f.firstPad + k; if (padNet[pi] >= 0) pins.push({ id: `p${pi}`, x: p.px - dx, y: p.py - dy }); });
+    // Top-view local x: undo KiCad's mirroring of bottom footprints.
+    const mx = bottom ? -1 : 1;
+    raw.pads.forEach((p, k) => { const pi = f.firstPad + k; if (padNet[pi] >= 0) pins.push({ id: `p${pi}`, x: mx * (p.px - dx), y: p.py - dy }); });
     // Mechanical: connector-like library, no pads, or body touching the board outline box.
     const [w, h] = (place.rotation & 1) ? [height, width] : [width, height];
     const atEdge = place.x - w / 2 < 0.5 || place.y - h / 2 < 0.5 || place.x + w / 2 > canvas.width - 0.5 || place.y + h / 2 > canvas.height - 0.5;
     mechanical.push(MECHANICAL_LIB.test(raw.lib) || !raw.pads.length || atEdge);
+    const tht = raw.pads.some((p) => p.type === 'thru_hole');
     const c = { id: `${f.name}#${fi}`, width, height, pins };
+    if (sideMode !== 'single') {
+      c.twoSided = tht;
+      c.sides = sideMode === 'free' && !tht ? 'any' : bottom ? 'bottom' : 'top';
+    }
     if (f.fixed || (options.preplace && mechanical[fi])) c.fixed = { ...place };
     return c;
   });
@@ -132,9 +146,9 @@ export function designToProblem(design, options = {}) {
   // Every pad, in the component body frame, for routing evaluation.
   const pads = [];
   design.footprints.forEach((f, fi) => {
-    const raw = design.raw[fi], [dx, dy] = bodyOffset[fi];
+    const raw = design.raw[fi], [dx, dy] = bodyOffset[fi], mx = originalLayout[fi].side ? -1 : 1;
     raw.pads.forEach((p, k) => pads.push({
-      comp: fi, lx: p.px - dx, ly: p.py - dy, w: p.w, h: p.h, rot: p.pang - raw.deg,
+      comp: fi, lx: mx * (p.px - dx), ly: p.py - dy, w: p.w, h: p.h, rot: p.pang - raw.deg,
       tht: p.type === 'thru_hole', hole: p.type === 'np_thru_hole', net: padNet[f.firstPad + k],
       padIndex: f.firstPad + k,
     }));
@@ -145,7 +159,7 @@ export function designToProblem(design, options = {}) {
     name: net.name,
     pads: net.pads.map((pi) => {
       const fi = design.pads[pi].parent, raw = design.raw[fi], k = pi - design.footprints[fi].firstPad, [dx, dy] = bodyOffset[fi];
-      return { comp: fi, padIndex: pi, x: raw.pads[k].px - dx, y: raw.pads[k].py - dy, anchor: padsOf(fi) >= 8 };
+      return { comp: fi, padIndex: pi, x: (originalLayout[fi].side ? -1 : 1) * (raw.pads[k].px - dx), y: raw.pads[k].py - dy, anchor: padsOf(fi) >= 8 };
     }),
   }));
 

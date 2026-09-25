@@ -1,4 +1,4 @@
-import { worldPin, rotatedSize } from '../problem.js';
+import { worldPin, rotatedSize, sharesSide } from '../problem.js';
 
 function priorityWeight(policy, netId, options){
   const p=Number(policy?.[netId]?.priority ?? options.defaultPriority);
@@ -75,6 +75,7 @@ export class PriorityCpuBatchScorer {
       const left=Math.max(0,aw/2-pa.x),right=Math.max(0,pa.x+aw/2-p.canvas.width),top=Math.max(0,ah/2-pa.y),bottom=Math.max(0,pa.y+ah/2-p.canvas.height);
       bounds+=left*left+right*right+top*top+bottom*bottom;
       for(let j=i+1;j<p.components.length;j++){
+        if(!sharesSide(p,i,pa,j,layout[j]))continue;
         const b=p.components[j],pb=layout[j],[bw,bh]=rotatedSize(b,pb.rotation);
         const ox=Math.max(0,Math.min(pa.x+aw/2,pb.x+bw/2)-Math.max(pa.x-aw/2,pb.x-bw/2));
         const oy=Math.max(0,Math.min(pa.y+ah/2,pb.y+bh/2)-Math.max(pa.y-ah/2,pb.y-bh/2));

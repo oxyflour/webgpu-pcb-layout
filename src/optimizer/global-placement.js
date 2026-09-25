@@ -1,4 +1,4 @@
-import { worldPin, rotatedSize } from '../problem.js';
+import { worldPin, rotatedSize, sharesSide } from '../problem.js';
 
 function cloneLayout(layout){ return layout.map(p=>({...p})); }
 
@@ -112,7 +112,7 @@ export class AnalyticalGlobalPlacer {
       if(p.components[i].fixed) continue;
       const [wi,hi]=rotatedSize(p.components[i],layout[i].rotation);
       for(let j=i+1;j<p.components.length;j++){
-        if(p.components[j].fixed) continue;
+        if(p.components[j].fixed || !sharesSide(p,i,layout[i],j,layout[j])) continue;
         const [wj,hj]=rotatedSize(p.components[j],layout[j].rotation);
         let dx=layout[i].x-layout[j].x, dy=layout[i].y-layout[j].y;
         if(Math.abs(dx)+Math.abs(dy)<1e-8){const u=deterministicUnit(i,j);dx=u[0]*1e-3;dy=u[1]*1e-3;}
@@ -147,6 +147,7 @@ export class AnalyticalGlobalPlacer {
       if(p.components[i].fixed) continue;
       const c=p.components[i],[wi,hi]=rotatedSize(c,layout[i].rotation);
       for(const j of fixed){
+        if(!sharesSide(p,i,layout[i],j,layout[j])) continue;
         const fcomp=p.components[j],[wj,hj]=rotatedSize(fcomp,layout[j].rotation);
         let dx=layout[i].x-layout[j].x,dy=layout[i].y-layout[j].y;
         if(Math.abs(dx)+Math.abs(dy)<1e-8){const u=deterministicUnit(i,j);dx=u[0]*1e-3;dy=u[1]*1e-3;}

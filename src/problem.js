@@ -57,7 +57,10 @@ export function normalizeProblem(problem) {
       width: Number(c.width),
       height: Number(c.height),
       rotatable: c.rotatable !== false,
-      fixed: c.fixed ? { x: Number(c.fixed.x), y: Number(c.fixed.y), rotation: (c.fixed.rotation ?? 0) & 3 } : null,
+      // Board sides this part may be placed on; `twoSided` parts (through-hole) block both.
+      sides: normalizeSides(c.sides, c.id),
+      twoSided: !!c.twoSided,
+      fixed: c.fixed ? { x: Number(c.fixed.x), y: Number(c.fixed.y), rotation: (c.fixed.rotation ?? 0) & 3, side: c.fixed.side ? 1 : 0 } : null,
       pins: (c.pins ?? []).map((p) => pinIndexByKey.get(`${c.id}\u0000${p.id}`))
     })),
     pins,
@@ -66,6 +69,27 @@ export function normalizeProblem(problem) {
     pinIndexByKey
   };
 }
+
+function normalizeSides(sides, id) {
+  const v = sides ?? 'top';
+  if (v !== 'top' && v !== 'bottom' && v !== 'any') throw new Error(`component ${id}: sides must be 'top', 'bottom' or 'any'`);
+  return v;
+}
+
+/** 0 = top, 1 = bottom. */
+export function placementSide(placement) { return placement.side ? 1 : 0; }
+
+/** Whether two placed components compete for the same board area. */
+export function sharesSide(problem, i, pi, j, pj) {
+  const a = problem.components[i], b = problem.components[j];
+  return a.twoSided || b.twoSided || placementSide(pi) === placementSide(pj);
+}
+
+/**
+ * Pin coordinates are given as seen from the top. A part flipped to the bottom is
+ * mirrored in its local x before rotation (the view from the top of the board).
+ */
+export function localPin(x, y, side) { return side ? [-x, y] : [x, y]; }
 
 export function rotateQuarter(x, y, r) {
   switch (r & 3) {
@@ -79,7 +103,8 @@ export function rotateQuarter(x, y, r) {
 export function worldPin(problem, layout, pinIndex) {
   const p = problem.pins[pinIndex];
   const pl = layout[p.componentIndex];
-  const [rx, ry] = rotateQuarter(p.x, p.y, pl.rotation);
+  const [lx, ly] = localPin(p.x, p.y, pl.side);
+  const [rx, ry] = rotateQuarter(lx, ly, pl.rotation);
   return [pl.x + rx, pl.y + ry];
 }
 

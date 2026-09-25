@@ -7,7 +7,8 @@ const WG = 256;
 const SMALL_NET = 32;
 
 const COMMON = /* wgsl */`
-struct Placement { pos: vec2<f32>, rot: u32, pad: u32 };
+// side: 0 = top, 1 = bottom (pins mirrored in local x).
+struct Placement { pos: vec2<f32>, rot: u32, side: u32 };
 // counts: candidates, components, nets, smallNets
 // counts2: largeNets, gridWidth, gridHeight, -
 // f0: canvasW, canvasH, wHpwl, wOverlap
@@ -28,7 +29,8 @@ const PIN_WORLD = /* wgsl */`
 fn pinWorld(base: u32, pi: u32) -> vec2<f32> {
   let pin = pins[pi];
   let pl = placements[base + bitcast<u32>(pin.z)];
-  return pl.pos + rotateQuarter(pin.xy, pl.rot);
+  let local = select(pin.xy, vec2<f32>(-pin.x, pin.y), pl.side == 1u);
+  return pl.pos + rotateQuarter(local, pl.rot);
 }
 `;
 
@@ -73,7 +75,8 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
 /** Pairwise overlap area and quadratic canvas violation; lane i scans pairs (i, j>i). */
 const GEOMETRY_WGSL = COMMON + /* wgsl */`
 @group(0) @binding(0) var<storage, read> placements: array<Placement>;
-@group(0) @binding(1) var<storage, read> componentSize: array<vec2<f32>>;
+// (width, height, twoSided, 0)
+@group(0) @binding(1) var<storage, read> componentSize: array<vec4<f32>>;
 @group(0) @binding(2) var<storage, read_write> outGeometry: array<vec2<f32>>;
 @group(0) @binding(3) var<uniform> params: Params;
 var<workgroup> partial: array<vec2<f32>, ${WG}>;
@@ -90,7 +93,8 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
   var bounds = 0.0;
   for (var i = lid; i < n; i += ${WG}u) {
     let a = placements[base + i];
-    let ah = 0.5 * rotatedSize(componentSize[i], a.rot);
+    let ai = componentSize[i];
+    let ah = 0.5 * rotatedSize(ai.xy, a.rot);
     let lo = max(vec2<f32>(0.0), ah - a.pos);
     let hi = max(vec2<f32>(0.0), a.pos + ah - canvas);
     bounds += dot(lo, lo) + dot(hi, hi);
@@ -98,7 +102,9 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
     let amax = a.pos + ah;
     for (var j = i + 1u; j < n; j++) {
       let b = placements[base + j];
-      let bh = 0.5 * rotatedSize(componentSize[j], b.rot);
+      let bj = componentSize[j];
+      if (a.side != b.side && ai.z == 0.0 && bj.z == 0.0) { continue; }
+      let bh = 0.5 * rotatedSize(bj.xy, b.rot);
       let o = max(vec2<f32>(0.0), min(amax, b.pos + bh) - max(amin, b.pos - bh));
       overlap += o.x * o.y;
     }
@@ -252,8 +258,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 `;
 
 function staticData(problem, netWeights) {
-  const componentSize = new Float32Array(problem.components.length * 2);
-  problem.components.forEach((c, i) => { componentSize[2 * i] = c.width; componentSize[2 * i + 1] = c.height; });
+  const componentSize = new Float32Array(problem.components.length * 4);
+  problem.components.forEach((c, i) => { componentSize.set([c.width, c.height, c.twoSided ? 1 : 0, 0], 4 * i); });
   const pins = new Float32Array(problem.pins.length * 4), pinBits = new Uint32Array(pins.buffer);
   problem.pins.forEach((p, i) => { pins[4 * i] = p.x; pins[4 * i + 1] = p.y; pinBits[4 * i + 2] = p.componentIndex; });
   let totalPins = 0; for (const n of problem.nets) totalPins += n.pins.length;
@@ -365,7 +371,7 @@ export class GpuBatchScorer {
       for (let k = 0; k < count; k++) {
         const layout = layouts[first + k];
         for (let i = 0, o = k * n * 4; i < n; i++, o += 4) {
-          const p = layout[i]; f32[o] = p.x; f32[o + 1] = p.y; u32[o + 2] = p.rotation & 3;
+          const p = layout[i]; f32[o] = p.x; f32[o + 1] = p.y; u32[o + 2] = p.rotation & 3; u32[o + 3] = p.side ? 1 : 0;
         }
       }
     });
@@ -373,14 +379,15 @@ export class GpuBatchScorer {
 
   /**
    * Score `count` candidates stored as contiguous slabs: candidate k, component i is
-   * at index k*n+i of x/y/r (the FastDeltaLnsOptimizer layout).
+   * at index k*n+i of x/y/r (the FastDeltaLnsOptimizer layout). r packs the quarter
+   * turns in bits 0-1 and the bottom side in bit 2.
    */
   scoreSlabs(x, y, r, count) {
     const n = this.problem.components.length;
     return this.#enqueue(count, (f32, u32, first, chunk) => {
       const src = first * n;
       for (let q = 0, o = 0; q < chunk * n; q++, o += 4) {
-        f32[o] = x[src + q]; f32[o + 1] = y[src + q]; u32[o + 2] = r[src + q] & 3;
+        f32[o] = x[src + q]; f32[o + 1] = y[src + q]; u32[o + 2] = r[src + q] & 3; u32[o + 3] = (r[src + q] >> 2) & 1;
       }
     });
   }

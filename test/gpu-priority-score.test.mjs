@@ -11,7 +11,8 @@ function randomProblem(seed, components = 60) {
   for (let i = 0; i < components; i++) {
     const w = 1 + rnd() * 9, h = 1 + rnd() * 7, pins = [];
     for (let k = 0; k < 12; k++) { pins.push({ id: `p${k}`, x: (rnd() - .5) * w, y: (rnd() - .5) * h }); free.push([`C${i}`, `p${k}`]); }
-    comps.push({ id: `C${i}`, width: w, height: h, pins });
+    // Double-sided board: through-hole parts block both sides.
+    comps.push({ id: `C${i}`, width: w, height: h, pins, sides: 'any', twoSided: i % 7 === 0 });
   }
   for (let i = free.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [free[i], free[j]] = [free[j], free[i]]; }
   const nets = []; let q = 0;
@@ -27,6 +28,7 @@ function randomLayouts(problem, seed, count) {
     x: k % 3 === 2 ? rnd() * 20 - 5 : rnd() * problem.canvas.width,
     y: k % 3 === 2 ? rnd() * 20 - 5 : rnd() * problem.canvas.height,
     rotation: Math.floor(rnd() * 4),
+    side: rnd() < 0.4 ? 1 : 0,
   })));
 }
 
@@ -83,7 +85,7 @@ test('scoreSlabs agrees with scoreLayouts and concurrent calls are serialized', 
   const gpu = new PriorityGpuBatchScorer(device, problem, {});
   const layouts = randomLayouts(problem, 4, 7);
   const x = new Float64Array(7 * n), y = new Float64Array(7 * n), r = new Uint8Array(7 * n);
-  layouts.forEach((l, k) => l.forEach((p, i) => { x[k * n + i] = p.x; y[k * n + i] = p.y; r[k * n + i] = p.rotation; }));
+  layouts.forEach((l, k) => l.forEach((p, i) => { x[k * n + i] = p.x; y[k * n + i] = p.y; r[k * n + i] = p.rotation | (p.side ? 4 : 0); }));
   const [a, b] = await Promise.all([gpu.scoreLayouts(layouts), gpu.scoreSlabs(x, y, r, 7)]);
   a.forEach((s, i) => assert.deepEqual(b[i], s));
   gpu.destroy(); device.destroy();

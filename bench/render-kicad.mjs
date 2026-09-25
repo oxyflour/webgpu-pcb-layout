@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { normalizeProblem, rotatedSize, worldPin } from '../src/problem.js';
+import { normalizeProblem, rotatedSize, worldPin, sharesSide } from '../src/problem.js';
 import { loadKicadParser, designToProblem, parseTracks } from './kicad-adapter.mjs';
 import { routeBoard } from './pcb-router.mjs';
 
@@ -29,6 +29,7 @@ function overlapping(problem, layout) {
     return [p.x - w / 2, p.y - h / 2, p.x + w / 2, p.y + h / 2];
   });
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    if (!sharesSide(problem, i, layout[i], j, layout[j])) continue;
     const a = box[i], b = box[j], ox = Math.min(a[2], b[2]) - Math.max(a[0], b[0]), oy = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
     if (ox > 0 && oy > 0 && ox * oy > 0.01) bad[i] = bad[j] = 1;
   }
@@ -50,7 +51,7 @@ function panel({ problem, layout, sides, contours, routes, tracks, highlight }) 
   for (const c of contours) parts.push(`<path class="edge" d="M${c.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join('L')}Z"/>`);
   layout.forEach((p, i) => {
     const [w, h] = rotatedSize(problem.components[i], p.rotation);
-    const cls = `${sides[i] < 0 ? 'bot' : 'top'}${highlight?.[i] ? ' bad' : ''}${problem.components[i].fixed ? ' locked' : ''}`;
+    const cls = `${(p.side ?? (sides[i] < 0 ? 1 : 0)) ? 'bot' : 'top'}${highlight?.[i] ? ' bad' : ''}${problem.components[i].fixed ? ' locked' : ''}`;
     parts.push(`<rect class="${cls}" x="${(p.x - w / 2).toFixed(2)}" y="${(p.y - h / 2).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}"><title>${esc(problem.components[i].id)}</title></rect>`);
   });
   if (tracks) {
@@ -80,7 +81,7 @@ const sections = [];
 for (const row of run.rows) {
   if (!row.layouts) { console.error(`skip ${row.case}: no layouts (re-run kicad-boards.mjs with --save-layouts)`); continue; }
   const text = fs.readFileSync(path.join(run.placerRoot, row.file), 'utf8');
-  const adapted = designToProblem(parse(text, path.basename(row.file)), { preplace: String(row.mode ?? '').includes('preplace') });
+  const adapted = designToProblem(parse(text, path.basename(row.file)), { preplace: String(row.mode ?? '').includes('preplace'), sides: (String(row.mode ?? '').match(/sides-(\w+)/) ?? [])[1] ?? 'single' });
   const problem = normalizeProblem(adapted.input);
   const tracks = parseTracks(text, adapted.origin);
   const { original, result } = row.layouts;

@@ -2,12 +2,14 @@
 //
 //   node bench/kicad-boards.mjs [--placer ../webgpu_pcb_placer] [--only name,name] [--seeds 1]
 //                               [--backend cpu|gpu] [--budget same|large] [--out file.json] [--save-layouts]
-//                               [--preplace] [--power] [--route]
+//                               [--preplace] [--power] [--route] [--sides single|original|free]
 //
 // --preplace  fix connector/mechanical/edge footprints at their original position
 // --power     pull small parts toward the nearest IC pin of their supply nets (see
 //             power-edges.mjs); the global stage runs on signals first, then the
 //             supply edges are assigned, refined and re-assigned before LNS
+// --sides     'single' puts every footprint on one plane; 'original' keeps KiCad sides;
+//             'free' lets SMD parts use either side (LNS flip moves)
 // --route     route original and optimized placements with the two-layer PathFinder
 //             router (pcb-router.mjs) and report clean nets
 // Every board starts from a uniform random placement (locked footprints stay put) and is
@@ -19,7 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { normalizeProblem, rotatedSize } from '../src/problem.js';
+import { normalizeProblem, rotatedSize, sharesSide } from '../src/problem.js';
 import { PriorityCpuBatchScorer } from '../src/cpu/priority-batch-scorer.js';
 import { HighPerformancePlacementOptimizer } from '../src/optimizer/high-performance-placement.js';
 import { PriorityGpuBatchScorer } from '../src/gpu/batch-scorer.js';
@@ -45,7 +47,8 @@ const preplace = args.includes('--preplace');
 const powerMode = args.includes('--power');
 const routeEval = args.includes('--route');
 const routeCell = Number(arg('route-cell', 0.4));
-const mode = [preplace && 'preplace', powerMode && 'power'].filter(Boolean).join('+') || 'plain';
+const sidesMode = arg('sides', 'single');
+const mode = [preplace && 'preplace', powerMode && 'power', sidesMode !== 'single' && `sides-${sidesMode}`].filter(Boolean).join('+') || 'plain';
 const device = backend === 'gpu' ? await (await import('../src/node.js')).createNodeWebGpuDevice() : null;
 
 const CIAA = 'benchmark/ciaa-Hardware/PCB';
@@ -75,11 +78,15 @@ function randomLayout(problem, seed) {
   return problem.components.map((c) => {
     if (c.fixed) return { ...c.fixed };
     const [w, h] = rotatedSize(c, 0);
-    return { x: w / 2 + rnd() * Math.max(0, problem.canvas.width - w), y: h / 2 + rnd() * Math.max(0, problem.canvas.height - h), rotation: 0 };
+    const p = { x: w / 2 + rnd() * Math.max(0, problem.canvas.width - w), y: h / 2 + rnd() * Math.max(0, problem.canvas.height - h), rotation: 0 };
+    // Free parts: ICs start on top, small parts on a random side.
+    if (c.sides === 'any') p.side = c.pins.length >= 8 ? 0 : rnd() < 0.5 ? 1 : 0;
+    else if (c.sides === 'bottom') p.side = 1;
+    return p;
   });
 }
 
-/** Pairs whose bodies overlap by more than 0.01 mm², and components sticking out of the canvas. */
+/** Same-side pairs whose bodies overlap by more than 0.01 mm², and parts outside the canvas. */
 function legality(problem, layout) {
   const n = problem.components.length, box = [];
   for (let i = 0; i < n; i++) {
@@ -91,6 +98,7 @@ function legality(problem, layout) {
     const a = box[i];
     if (a[0] < -1e-6 || a[1] < -1e-6 || a[2] > problem.canvas.width + 1e-6 || a[3] > problem.canvas.height + 1e-6) outside++;
     for (let j = i + 1; j < n; j++) {
+      if (!sharesSide(problem, i, layout[i], j, layout[j])) continue;
       const b = box[j];
       const ox = Math.min(a[2], b[2]) - Math.max(a[0], b[0]), oy = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
       if (ox > 0 && oy > 0 && ox * oy > 0.01) { pairs++; bad[i] = bad[j] = 1; }
@@ -182,7 +190,7 @@ for (const [name, rel] of CASES) {
   const text = fs.readFileSync(file, 'utf8');
   if (!text.includes('(footprint') && !text.includes('(module')) { console.error(`skip ${name}: no footprints (LFS stub?)`); continue; }
   const design = parse(text, path.basename(file));
-  const adapted = designToProblem(design, { preplace });
+  const adapted = designToProblem(design, { preplace, sides: sidesMode });
   const { input, originalLayout, stats } = adapted;
   const problem = normalizeProblem(input);
   const origRoute = routeEval ? routeStats(adapted, originalLayout) : null;

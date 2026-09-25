@@ -21,7 +21,7 @@ function buildTables(problem, o) {
   const n = problem.components.length, pins = problem.pins, nets = problem.nets;
   const movable = [], fixed = [];
   problem.components.forEach((c, i) => (c.fixed ? fixed : movable).push(i));
-  const fixedLayout = problem.components.map((c) => c.fixed ? { ...c.fixed } : { x: 0, y: 0, rotation: 0 });
+  const fixedLayout = problem.components.map((c) => c.fixed ? { ...c.fixed } : { x: 0, y: 0, rotation: 0, side: 0 });
 
   const netWeight = nets.map((net) => {
     const raw = typeof o.netWeight === 'function' ? o.netWeight(net) : (o.netWeight?.[net.id] ?? 1);
@@ -54,6 +54,7 @@ function buildTables(problem, o) {
   put('compStart', compStart); put('refs', refs); put('netOff', netOff); put('netPins', netPins);
   put('pinComp', pinComp); put('pinFlags', pinFlags); put('pinFirst', pinFirst);
   put('movable', movable); put('fixed', fixed);
+  put('twoSided', problem.components.map((c) => c.twoSided ? 1 : 0));
   if (!u32.length) u32.push(0);
 
   const f32 = [];
@@ -106,8 +107,13 @@ fn pinFlags(p: u32) -> u32 { return topo[${S.pinFlags}u + p]; }
 fn pinPos(base: u32, p: u32) -> vec2<f32> {
   if ((pinFlags(p) & 1u) != 0u) { return vec2<f32>(stat[${S.pinConst}u + 2u * p], stat[${S.pinConst}u + 2u * p + 1u]); }
   let pl = posIn[base + topo[${S.pinComp}u + p]];
-  let local = vec2<f32>(stat[${S.pinLocal}u + 2u * p], stat[${S.pinLocal}u + 2u * p + 1u]);
+  var local = vec2<f32>(stat[${S.pinLocal}u + 2u * p], stat[${S.pinLocal}u + 2u * p + 1u]);
+  if (bitcast<u32>(pl.w) == 1u) { local.x = -local.x; }
   return pl.xy + rotateQuarter(local, bitcast<u32>(pl.z));
+}
+/** Whether components i and j (with packed sides si, sj) compete for board area. */
+fn sharesSide(i: u32, si: u32, j: u32, sj: u32) -> bool {
+  return si == sj || topo[${S.twoSided}u + i] != 0u || topo[${S.twoSided}u + j] != 0u;
 }
 `;
 }
@@ -141,6 +147,7 @@ function forceWgsl(t, o, canvas) {
 var<workgroup> tilePos: array<vec2<f32>, ${WG}>;
 var<workgroup> tileSize: array<vec2<f32>, ${WG}>;
 var<workgroup> tileIndex: array<u32, ${WG}>;
+var<workgroup> tileSide: array<u32, ${WG}>;
 
 fn deterministicUnit(i: u32, j: u32) -> vec2<f32> {
   let a = ((i + 1u) * 73856093u) ^ ((j + 1u) * 19349663u);
@@ -215,6 +222,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
     for (var q = 0u; q < FIXED; q++) {
       let j = topo[${S.fixed}u + q];
       let pj = posIn[base + j];
+      if (!sharesSide(i, bitcast<u32>(p.w), j, bitcast<u32>(pj.w))) { continue; }
       var d = p.xy - pj.xy;
       if (abs(d.x) + abs(d.y) < 1e-8) { d = deterministicUnit(i, j) * 1e-3; }
       let ext = 0.5 * (size + compSize(j, bitcast<u32>(pj.z))) + vec2<f32>(${lit(o.macroClearance)});
@@ -246,13 +254,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
       tilePos[lid] = pj.xy;
       tileSize[lid] = compSize(j, bitcast<u32>(pj.z));
       tileIndex[lid] = j;
+      tileSide[lid] = bitcast<u32>(pj.w);
     }
     workgroupBarrier();
     if (live) {
       let count = min(${WG}u, MOVABLE - tile);
       for (var k = 0u; k < count; k++) {
         let j = tileIndex[k];
-        if (j != i) { force += pairForce(i, p.xy, size, j, tilePos[k], tileSize[k]); }
+        if (j != i && sharesSide(i, bitcast<u32>(p.w), j, tileSide[k])) { force += pairForce(i, p.xy, size, j, tilePos[k], tileSize[k]); }
       }
     }
     workgroupBarrier();
@@ -265,7 +274,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
     vel[base + i] = v;
     let half = 0.5 * size;
     let xy = max(half, min(CANVAS - half, p.xy + v));
-    posOut[base + i] = vec4<f32>(xy, p.z, 0.0);
+    posOut[base + i] = vec4<f32>(xy, p.z, p.w);
   }
 }
 `;
@@ -309,7 +318,7 @@ export class GpuAnalyticalGlobalPlacer {
     const host = new ArrayBuffer(starts * n * 16), hf = new Float32Array(host), hu = new Uint32Array(host);
     layouts.forEach((layout, s) => layout.forEach((pl, i) => {
       const c = this.problem.components[i], src = c.fixed ?? pl, o = (s * n + i) * 4;
-      hf[o] = src.x; hf[o + 1] = src.y; hu[o + 2] = src.rotation & 3;
+      hf[o] = src.x; hf[o + 1] = src.y; hu[o + 2] = src.rotation & 3; hu[o + 3] = src.side ? 1 : 0;
     }));
     if (!t.movable.length || iterations <= 0) return this.#toLayouts(hf, hu, starts);
 
@@ -363,7 +372,7 @@ export class GpuAnalyticalGlobalPlacer {
     return Array.from({ length: starts }, (_, s) => this.problem.components.map((c, i) => {
       if (c.fixed) return { ...c.fixed };
       const o = (s * n + i) * 4;
-      return { x: f[o], y: f[o + 1], rotation: u[o + 2] & 3 };
+      return { x: f[o], y: f[o + 1], rotation: u[o + 2] & 3, side: u[o + 3] & 1 };
     }));
   }
 

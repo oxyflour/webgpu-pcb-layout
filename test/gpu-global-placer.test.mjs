@@ -16,7 +16,7 @@ function problemAndLayout(seed, count = 150) {
   for (let i = 0; i < count; i++) {
     const w = 1 + rnd() * 6, h = 1 + rnd() * 4, pins = [];
     for (let k = 0; k < 4; k++) { pins.push({ id: `p${k}`, x: (rnd() - .5) * w, y: (rnd() - .5) * h }); free.push([`C${i}`, `p${k}`]); }
-    components.push({ id: `C${i}`, width: w, height: h, pins });
+    components.push({ id: `C${i}`, width: w, height: h, pins, sides: 'any', twoSided: i % 9 === 0 });
   }
   for (let i = free.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [free[i], free[j]] = [free[j], free[i]]; }
   const nets = []; let q = 0;
@@ -25,7 +25,7 @@ function problemAndLayout(seed, count = 150) {
   const layout = problem.components.map((c, i) => c.fixed ? { ...c.fixed } : {
     // A few coincident components exercise the deterministic separation direction,
     // and some start outside the canvas to exercise the boundary force.
-    x: i % 25 === 3 ? 30 : rnd() * 150 - 5, y: i % 25 === 3 ? 30 : rnd() * 110 - 5, rotation: Math.floor(rnd() * 4),
+    x: i % 25 === 3 ? 30 : rnd() * 150 - 5, y: i % 25 === 3 ? 30 : rnd() * 110 - 5, rotation: Math.floor(rnd() * 4), side: i % 3 === 1 ? 1 : 0,
   });
   return { problem, layout };
 }
@@ -43,7 +43,7 @@ test('WebGPU global placer tracks the CPU placer step by step', async (t) => {
     const cpu = await new AnalyticalGlobalPlacer(problem, { ...options, iterations, recordEvery: 1e9 }).optimize(layout);
     const [got] = await gpu.optimizeBatch([layout], iterations);
     let worst = 0;
-    got.forEach((p, i) => { worst = Math.max(worst, Math.abs(p.x - cpu.layout[i].x), Math.abs(p.y - cpu.layout[i].y)); assert.equal(p.rotation, cpu.layout[i].rotation); });
+    got.forEach((p, i) => { worst = Math.max(worst, Math.abs(p.x - cpu.layout[i].x), Math.abs(p.y - cpu.layout[i].y)); assert.equal(p.rotation, cpu.layout[i].rotation); assert.equal(p.side, cpu.layout[i].side ?? 0); });
     assert.ok(worst < 2e-3, `${iterations} iterations: max position error ${worst}`);
   }
   gpu.destroy(); device.destroy();

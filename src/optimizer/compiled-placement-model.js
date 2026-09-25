@@ -6,6 +6,9 @@ function netPriorityWeight(policy, netId, options){
   return policy?.[netId]?.topLocked ? base * options.topLockedBoost : base;
 }
 
+/** Flat-slab orientation byte: bits 0-1 quarter turns, bit 2 bottom side. */
+export function packOrientation(p){ return (p.rotation&3)|(p.side?4:0); }
+
 /**
  * Flat, allocation-free placement objective used to pre-rank LNS proposals.
  * It deliberately uses a smaller approximate congestion grid; finalists are
@@ -32,10 +35,11 @@ export class CompiledPlacementModel {
     this.compH = new Float64Array(n);
     this.fixed = new Uint8Array(n);
     this.rotatable = new Uint8Array(n);
+    this.twoSided = new Uint8Array(n);
     for(let i=0;i<n;i++){
       const c=problem.components[i];
       this.compW[i]=c.width; this.compH[i]=c.height;
-      this.fixed[i]=c.fixed?1:0; this.rotatable[i]=c.rotatable?1:0;
+      this.fixed[i]=c.fixed?1:0; this.rotatable[i]=c.rotatable?1:0; this.twoSided[i]=c.twoSided?1:0;
     }
     const pn=problem.pins.length;
     this.pinComp = new Uint32Array(pn);
@@ -62,18 +66,18 @@ export class CompiledPlacementModel {
 
   layoutToFlat(layout){
     const x=new Float64Array(this.n),y=new Float64Array(this.n),r=new Uint8Array(this.n);
-    for(let i=0;i<this.n;i++){x[i]=layout[i].x;y[i]=layout[i].y;r[i]=layout[i].rotation&3;}
+    for(let i=0;i<this.n;i++){x[i]=layout[i].x;y[i]=layout[i].y;r[i]=packOrientation(layout[i]);}
     return {x,y,r};
   }
 
   flatToLayout(x,y,r,offset=0){
     const out=new Array(this.n);
-    for(let i=0;i<this.n;i++)out[i]={x:x[offset+i],y:y[offset+i],rotation:r[offset+i]&3};
+    for(let i=0;i<this.n;i++)out[i]={x:x[offset+i],y:y[offset+i],rotation:r[offset+i]&3,side:(r[offset+i]>>2)&1};
     return out;
   }
 
   #pinWorld(pi, x, y, r, off){
-    const ci=this.pinComp[pi], rot=r[off+ci]&3, px=this.pinX[pi], py=this.pinY[pi];
+    const ci=this.pinComp[pi], rot=r[off+ci]&3, px=(r[off+ci]&4)?-this.pinX[pi]:this.pinX[pi], py=this.pinY[pi];
     let rx,ry;
     if(rot===0){rx=px;ry=py;} else if(rot===1){rx=-py;ry=px;} else if(rot===2){rx=-px;ry=-py;} else {rx=py;ry=-px;}
     return [x[off+ci]+rx,y[off+ci]+ry];
@@ -99,6 +103,7 @@ export class CompiledPlacementModel {
       const left=Math.max(0,aw/2-xi),right=Math.max(0,xi+aw/2-p.canvas.width),top=Math.max(0,ah/2-yi),bottom=Math.max(0,yi+ah/2-p.canvas.height);
       bounds+=left*left+right*right+top*top+bottom*bottom;
       for(let j=i+1;j<this.n;j++){
+        if(((r[off+i]^r[off+j])&4) && !this.twoSided[i] && !this.twoSided[j])continue;
         const rj=r[off+j]&3,bw=(rj&1)?this.compH[j]:this.compW[j],bh=(rj&1)?this.compW[j]:this.compH[j];
         const ox=Math.max(0,Math.min(xi+aw/2,x[off+j]+bw/2)-Math.max(xi-aw/2,x[off+j]-bw/2));
         const oy=Math.max(0,Math.min(yi+ah/2,y[off+j]+bh/2)-Math.max(yi-ah/2,y[off+j]-bh/2));

@@ -3,7 +3,7 @@
 // filter) sits next to the IC pin it serves. withPowerEdges() turns every supply pin on
 // a movable small part into a low-weight 2-pin net to the nearest IC pin of the same net
 // under the given layout. Re-run it as the layout changes (the assignment is dynamic).
-import { rotateQuarter } from '../src/problem.js';
+import { rotateQuarter, localPin } from '../src/problem.js';
 
 export const POWER_EDGE_PREFIX = '~pwr';
 
@@ -17,7 +17,7 @@ export const POWER_EDGE_PREFIX = '~pwr';
 export function withPowerEdges(input, power, layout) {
   const components = input.components.map((c) => ({ ...c, pins: [...c.pins] }));
   const nets = [...input.nets];
-  const world = (p) => { const pl = layout[p.comp], [rx, ry] = rotateQuarter(p.x, p.y, pl.rotation); return [pl.x + rx, pl.y + ry]; };
+  const world = (p) => { const pl = layout[p.comp], [rx, ry] = rotateQuarter(...localPin(p.x, p.y, pl.side), pl.rotation); return [pl.x + rx, pl.y + ry]; };
   let edge = 0;
   for (const net of power) {
     const anchors = net.pads.filter((p) => p.anchor), anchorPos = anchors.map(world);
