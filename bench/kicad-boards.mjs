@@ -2,7 +2,14 @@
 //
 //   node bench/kicad-boards.mjs [--placer ../webgpu_pcb_placer] [--only name,name] [--seeds 1]
 //                               [--backend cpu|gpu] [--budget same|large] [--out file.json] [--save-layouts]
+//                               [--preplace] [--power] [--route]
 //
+// --preplace  fix connector/mechanical/edge footprints at their original position
+// --power     pull small parts toward the nearest IC pin of their supply nets (see
+//             power-edges.mjs); the global stage runs on signals first, then the
+//             supply edges are assigned, refined and re-assigned before LNS
+// --route     route original and optimized placements with the two-layer PathFinder
+//             router (pcb-router.mjs) and report clean nets
 // Every board starts from a uniform random placement (locked footprints stay put) and is
 // optimized with HighPerformancePlacementOptimizer. `--backend gpu` runs the multi-start
 // global stage on GpuAnalyticalGlobalPlacer and scores LNS candidates with
@@ -16,7 +23,14 @@ import { normalizeProblem, rotatedSize } from '../src/problem.js';
 import { PriorityCpuBatchScorer } from '../src/cpu/priority-batch-scorer.js';
 import { HighPerformancePlacementOptimizer } from '../src/optimizer/high-performance-placement.js';
 import { PriorityGpuBatchScorer } from '../src/gpu/batch-scorer.js';
+import { MultiStartGlobalPlacer } from '../src/optimizer/multistart-global.js';
+import { AnalyticalGlobalPlacer } from '../src/optimizer/global-placement.js';
+import { FastDeltaLnsOptimizer } from '../src/optimizer/fast-delta-lns.js';
+import { GpuLnsOptimizer } from '../src/optimizer/lns.js';
+import { GpuAnalyticalGlobalPlacer } from '../src/gpu/global-placer.js';
 import { loadKicadParser, designToProblem } from './kicad-adapter.mjs';
+import { withPowerEdges, isPowerEdge } from './power-edges.mjs';
+import { routeBoard } from './pcb-router.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : def; };
@@ -27,6 +41,11 @@ const outFile = arg('out', null);
 const saveLayouts = args.includes('--save-layouts');
 const backend = arg('backend', 'cpu');
 const budget = arg('budget', 'same');
+const preplace = args.includes('--preplace');
+const powerMode = args.includes('--power');
+const routeEval = args.includes('--route');
+const routeCell = Number(arg('route-cell', 0.4));
+const mode = [preplace && 'preplace', powerMode && 'power'].filter(Boolean).join('+') || 'plain';
 const device = backend === 'gpu' ? await (await import('../src/node.js')).createNodeWebGpuDevice() : null;
 
 const CIAA = 'benchmark/ciaa-Hardware/PCB';
@@ -116,6 +135,43 @@ function configFor(problem, seed, budget) {
   };
 }
 
+const POWER_EDGE_WEIGHT = 0.25;
+const policyFor = (problem) => Object.fromEntries(problem.nets.filter((n) => isPowerEdge(n.id)).map((n) => [n.id, { priority: 0 }]));
+
+/**
+ * Staged pipeline with supply edges: signal-only multi-start global placement, supply
+ * edges assigned from that result and refined by another global pass, then re-assigned
+ * once more for LNS + polish. Component order never changes, so layouts carry over.
+ */
+async function placeWithPower(adapted, init, cfg) {
+  const o = cfg.optimizer, placer = { ...o.global.placer, netWeight: (net) => isPowerEdge(net.id) ? POWER_EDGE_WEIGHT : 1 };
+  const t0 = performance.now();
+  const p0 = normalizeProblem(adapted.input);
+  const scorer0 = device ? new PriorityGpuBatchScorer(device, p0, cfg.scorerOptions) : new PriorityCpuBatchScorer(p0, cfg.scorerOptions);
+  const global = await new MultiStartGlobalPlacer(p0, scorer0, { seed: o.seed ^ 0xA511, device, ...o.global }).optimize(init);
+  scorer0.destroy?.();
+  const p1 = normalizeProblem(withPowerEdges(adapted.input, adapted.power, global.layout));
+  let refined;
+  if (device) { const g = new GpuAnalyticalGlobalPlacer(device, p1, placer); [refined] = await g.optimizeBatch([global.layout], o.global.fineIterations); g.destroy(); }
+  else refined = (await new AnalyticalGlobalPlacer(p1, { ...placer, iterations: o.global.fineIterations, recordEvery: 1e9 }).optimize(global.layout)).layout;
+  const t1 = performance.now();
+  const p2 = normalizeProblem(withPowerEdges(adapted.input, adapted.power, refined));
+  const scorerOptions = { ...cfg.scorerOptions, policy: policyFor(p2) };
+  const scorer = device ? new PriorityGpuBatchScorer(device, p2, scorerOptions) : new PriorityCpuBatchScorer(p2, scorerOptions);
+  const fast = await new FastDeltaLnsOptimizer(p2, scorer, { seed: o.seed ^ 0x51A2, approximate: { ...o.approximate, policy: scorerOptions.policy }, ...o.fastLns }).optimize(refined);
+  const t2 = performance.now();
+  const polish = await new GpuLnsOptimizer(p2, scorer, { seed: o.seed ^ 0x9E37, ...o.polish }).optimize(fast.layout);
+  const t3 = performance.now();
+  scorer.destroy?.();
+  return { layout: polish.layout, score: polish.score, global, fast, timing: { globalMs: t1 - t0, fastLnsMs: t2 - t1, polishMs: t3 - t2 } };
+}
+
+function routeStats(adapted, layout) {
+  const t = performance.now();
+  const r = routeBoard(adapted.routing, layout, adapted.sides, { cell: routeCell });
+  return { nets: r.nets, clean: r.clean, complete: r.complete, overflow: r.overflow, vias: r.vias, length: Math.round(r.length), rounds: r.rounds, ms: performance.now() - t };
+}
+
 const r1 = (v) => +v.toFixed(1);
 const parse = await loadKicadParser(placerRoot);
 const rows = [], details = [];
@@ -126,8 +182,10 @@ for (const [name, rel] of CASES) {
   const text = fs.readFileSync(file, 'utf8');
   if (!text.includes('(footprint') && !text.includes('(module')) { console.error(`skip ${name}: no footprints (LFS stub?)`); continue; }
   const design = parse(text, path.basename(file));
-  const { input, originalLayout, stats } = designToProblem(design);
+  const adapted = designToProblem(design, { preplace });
+  const { input, originalLayout, stats } = adapted;
   const problem = normalizeProblem(input);
+  const origRoute = routeEval ? routeStats(adapted, originalLayout) : null;
 
   for (let s = 0; s < seeds; s++) {
     const seed = 20260925 + 7919 * s;
@@ -138,20 +196,24 @@ for (const [name, rel] of CASES) {
     const init = randomLayout(problem, seed);
     const start = scorer.scoreLayout(init);
     const t0 = performance.now();
-    const out = await new HighPerformancePlacementOptimizer(problem, searchScorer, { ...cfg.optimizer, device }).optimize(init);
+    const out = powerMode
+      ? await placeWithPower(adapted, init, cfg)
+      : await new HighPerformancePlacementOptimizer(problem, searchScorer, { ...cfg.optimizer, device }).optimize(init);
     const wall = performance.now() - t0;
     if (searchScorer !== scorer) searchScorer.destroy();
     const fin = scorer.scoreLayout(out.layout), finLegal = legality(problem, out.layout);
+    const newRoute = routeEval ? routeStats(adapted, out.layout) : null;
     const row = {
-      case: name, backend, budget, n: stats.footprints, nets: stats.nets, density: +stats.density.toFixed(2), seed,
+      case: name, backend, budget, mode, n: stats.footprints, fixed: stats.locked, nets: stats.nets, density: +stats.density.toFixed(2), seed,
       'orig hpwl': Math.round(orig.hpwl), 'orig ovl': r1(orig.overlap),
       'rand hpwl': Math.round(start.hpwl),
       'hpwl': Math.round(fin.hpwl), 'hpwl/orig': +(fin.hpwl / orig.hpwl).toFixed(2),
       'ovl mm2': r1(fin.overlap), 'ovl pairs': finLegal.overlapPairs, 'bounds': +fin.bounds.toFixed(2),
       'global s': r1(out.timing.globalMs / 1000), 'lns s': r1(out.timing.fastLnsMs / 1000), 'polish s': r1(out.timing.polishMs / 1000), 'total s': r1(wall / 1000),
+      ...(routeEval ? { 'orig clean': `${origRoute.clean}/${origRoute.nets}`, 'clean': `${newRoute.clean}/${newRoute.nets}`, 'orig ovf': origRoute.overflow, 'ovf': newRoute.overflow } : {}),
     };
     rows.push(row);
-    details.push({ ...row, file: rel, stats, original: { score: orig, legality: origLegal }, random: start, result: { score: fin, searchScore: out.score, legality: finLegal, globalScore: out.global.score, fastScore: out.fast.score }, config: cfg, ...(saveLayouts ? { layouts: { original: originalLayout, random: init, result: out.layout } } : {}) });
+    details.push({ ...row, file: rel, stats, original: { score: orig, legality: origLegal }, random: start, result: { score: fin, searchScore: out.score, legality: finLegal, globalScore: out.global.score, fastScore: out.fast.score }, config: cfg, route: routeEval ? { original: origRoute, result: newRoute } : undefined, ...(saveLayouts ? { layouts: { original: originalLayout, random: init, result: out.layout } } : {}) });
     console.error(JSON.stringify(row));
   }
 }
