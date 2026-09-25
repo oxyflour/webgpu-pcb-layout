@@ -1,0 +1,54 @@
+{
+  "name": "webgpu-pin-layout",
+  "version": "0.2.0",
+  "description": "High-throughput topology-first component placement and multilayer routing with WebGPU batch scoring.",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./node": {
+      "types": "./src/node.d.ts",
+      "import": "./src/node.js"
+    }
+  },
+  "files": [
+    "src",
+    "test",
+    "examples",
+    "bench",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:gpu": "WEBGPU_REQUIRED=1 node --test test/gpu-*.test.mjs test/router-gpu.test.mjs",
+    "bench": "node bench/batch-score.mjs",
+    "check": "node --check src/index.js && node --check src/gpu/batch-scorer.js && node --check src/gpu/grid-router.js && node --check src/router/negotiated-router.js && node --check src/optimizer/lns.js",
+    "bench:placement": "node bench/placement.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@khalidsaidi/topoloom": "^0.3.0",
+    "@webgpu/types": "^0.1.74"
+  },
+  "optionalDependencies": {
+    "webgpu": "^0.6.1"
+  },
+  "keywords": [
+    "webgpu",
+    "layout",
+    "routing",
+    "planarity",
+    "pcb",
+    "vlsi",
+    "graph",
+    "wgsl"
+  ],
+  "license": "MIT"
+}

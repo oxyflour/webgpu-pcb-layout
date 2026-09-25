@@ -1,0 +1,11 @@
+import { createNodeWebGpuDevice } from '../src/node.js';
+import { normalizeProblem, GpuBatchScorer } from '../src/index.js';
+const N=100,K=4096;const components=[];const nets=[];
+for(let i=0;i<N;i++)components.push({id:`C${i}`,width:8+(i%5),height:6+(i%7),pins:[{id:'a',x:4,y:0},{id:'b',x:-4,y:0}]});
+for(let i=0;i<N-1;i++)nets.push({id:`N${i}`,pins:[{componentId:`C${i}`,pinId:'a'},{componentId:`C${i+1}`,pinId:'b'}]});
+const p=normalizeProblem({canvas:{width:1000,height:700},components,nets});
+const layouts=Array.from({length:K},(_,k)=>components.map((_,i)=>({x:20+(i%10)*90+((k*17+i)%13),y:20+Math.floor(i/10)*60+((k+i*3)%11),rotation:(k+i)&3})));
+const device=await createNodeWebGpuDevice();const scorer=new GpuBatchScorer(device,p);
+await scorer.scoreLayouts(layouts.slice(0,32));const t0=performance.now();const scores=await scorer.scoreLayouts(layouts);const dt=performance.now()-t0;
+console.log({components:N,candidates:K,ms:dt,candidatesPerSecond:K/(dt/1000),best:Math.min(...scores.map(s=>s.total))});
+scorer.destroy();device.destroy();
