@@ -214,7 +214,21 @@ The congestion term is computed on a configurable coarse grid. Each net gets a d
 
 This is deliberately a **cheap placement surrogate**. Exact non-crossing routing happens only after the placement search has narrowed the space.
 
-The scorer accepts up to 65,535 candidates per call; for larger populations, chunk them.
+`scoreLayouts()` chunks large populations automatically (at most 65,535 workgroups, and as many candidates as fit in one storage binding per dispatch). `scoreSlabs(x, y, r, count)` scores flat typed-array populations (candidate `k`, component `i` at `k*n+i`) without building layout objects; `FastDeltaLnsOptimizer` and `GpuLnsOptimizer` use it automatically when the scorer provides it.
+
+### Priority-weighted GPU scoring
+
+`PriorityGpuBatchScorer` (or `new GpuBatchScorer(device, problem, { priority: true, ... })`) is the WebGPU counterpart of `PriorityCpuBatchScorer`: it takes the same `policy`, `weights`, `coarse`, `priorityScale`, `minNetWeight`, `topLockedBoost` and `defaultPriority` options (or explicit per-net `netWeights`) and returns the same fields, including `weightedHpwl`:
+
+```js
+const scorer = new PriorityGpuBatchScorer(device, problem, {
+  policy: { CLK: { priority: 95 }, USB_DP: { priority: 90, topLocked: true } },
+  weights: { hpwl: 1, overlap: 200, bounds: 200, congestion: 0.5 },
+  coarse: { gridWidth: 40, gridHeight: 30, capacity: 8 },
+});
+```
+
+Net weights multiply HPWL and each net's coarse-congestion demand. Congestion demand is accumulated as fixed-point atomics, deduplicated per net exactly like the CPU scorer; nets of up to 32 pins are handled by one lane, larger nets cooperatively by the workgroup. Grids that do not fit in workgroup memory (more than ~1,900 cells on a 16 KiB device) automatically use a per-candidate global-memory grid.
 
 ## Exact routing heuristic
 
@@ -285,6 +299,16 @@ npm run bench
 ```
 
 The included benchmark scores 4,096 candidate layouts containing 100 components using the GPU batch scorer.
+
+### Real KiCad boards
+
+`bench/kicad-boards.mjs` places real boards from the sibling `webgpu_pcb_placer/benchmark` checkout (CIAA family and the openPPC notebook motherboards, 34-2,275 footprints) from a random start and compares the result against the original human layout under the same objective:
+
+```bash
+npm run bench:kicad -- --backend gpu --budget large --out bench/results/kicad-boards-gpu-large.json
+```
+
+`bench/kicad-adapter.mjs` converts footprints to rectangles (pad bounding box + 0.25 mm), KiCad rotations to quarter turns, and drops ground/supply nets. All footprints share one plane, so double-sided boards are denser here than in reality. Use `--backend cpu` for the CPU reference scorer, `--budget same` for the CPU-sized search budget, `--only name,...` to select boards and `--placer <dir>` if the placer checkout lives elsewhere.
 
 ## Architecture
 

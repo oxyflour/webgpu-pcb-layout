@@ -1,7 +1,7 @@
 export { normalizeProblem, worldPin, rotateQuarter, rotatedSize } from './problem.js';
 export { scoreLayoutCpu, coarseCongestionCpu } from './cpu-score.js';
 export { requestWebGpuDevice } from './gpu/device.js';
-export { GpuBatchScorer } from './gpu/batch-scorer.js';
+export { GpuBatchScorer, PriorityGpuBatchScorer } from './gpu/batch-scorer.js';
 export { GpuGridRouter } from './gpu/grid-router.js';
 export { buildAugmentedGraph, analyzeTopology, initialLayoutFromEmbedding } from './topology/planarity.js';
 export { makeGrid, worldToCell, cellCenter, rasterizeComponents, carveNetPins } from './router/geometry.js';
@@ -20,4 +20,5 @@ export { PriorityCpuBatchScorer } from './cpu/priority-batch-scorer.js';
 export { CompiledPlacementModel } from './optimizer/compiled-placement-model.js';
 export { FastDeltaLnsOptimizer } from './optimizer/fast-delta-lns.js';
 export { MultiStartGlobalPlacer } from './optimizer/multistart-global.js';
+export { GpuAnalyticalGlobalPlacer } from './gpu/global-placer.js';
 export { HighPerformancePlacementOptimizer } from './optimizer/high-performance-placement.js';

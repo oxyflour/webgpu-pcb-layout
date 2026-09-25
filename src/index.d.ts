@@ -19,11 +19,16 @@ export function buildAugmentedGraph(problem:NormalizedProblem):any;
 export function analyzeTopology(problem:NormalizedProblem):Promise<any>;
 export function initialLayoutFromEmbedding(problem:NormalizedProblem,topology:any,margin?:number):Placement[];
 
+export interface BatchScore extends Score { weightedHpwl:number }
 export class GpuBatchScorer {
+  /** Default mode matches scoreLayoutCpu(); pass `priority: true`, `policy` or `netWeights` for PriorityCpuBatchScorer semantics. */
   constructor(device:GPUDevice,problem:NormalizedProblem,options?:any);
-  scoreLayouts(layouts:Placement[][]):Promise<Score[]>;
+  scoreLayouts(layouts:Placement[][]):Promise<BatchScore[]>;
+  /** Candidate k, component i at index k*n+i. */
+  scoreSlabs(x:ArrayLike<number>,y:ArrayLike<number>,r:ArrayLike<number>,count:number):Promise<BatchScore[]>;
   destroy():void;
 }
+export class PriorityGpuBatchScorer extends GpuBatchScorer {}
 export class GpuGridRouter {
   constructor(device:GPUDevice);
   distanceField(args:any):Promise<{distances:Float32Array;iterations:number;infCost:number}>;
@@ -63,4 +68,15 @@ export class MultiStartGlobalPlacer {
 export class HighPerformancePlacementOptimizer {
   constructor(problem:NormalizedProblem,exactScorer:{scoreLayouts(layouts:Placement[][]):Promise<Score[]>},options?:any);
   optimize(initial:Placement[]):Promise<{layout:Placement[];score:Score;timing:{globalMs:number;fastLnsMs:number;polishMs:number;totalMs:number};global:any;fast:any;polish:any}>;
+}
+export class AnalyticalGlobalPlacer {
+  constructor(problem:NormalizedProblem,options?:any);
+  optimize(initial:Placement[]):Promise<{layout:Placement[];trace:any[]}>;
+}
+export class GpuAnalyticalGlobalPlacer {
+  constructor(device:GPUDevice,problem:NormalizedProblem,options?:any);
+  /** Runs every start in one batch and reads positions back once at the end. */
+  optimizeBatch(layouts:Placement[][],iterations?:number):Promise<Placement[][]>;
+  optimize(initial:Placement[]):Promise<{layout:Placement[];trace:any[]}>;
+  destroy():void;
 }

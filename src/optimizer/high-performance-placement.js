@@ -15,13 +15,15 @@ export class HighPerformancePlacementOptimizer {
       fastLns:options.fastLns??{},
       polish:options.polish??{},
       approximate:options.approximate??{},
+      // WebGPU device for the global stage; LNS stages use the scorer's own backend.
+      device:options.device??null,
     };
   }
 
   async optimize(initial){
     const o=this.options;
     const t0=performance.now();
-    const global=new MultiStartGlobalPlacer(this.problem,this.exactScorer,{seed:o.seed^0xA511,...o.global});
+    const global=new MultiStartGlobalPlacer(this.problem,this.exactScorer,{seed:o.seed^0xA511,device:o.device,...o.global});
     const gr=await global.optimize(initial);
     const t1=performance.now();
     const fast=new FastDeltaLnsOptimizer(this.problem,this.exactScorer,{seed:o.seed^0x51A2,approximate:o.approximate,...o.fastLns});

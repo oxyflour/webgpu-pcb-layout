@@ -10,7 +10,7 @@ function deterministicUnit(i,j){
   return [Math.cos(t), Math.sin(t)];
 }
 
-function pinAnchorOutsideFixed(problem, layout, pinIndex, gap=4){
+export function pinAnchorOutsideFixed(problem, layout, pinIndex, gap=4){
   const pin = problem.pins[pinIndex];
   const comp = problem.components[pin.componentIndex];
   if(!comp.fixed || !pin.normal) return worldPin(problem, layout, pinIndex);
@@ -24,6 +24,30 @@ function pinAnchorOutsideFixed(problem, layout, pinIndex, gap=4){
   return [px, pl.y + Math.sign(ny || 1) * (h/2 + gap)];
 }
 
+/** Resolve AnalyticalGlobalPlacer defaults (shared with the WebGPU placer). */
+export function resolveGlobalPlacerOptions(options={}){
+  return {
+    iterations: options.iterations ?? 500,
+    wireStrength: options.wireStrength ?? 1.0,
+    densityStrength: options.densityStrength ?? 0.50,
+    overlapStrength: options.overlapStrength ?? 2.5,
+    macroStrength: options.macroStrength ?? 4.0,
+    boundaryStrength: options.boundaryStrength ?? 2.0,
+    clearance: options.clearance ?? 2.5,
+    macroClearance: options.macroClearance ?? 5.0,
+    egressGap: options.egressGap ?? 6.0,
+    fixedAnchorBoost: options.fixedAnchorBoost ?? 4.0,
+    movableNetScale: options.movableNetScale ?? 0.85,
+    damping: options.damping ?? 0.72,
+    step: options.step ?? 0.55,
+    maxMove: options.maxMove ?? 2.5,
+    cooling: options.cooling ?? 0.997,
+    recordEvery: options.recordEvery ?? 5,
+    onIteration: options.onIteration ?? null,
+    netWeight: options.netWeight ?? null,
+  };
+}
+
 /**
  * Small/medium-scale analytical/force global placer for arbitrary component+pin canvases.
  *
@@ -35,26 +59,7 @@ function pinAnchorOutsideFixed(problem, layout, pinIndex, gap=4){
 export class AnalyticalGlobalPlacer {
   constructor(problem, options={}){
     this.problem = problem;
-    this.options = {
-      iterations: options.iterations ?? 500,
-      wireStrength: options.wireStrength ?? 1.0,
-      densityStrength: options.densityStrength ?? 0.50,
-      overlapStrength: options.overlapStrength ?? 2.5,
-      macroStrength: options.macroStrength ?? 4.0,
-      boundaryStrength: options.boundaryStrength ?? 2.0,
-      clearance: options.clearance ?? 2.5,
-      macroClearance: options.macroClearance ?? 5.0,
-      egressGap: options.egressGap ?? 6.0,
-      fixedAnchorBoost: options.fixedAnchorBoost ?? 4.0,
-      movableNetScale: options.movableNetScale ?? 0.85,
-      damping: options.damping ?? 0.72,
-      step: options.step ?? 0.55,
-      maxMove: options.maxMove ?? 2.5,
-      cooling: options.cooling ?? 0.997,
-      recordEvery: options.recordEvery ?? 5,
-      onIteration: options.onIteration ?? null,
-      netWeight: options.netWeight ?? null,
-    };
+    this.options = resolveGlobalPlacerOptions(options);
   }
 
   #netForces(layout, fx, fy, wireStrength){

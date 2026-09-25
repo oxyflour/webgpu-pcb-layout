@@ -30,21 +30,35 @@ function weightedCongestion(problem, layout, policy, options){
   return penalty;
 }
 
+/** Resolve the priority-scorer option defaults shared by the CPU and GPU backends. */
+export function resolvePriorityOptions(options={}){
+  return {
+    policy: options.policy ?? {},
+    weights: {hpwl:1,overlap:4500,bounds:4500,congestion:4,...options.weights},
+    defaultPriority: options.defaultPriority ?? 50,
+    minNetWeight: options.minNetWeight ?? 0.20,
+    priorityScale: options.priorityScale ?? 55,
+    topLockedBoost: options.topLockedBoost ?? 2.2,
+    gridWidth: options.coarse?.gridWidth ?? 40,
+    gridHeight: options.coarse?.gridHeight ?? 30,
+    capacity: options.coarse?.capacity ?? 2.2,
+  };
+}
+
+/** Per-net HPWL/congestion weights for a priority policy. */
+export function priorityNetWeights(problem, options={}){
+  const o=resolvePriorityOptions(options);
+  return Float64Array.from(problem.nets, net=>priorityWeight(o.policy,net.id,o));
+}
+
 /** CPU reference scorer whose placement objective is aware of surface-network priority. */
 export class PriorityCpuBatchScorer {
   constructor(problem, options={}){
     this.problem=problem;
-    this.policy=options.policy ?? {};
-    this.weights={hpwl:1,overlap:4500,bounds:4500,congestion:4,...options.weights};
-    this.options={
-      defaultPriority: options.defaultPriority ?? 50,
-      minNetWeight: options.minNetWeight ?? 0.20,
-      priorityScale: options.priorityScale ?? 55,
-      topLockedBoost: options.topLockedBoost ?? 2.2,
-      gridWidth: options.coarse?.gridWidth ?? 40,
-      gridHeight: options.coarse?.gridHeight ?? 30,
-      capacity: options.coarse?.capacity ?? 2.2,
-    };
+    const o=resolvePriorityOptions(options);
+    this.policy=o.policy;
+    this.weights=o.weights;
+    this.options=o;
   }
   async scoreLayouts(layouts){ return layouts.map(l=>this.scoreLayout(l)); }
   scoreLayout(layout){

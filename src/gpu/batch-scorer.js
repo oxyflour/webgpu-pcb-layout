@@ -1,19 +1,18 @@
-import { createBuffer, readBuffer } from './device.js';
+import { createBuffer } from './device.js';
+import { resolvePriorityOptions, priorityNetWeights } from '../cpu/priority-batch-scorer.js';
 
 const WG = 256;
+// Nets up to this many pins are handled by one lane each (exact L-star dedupe in
+// private memory); larger nets are processed cooperatively by the whole workgroup.
+const SMALL_NET = 32;
 
-const HPWL_WGSL = /* wgsl */`
+const COMMON = /* wgsl */`
 struct Placement { pos: vec2<f32>, rot: u32, pad: u32 };
-struct Params { counts: vec4<u32>, canvasWeights: vec4<f32>, misc: vec4<f32>, coarse: vec4<u32> };
-@group(0) @binding(0) var<storage, read> placements: array<Placement>;
-@group(0) @binding(1) var<storage, read> pinComponent: array<u32>;
-@group(0) @binding(2) var<storage, read> pinLocal: array<vec2<f32>>;
-@group(0) @binding(3) var<storage, read> netOffsets: array<u32>;
-@group(0) @binding(4) var<storage, read> netPins: array<u32>;
-@group(0) @binding(5) var<storage, read_write> outSum: array<f32>;
-@group(0) @binding(6) var<uniform> params: Params;
-var<workgroup> partial: array<f32, ${WG}>;
-
+// counts: candidates, components, nets, smallNets
+// counts2: largeNets, gridWidth, gridHeight, -
+// f0: canvasW, canvasH, wHpwl, wOverlap
+// f1: wBounds, wCongestion, capacity, 1/demandScale
+struct Params { counts: vec4<u32>, counts2: vec4<u32>, f0: vec4<f32>, f1: vec4<f32> };
 fn rotateQuarter(v: vec2<f32>, r: u32) -> vec2<f32> {
   switch (r & 3u) {
     case 0u: { return v; }
@@ -22,306 +21,423 @@ fn rotateQuarter(v: vec2<f32>, r: u32) -> vec2<f32> {
     default: { return vec2<f32>(v.y, -v.x); }
   }
 }
+fn rotatedSize(s: vec2<f32>, r: u32) -> vec2<f32> { return select(s, s.yx, (r & 1u) == 1u); }
+`;
+// pins[i] = (localX, localY, bitcast<f32>(componentIndex), 0)
+const PIN_WORLD = /* wgsl */`
+fn pinWorld(base: u32, pi: u32) -> vec2<f32> {
+  let pin = pins[pi];
+  let pl = placements[base + bitcast<u32>(pin.z)];
+  return pl.pos + rotateQuarter(pin.xy, pl.rot);
+}
+`;
+
+/** Raw and priority-weighted HPWL; one workgroup per candidate, one lane per net. */
+const HPWL_WGSL = COMMON + PIN_WORLD + /* wgsl */`
+@group(0) @binding(0) var<storage, read> placements: array<Placement>;
+@group(0) @binding(1) var<storage, read> pins: array<vec4<f32>>;
+@group(0) @binding(2) var<storage, read> netOffsets: array<u32>;
+@group(0) @binding(3) var<storage, read> netPins: array<u32>;
+@group(0) @binding(4) var<storage, read> netWeight: array<f32>;
+@group(0) @binding(5) var<storage, read_write> outHpwl: array<vec2<f32>>;
+@group(0) @binding(6) var<uniform> params: Params;
+var<workgroup> partial: array<vec2<f32>, ${WG}>;
 
 @compute @workgroup_size(${WG})
 fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid3: vec3<u32>) {
   let candidate = wid.x;
   let lid = lid3.x;
-  let candidateCount = params.counts.x;
-  let componentCount = params.counts.y;
-  let netCount = params.counts.z;
-  if (candidate >= candidateCount) { return; }
-  var acc = 0.0;
-  var n = lid;
-  loop {
-    if (n >= netCount) { break; }
-    let begin = netOffsets[n];
-    let end = netOffsets[n + 1u];
+  if (candidate >= params.counts.x) { return; }
+  let base = candidate * params.counts.y;
+  var acc = vec2<f32>(0.0, 0.0);
+  for (var n = lid; n < params.counts.z; n += ${WG}u) {
     var minP = vec2<f32>(1e30, 1e30);
     var maxP = vec2<f32>(-1e30, -1e30);
-    var k = begin;
-    loop {
-      if (k >= end) { break; }
-      let pi = netPins[k];
-      let ci = pinComponent[pi];
-      let pl = placements[candidate * componentCount + ci];
-      let p = pl.pos + rotateQuarter(pinLocal[pi], pl.rot);
+    for (var k = netOffsets[n]; k < netOffsets[n + 1u]; k++) {
+      let p = pinWorld(base, netPins[k]);
       minP = min(minP, p); maxP = max(maxP, p);
-      k = k + 1u;
     }
-    acc = acc + (maxP.x - minP.x) + (maxP.y - minP.y);
-    n = n + ${WG}u;
+    let hp = (maxP.x - minP.x) + (maxP.y - minP.y);
+    acc += vec2<f32>(hp, netWeight[n] * hp);
   }
   partial[lid] = acc;
   workgroupBarrier();
-  var stride = ${WG / 2}u;
-  loop {
-    if (stride == 0u) { break; }
-    if (lid < stride) { partial[lid] = partial[lid] + partial[lid + stride]; }
+  for (var stride = ${WG / 2}u; stride > 0u; stride >>= 1u) {
+    if (lid < stride) { partial[lid] += partial[lid + stride]; }
     workgroupBarrier();
-    stride = stride >> 1u;
   }
-  if (lid == 0u) { outSum[candidate] = partial[0]; }
+  if (lid == 0u) { outHpwl[candidate] = partial[0]; }
 }
 `;
 
-const OVERLAP_WGSL = /* wgsl */`
-struct Placement { pos: vec2<f32>, rot: u32, pad: u32 };
-struct Params { counts: vec4<u32>, canvasWeights: vec4<f32>, misc: vec4<f32>, coarse: vec4<u32> };
+/** Pairwise overlap area and quadratic canvas violation; lane i scans pairs (i, j>i). */
+const GEOMETRY_WGSL = COMMON + /* wgsl */`
 @group(0) @binding(0) var<storage, read> placements: array<Placement>;
 @group(0) @binding(1) var<storage, read> componentSize: array<vec2<f32>>;
-@group(0) @binding(2) var<storage, read> pairs: array<vec2<u32>>;
-@group(0) @binding(3) var<storage, read_write> outSum: array<f32>;
-@group(0) @binding(4) var<uniform> params: Params;
-var<workgroup> partial: array<f32, ${WG}>;
-fn rs(s: vec2<f32>, r: u32) -> vec2<f32> { return select(s, s.yx, (r & 1u) == 1u); }
-@compute @workgroup_size(${WG})
-fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid3: vec3<u32>) {
-  let candidate = wid.x; let lid = lid3.x;
-  let candidateCount = params.counts.x; let componentCount = params.counts.y; let pairCount = params.counts.w;
-  if (candidate >= candidateCount) { return; }
-  var acc = 0.0; var q = lid;
-  loop {
-    if (q >= pairCount) { break; }
-    let pair = pairs[q];
-    let a = placements[candidate * componentCount + pair.x];
-    let b = placements[candidate * componentCount + pair.y];
-    let as = rs(componentSize[pair.x], a.rot); let bs = rs(componentSize[pair.y], b.rot);
-    let amin = a.pos - 0.5 * as; let amax = a.pos + 0.5 * as;
-    let bmin = b.pos - 0.5 * bs; let bmax = b.pos + 0.5 * bs;
-    let ox = max(0.0, min(amax.x, bmax.x) - max(amin.x, bmin.x));
-    let oy = max(0.0, min(amax.y, bmax.y) - max(amin.y, bmin.y));
-    acc = acc + ox * oy; q = q + ${WG}u;
-  }
-  partial[lid] = acc; workgroupBarrier();
-  var stride = ${WG / 2}u;
-  loop { if (stride == 0u) { break; } if (lid < stride) { partial[lid] += partial[lid + stride]; } workgroupBarrier(); stride >>= 1u; }
-  if (lid == 0u) { outSum[candidate] = partial[0]; }
-}
-`;
-
-const BOUNDS_WGSL = /* wgsl */`
-struct Placement { pos: vec2<f32>, rot: u32, pad: u32 };
-struct Params { counts: vec4<u32>, canvasWeights: vec4<f32>, misc: vec4<f32>, coarse: vec4<u32> };
-@group(0) @binding(0) var<storage, read> placements: array<Placement>;
-@group(0) @binding(1) var<storage, read> componentSize: array<vec2<f32>>;
-@group(0) @binding(2) var<storage, read_write> outSum: array<f32>;
+@group(0) @binding(2) var<storage, read_write> outGeometry: array<vec2<f32>>;
 @group(0) @binding(3) var<uniform> params: Params;
-var<workgroup> partial: array<f32, ${WG}>;
-fn rs(s: vec2<f32>, r: u32) -> vec2<f32> { return select(s, s.yx, (r & 1u) == 1u); }
+var<workgroup> partial: array<vec2<f32>, ${WG}>;
+
 @compute @workgroup_size(${WG})
 fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid3: vec3<u32>) {
-  let candidate = wid.x; let lid = lid3.x;
-  let candidateCount = params.counts.x; let componentCount = params.counts.y;
-  let W = params.canvasWeights.x; let H = params.canvasWeights.y;
-  if (candidate >= candidateCount) { return; }
-  var acc = 0.0; var i = lid;
-  loop {
-    if (i >= componentCount) { break; }
-    let p = placements[candidate * componentCount + i]; let s = rs(componentSize[i], p.rot);
-    let left = max(0.0, 0.5 * s.x - p.pos.x);
-    let right = max(0.0, p.pos.x + 0.5 * s.x - W);
-    let top = max(0.0, 0.5 * s.y - p.pos.y);
-    let bottom = max(0.0, p.pos.y + 0.5 * s.y - H);
-    acc += left*left + right*right + top*top + bottom*bottom; i += ${WG}u;
-  }
-  partial[lid] = acc; workgroupBarrier();
-  var stride = ${WG / 2}u;
-  loop { if (stride == 0u) { break; } if (lid < stride) { partial[lid] += partial[lid + stride]; } workgroupBarrier(); stride >>= 1u; }
-  if (lid == 0u) { outSum[candidate] = partial[0]; }
-}
-`;
-
-
-const CONGESTION_WGSL = /* wgsl */`
-struct Placement { pos: vec2<f32>, rot: u32, pad: u32 };
-struct Params { counts: vec4<u32>, canvasWeights: vec4<f32>, misc: vec4<f32>, coarse: vec4<u32> };
-@group(0) @binding(0) var<storage, read> placements: array<Placement>;
-@group(0) @binding(1) var<storage, read> pinComponent: array<u32>;
-@group(0) @binding(2) var<storage, read> pinLocal: array<vec2<f32>>;
-@group(0) @binding(3) var<storage, read> netOffsets: array<u32>;
-@group(0) @binding(4) var<storage, read> netPins: array<u32>;
-@group(0) @binding(5) var<storage, read_write> outSum: array<f32>;
-@group(0) @binding(6) var<uniform> params: Params;
-var<workgroup> partial: array<f32, ${WG}>;
-fn rotateQuarter(v: vec2<f32>, r: u32) -> vec2<f32> {
-  switch (r & 3u) { case 0u:{return v;} case 1u:{return vec2<f32>(-v.y,v.x);} case 2u:{return -v;} default:{return vec2<f32>(v.y,-v.x);} }
-}
-fn pinCell(candidate:u32, pi:u32)->vec2<u32> {
-  let ci=pinComponent[pi]; let pl=placements[candidate*params.counts.y+ci]; let p=pl.pos+rotateQuarter(pinLocal[pi],pl.rot);
-  let gx=u32(clamp(i32(floor(p.x/params.canvasWeights.x*f32(params.coarse.x))),0,i32(params.coarse.x)-1));
-  let gy=u32(clamp(i32(floor(p.y/params.canvasWeights.y*f32(params.coarse.y))),0,i32(params.coarse.y)-1));
-  return vec2<u32>(gx,gy);
-}
-fn between(v:u32,a:u32,b:u32)->bool { return v>=min(a,b) && v<=max(a,b); }
-@compute @workgroup_size(${WG})
-fn main(@builtin(workgroup_id) wid:vec3<u32>,@builtin(local_invocation_id) lid3:vec3<u32>) {
-  let candidate=wid.x;let lid=lid3.x;if(candidate>=params.counts.x){return;}
-  let gw=params.coarse.x;let gh=params.coarse.y;let cells=gw*gh;var acc=0.0;var c=lid;
-  loop {
-    if(c>=cells){break;} let cx=c%gw;let cy=c/gw;var demand=0u;var n=0u;
-    loop {
-      if(n>=params.counts.z){break;} let begin=netOffsets[n];let end=netOffsets[n+1u];var used=false;
-      if(end>begin+1u){let a=pinCell(candidate,netPins[begin]);var k=begin+1u;loop{if(k>=end){break;}let t=pinCell(candidate,netPins[k]);
-        if((cy==a.y && between(cx,a.x,t.x)) || (cx==t.x && between(cy,a.y,t.y))){used=true;break;} k+=1u;}}
-      if(used){demand+=1u;} n+=1u;
+  let candidate = wid.x;
+  let lid = lid3.x;
+  if (candidate >= params.counts.x) { return; }
+  let n = params.counts.y;
+  let base = candidate * n;
+  let canvas = params.f0.xy;
+  var overlap = 0.0;
+  var bounds = 0.0;
+  for (var i = lid; i < n; i += ${WG}u) {
+    let a = placements[base + i];
+    let ah = 0.5 * rotatedSize(componentSize[i], a.rot);
+    let lo = max(vec2<f32>(0.0), ah - a.pos);
+    let hi = max(vec2<f32>(0.0), a.pos + ah - canvas);
+    bounds += dot(lo, lo) + dot(hi, hi);
+    let amin = a.pos - ah;
+    let amax = a.pos + ah;
+    for (var j = i + 1u; j < n; j++) {
+      let b = placements[base + j];
+      let bh = 0.5 * rotatedSize(componentSize[j], b.rot);
+      let o = max(vec2<f32>(0.0), min(amax, b.pos + bh) - max(amin, b.pos - bh));
+      overlap += o.x * o.y;
     }
-    let over=max(0,i32(demand)-i32(params.coarse.z));acc+=f32(over*over);c+=${WG}u;
   }
-  partial[lid]=acc;workgroupBarrier();var stride=${WG/2}u;
-  loop{if(stride==0u){break;}if(lid<stride){partial[lid]+=partial[lid+stride];}workgroupBarrier();stride>>=1u;}
-  if(lid==0u){outSum[candidate]=partial[0];}
+  partial[lid] = vec2<f32>(overlap, bounds);
+  workgroupBarrier();
+  for (var stride = ${WG / 2}u; stride > 0u; stride >>= 1u) {
+    if (lid < stride) { partial[lid] += partial[lid + stride]; }
+    workgroupBarrier();
+  }
+  if (lid == 0u) { outGeometry[candidate] = partial[0]; }
 }
 `;
 
-const REDUCE_WGSL = /* wgsl */`
-struct Params { counts: vec4<u32>, canvasWeights: vec4<f32>, misc: vec4<f32>, coarse: vec4<u32> };
+/**
+ * Coarse L-star congestion, matching the CPU scorers exactly: every net adds its
+ * (fixed-point) weight once to each distinct cell touched by the star from its first
+ * pin, then sum(max(0, demand - capacity)^2).
+ */
+// Demand/stamp grids live in workgroup memory when they fit, otherwise in a per-candidate
+// region of a global scratch buffer (offset `sb`).
+const GRID_WORKGROUP = (cells) => /* wgsl */`
+var<workgroup> demand: array<atomic<u32>, ${cells}>;
+var<workgroup> stamp: array<atomic<u32>, ${cells}>;
+fn zeroCell(sb: u32, c: u32) { atomicStore(&demand[c], 0u); atomicStore(&stamp[c], 0u); }
+fn addDemand(sb: u32, c: i32, w: u32) { atomicAdd(&demand[c], w); }
+fn mark(sb: u32, c: i32, tag: u32, w: u32) { if (atomicExchange(&stamp[c], tag) != tag) { atomicAdd(&demand[c], w); } }
+fn loadDemand(sb: u32, c: u32) -> u32 { return atomicLoad(&demand[c]); }
+fn sync() { workgroupBarrier(); }
+`;
+const GRID_GLOBAL = (cells) => /* wgsl */`
+@group(0) @binding(7) var<storage, read_write> scratch: array<atomic<u32>>;
+fn zeroCell(sb: u32, c: u32) { atomicStore(&scratch[sb + c], 0u); atomicStore(&scratch[sb + ${cells}u + c], 0u); }
+fn addDemand(sb: u32, c: i32, w: u32) { atomicAdd(&scratch[sb + u32(c)], w); }
+fn mark(sb: u32, c: i32, tag: u32, w: u32) { if (atomicExchange(&scratch[sb + ${cells}u + u32(c)], tag) != tag) { atomicAdd(&scratch[sb + u32(c)], w); } }
+fn loadDemand(sb: u32, c: u32) -> u32 { return atomicLoad(&scratch[sb + c]); }
+fn sync() { storageBarrier(); workgroupBarrier(); }
+`;
+
+const congestionWgsl = (cells, globalGrid) => COMMON + PIN_WORLD + /* wgsl */`
+@group(0) @binding(0) var<storage, read> placements: array<Placement>;
+@group(0) @binding(1) var<storage, read> pins: array<vec4<f32>>;
+@group(0) @binding(2) var<storage, read> netOffsets: array<u32>;
+@group(0) @binding(3) var<storage, read> netPins: array<u32>;
+@group(0) @binding(4) var<storage, read> netWeightQ: array<u32>;
+// Small nets first (counts.w of them), then large nets (counts2.x).
+@group(0) @binding(5) var<storage, read> netOrder: array<u32>;
+@group(0) @binding(6) var<storage, read_write> outCongestion: array<f32>;
+@group(0) @binding(8) var<uniform> params: Params;
+${globalGrid ? GRID_GLOBAL(cells) : GRID_WORKGROUP(cells)}
+var<workgroup> partial: array<f32, ${WG}>;
+
+fn pinCell(base: u32, pi: u32) -> vec2<i32> {
+  let p = pinWorld(base, pi);
+  let g = vec2<i32>(i32(params.counts2.y), i32(params.counts2.z));
+  let c = vec2<i32>(floor(p / params.f0.xy * vec2<f32>(g)));
+  return clamp(c, vec2<i32>(0), g - vec2<i32>(1));
+}
+
+@compute @workgroup_size(${WG})
+fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid3: vec3<u32>) {
+  let candidate = wid.x;
+  let lid = lid3.x;
+  if (candidate >= params.counts.x) { return; }
+  let base = candidate * params.counts.y;
+  let gw = i32(params.counts2.y);
+  let sb = candidate * ${2 * cells}u;
+  for (var c = lid; c < ${cells}u; c += ${WG}u) { zeroCell(sb, c); }
+  sync();
+
+  // Small nets: one lane per net. The star's touched set is the anchor-row interval
+  // plus, per column, the farthest vertical extent above and below the anchor row.
+  for (var s = lid; s < params.counts.w; s += ${WG}u) {
+    let net = netOrder[s];
+    let begin = netOffsets[net];
+    let m = netOffsets[net + 1u] - begin;
+    let w = netWeightQ[net];
+    var cell: array<vec2<i32>, ${SMALL_NET}>;
+    let a = pinCell(base, netPins[begin]);
+    var minX = a.x;
+    var maxX = a.x;
+    for (var k = 1u; k < m; k++) {
+      let t = pinCell(base, netPins[begin + k]);
+      cell[k] = t; minX = min(minX, t.x); maxX = max(maxX, t.x);
+    }
+    for (var x = minX; x <= maxX; x++) { addDemand(sb, a.y * gw + x, w); }
+    for (var k = 1u; k < m; k++) {
+      let t = cell[k];
+      if (t.y == a.y) { continue; }
+      let up = t.y < a.y;
+      var covered = 0;
+      for (var j = 1u; j < k; j++) {
+        let u = cell[j];
+        if (u.x == t.x && u.y != a.y && (u.y < a.y) == up) { covered = max(covered, abs(u.y - a.y)); }
+      }
+      let dir = select(1, -1, up);
+      for (var d = covered + 1; d <= abs(t.y - a.y); d++) { addDemand(sb, (a.y + dir * d) * gw + t.x, w); }
+    }
+  }
+
+  // Large nets: whole workgroup per net, deduplicated with a per-net cell stamp.
+  for (var li = 0u; li < params.counts2.x; li++) {
+    let net = netOrder[params.counts.w + li];
+    let begin = netOffsets[net];
+    let end = netOffsets[net + 1u];
+    let w = netWeightQ[net];
+    let tag = li + 1u;
+    let a = pinCell(base, netPins[begin]);
+    for (var k = begin + 1u + lid; k < end; k += ${WG}u) {
+      let t = pinCell(base, netPins[k]);
+      for (var x = min(a.x, t.x); x <= max(a.x, t.x); x++) { mark(sb, a.y * gw + x, tag, w); }
+      for (var y = min(a.y, t.y); y <= max(a.y, t.y); y++) { mark(sb, y * gw + t.x, tag, w); }
+    }
+    sync();
+  }
+  sync();
+
+  var acc = 0.0;
+  for (var c = lid; c < ${cells}u; c += ${WG}u) {
+    let over = max(0.0, f32(loadDemand(sb, c)) * params.f1.w - params.f1.z);
+    acc += over * over;
+  }
+  partial[lid] = acc;
+  workgroupBarrier();
+  for (var stride = ${WG / 2}u; stride > 0u; stride >>= 1u) {
+    if (lid < stride) { partial[lid] += partial[lid + stride]; }
+    workgroupBarrier();
+  }
+  if (lid == 0u) { outCongestion[candidate] = partial[0]; }
+}
+`;
+
+const REDUCE_WGSL = COMMON + /* wgsl */`
 struct ScoreOut { a: vec4<f32>, b: vec4<f32> };
-@group(0) @binding(0) var<storage, read> hpwl: array<f32>;
-@group(0) @binding(1) var<storage, read> overlap: array<f32>;
-@group(0) @binding(2) var<storage, read> bounds: array<f32>;
-@group(0) @binding(3) var<storage, read> congestion: array<f32>;
-@group(0) @binding(4) var<storage, read_write> scores: array<ScoreOut>;
-@group(0) @binding(5) var<uniform> params: Params;
-@compute @workgroup_size(256)
+@group(0) @binding(0) var<storage, read> hpwl: array<vec2<f32>>;
+@group(0) @binding(1) var<storage, read> geometry: array<vec2<f32>>;
+@group(0) @binding(2) var<storage, read> congestion: array<f32>;
+@group(0) @binding(3) var<storage, read_write> scores: array<ScoreOut>;
+@group(0) @binding(4) var<uniform> params: Params;
+@compute @workgroup_size(${WG})
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let i = gid.x; if (i >= params.counts.x) { return; }
-  let total = params.canvasWeights.z * hpwl[i] + params.canvasWeights.w * overlap[i] + params.misc.x * bounds[i] + params.misc.y * congestion[i];
-  scores[i].a = vec4<f32>(total, hpwl[i], overlap[i], bounds[i]);
-  scores[i].b = vec4<f32>(congestion[i], 0.0, 0.0, 0.0);
+  let i = gid.x;
+  if (i >= params.counts.x) { return; }
+  let h = hpwl[i];
+  let g = geometry[i];
+  let c = congestion[i];
+  let total = params.f0.z * h.y + params.f0.w * g.x + params.f1.x * g.y + params.f1.y * c;
+  scores[i].a = vec4<f32>(total, h.x, h.y, g.x);
+  scores[i].b = vec4<f32>(g.y, c, 0.0, 0.0);
 }
 `;
 
-function staticData(problem) {
+function staticData(problem, netWeights) {
   const componentSize = new Float32Array(problem.components.length * 2);
-  problem.components.forEach((c, i) => { componentSize[2*i] = c.width; componentSize[2*i+1] = c.height; });
-  const pinComponent = new Uint32Array(problem.pins.length);
-  const pinLocal = new Float32Array(problem.pins.length * 2);
-  problem.pins.forEach((p, i) => { pinComponent[i] = p.componentIndex; pinLocal[2*i] = p.x; pinLocal[2*i+1] = p.y; });
+  problem.components.forEach((c, i) => { componentSize[2 * i] = c.width; componentSize[2 * i + 1] = c.height; });
+  const pins = new Float32Array(problem.pins.length * 4), pinBits = new Uint32Array(pins.buffer);
+  problem.pins.forEach((p, i) => { pins[4 * i] = p.x; pins[4 * i + 1] = p.y; pinBits[4 * i + 2] = p.componentIndex; });
   let totalPins = 0; for (const n of problem.nets) totalPins += n.pins.length;
   const netOffsets = new Uint32Array(problem.nets.length + 1);
   const netPins = new Uint32Array(totalPins); let k = 0;
-  problem.nets.forEach((n, i) => { netOffsets[i] = k; for (const p of n.pins) netPins[k++] = p; }); netOffsets[problem.nets.length] = k;
-  const q = problem.components.length * (problem.components.length - 1) / 2;
-  const pairs = new Uint32Array(q * 2); k = 0;
-  for (let i=0;i<problem.components.length;i++) for (let j=i+1;j<problem.components.length;j++) { pairs[k++]=i; pairs[k++]=j; }
-  return { componentSize, pinComponent, pinLocal, netOffsets, netPins, pairs, pairCount:q };
+  problem.nets.forEach((n, i) => { netOffsets[i] = k; for (const p of n.pins) netPins[k++] = p; });
+  netOffsets[problem.nets.length] = k;
+
+  // Fixed-point congestion weights: the largest possible cell demand must fit in u32.
+  const weightSum = netWeights.reduce((s, w) => s + w, 0);
+  const demandScale = Math.min(65536, 2 ** Math.floor(Math.log2(4e9 / Math.max(1, weightSum))));
+  const netWeightQ = Uint32Array.from(netWeights, (w) => Math.round(w * demandScale));
+  const small = [], large = [];
+  problem.nets.forEach((n, i) => { if (n.pins.length >= 2) (n.pins.length <= SMALL_NET ? small : large).push(i); });
+  return {
+    componentSize, pins, netOffsets, netPins,
+    netWeight: Float32Array.from(netWeights), netWeightQ, demandScale,
+    netOrder: Uint32Array.from([...small, ...large]), smallCount: small.length, largeCount: large.length,
+  };
 }
 
-function nextPow2(v) { let n=1; while(n<v)n<<=1; return n; }
+function nextPow2(v) { let n = 1; while (n < v) n <<= 1; return n; }
 
-function packLayoutsInto(layouts, componentCount, hostBuffer) {
-  const needed = layouts.length * componentCount * 16;
-  if (hostBuffer.byteLength < needed) throw new Error('host placement buffer too small');
-  const dv = new DataView(hostBuffer); let o = 0;
-  for (const layout of layouts) {
-    if (layout.length !== componentCount) throw new Error('layout component count mismatch');
-    for (const p of layout) {
-      dv.setFloat32(o, p.x, true); dv.setFloat32(o+4, p.y, true);
-      dv.setUint32(o+8, p.rotation & 3, true); dv.setUint32(o+12, 0, true); o += 16;
-    }
-  }
-  return new Uint8Array(hostBuffer, 0, needed);
-}
-
+/**
+ * WebGPU batch placement scorer: one workgroup per candidate layout.
+ *
+ * Default mode reproduces scoreLayoutCpu() (unit net weights, `coarseCongestion`
+ * grid). Priority mode (`priority: true`, a `policy`, or explicit `netWeights`)
+ * reproduces PriorityCpuBatchScorer and accepts the same options.
+ */
 export class GpuBatchScorer {
   constructor(device, problem, options = {}) {
     this.device = device; this.problem = problem;
-    this.weights = { hpwl: 1, overlap: 1000, bounds: 1000, congestion: 1, ...options.weights };
-    this.coarse = { gridWidth: 32, gridHeight: 32, capacity: 1, ...options.coarseCongestion };
-    this.static = staticData(problem);
+    const priority = options.priority ?? (options.policy !== undefined || options.netWeights !== undefined);
+    let netWeights;
+    if (priority) {
+      const o = resolvePriorityOptions(options);
+      this.weights = o.weights;
+      this.coarse = { gridWidth: o.gridWidth, gridHeight: o.gridHeight, capacity: o.capacity };
+      netWeights = options.netWeights ? Float64Array.from(options.netWeights) : priorityNetWeights(problem, options);
+    } else {
+      this.weights = { hpwl: 1, overlap: 1000, bounds: 1000, congestion: 1, ...options.weights };
+      this.coarse = { gridWidth: 32, gridHeight: 32, capacity: 1, ...(options.coarseCongestion ?? options.coarse) };
+      netWeights = new Float64Array(problem.nets.length).fill(1);
+    }
+    if (netWeights.length !== problem.nets.length) throw new Error('netWeights length must equal the number of nets');
+    this.netWeights = netWeights;
+
+    const cells = this.cells = this.coarse.gridWidth * this.coarse.gridHeight;
+    // Grids too large for workgroup memory fall back to a global scratch buffer.
+    this.globalGrid = options.globalCongestionGrid ?? (cells * 8 + WG * 4 > device.limits.maxComputeWorkgroupStorageSize);
+
+    const d = this.static = staticData(problem, netWeights);
     const U = GPUBufferUsage;
-    const d = this.static;
+    const buf = (data) => createBuffer(device, Math.max(4, data.byteLength), U.STORAGE, data.byteLength ? data : new Uint32Array(1));
     this.buffers = {
-      componentSize: createBuffer(device, d.componentSize.byteLength, U.STORAGE, d.componentSize),
-      pinComponent: createBuffer(device, d.pinComponent.byteLength, U.STORAGE, d.pinComponent),
-      pinLocal: createBuffer(device, d.pinLocal.byteLength, U.STORAGE, d.pinLocal),
-      netOffsets: createBuffer(device, d.netOffsets.byteLength, U.STORAGE, d.netOffsets),
-      netPins: createBuffer(device, d.netPins.byteLength, U.STORAGE, d.netPins),
-      pairs: createBuffer(device, Math.max(8, d.pairs.byteLength), U.STORAGE, d.pairs.byteLength ? d.pairs : new Uint32Array(2))
+      componentSize: buf(d.componentSize), pins: buf(d.pins),
+      netOffsets: buf(d.netOffsets), netPins: buf(d.netPins), netWeight: buf(d.netWeight), netWeightQ: buf(d.netWeightQ),
+      netOrder: buf(d.netOrder),
+      params: createBuffer(device, 64, U.UNIFORM | U.COPY_DST),
     };
+    const pipeline = (code) => device.createComputePipeline({ layout: 'auto', compute: { module: device.createShaderModule({ code }), entryPoint: 'main' } });
     this.pipelines = {
-      hpwl: device.createComputePipeline({ layout:'auto', compute:{ module:device.createShaderModule({code:HPWL_WGSL}), entryPoint:'main' } }),
-      overlap: device.createComputePipeline({ layout:'auto', compute:{ module:device.createShaderModule({code:OVERLAP_WGSL}), entryPoint:'main' } }),
-      bounds: device.createComputePipeline({ layout:'auto', compute:{ module:device.createShaderModule({code:BOUNDS_WGSL}), entryPoint:'main' } }),
-      congestion: device.createComputePipeline({ layout:'auto', compute:{ module:device.createShaderModule({code:CONGESTION_WGSL}), entryPoint:'main' } }),
-      reduce: device.createComputePipeline({ layout:'auto', compute:{ module:device.createShaderModule({code:REDUCE_WGSL}), entryPoint:'main' } })
+      hpwl: pipeline(HPWL_WGSL), geometry: pipeline(GEOMETRY_WGSL),
+      congestion: pipeline(congestionWgsl(cells, this.globalGrid)), reduce: pipeline(REDUCE_WGSL),
     };
-    this.dynamic = null;
-    this.capacity = 0;
-    this.hostPlacementBuffer = new ArrayBuffer(0);
-    this.paramsData = new ArrayBuffer(64);
+
+    const n = problem.components.length;
+    const maxBinding = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
+    const perCandidate = Math.max(Math.max(1, n) * 16, this.globalGrid ? cells * 8 : 0);
+    this.maxChunk = Math.max(1, Math.min(65535, Math.floor(maxBinding / perCandidate)));
+    this.dynamic = null; this.capacity = 0; this.bindGroups = null;
+    this.hostPlacements = new ArrayBuffer(0);
+    this.queue = Promise.resolve();
   }
 
   #ensureCapacity(count) {
     if (count <= this.capacity && this.dynamic) return;
-    const device=this.device,U=GPUBufferUsage;
+    const device = this.device, U = GPUBufferUsage;
     if (this.dynamic) for (const b of Object.values(this.dynamic)) b.destroy();
-    this.capacity = nextPow2(count);
-    const c=this.capacity, componentCount=this.problem.components.length;
-    this.hostPlacementBuffer = new ArrayBuffer(c * componentCount * 16);
-    this.dynamic = {
-      placements:createBuffer(device, c*componentCount*16, U.STORAGE|U.COPY_DST),
-      hpwl:createBuffer(device, c*4, U.STORAGE),
-      overlap:createBuffer(device, c*4, U.STORAGE),
-      bounds:createBuffer(device, c*4, U.STORAGE),
-      congestion:createBuffer(device, c*4, U.STORAGE),
-      scores:createBuffer(device, c*32, U.STORAGE|U.COPY_SRC),
-      readback:createBuffer(device, c*32, U.COPY_DST|U.MAP_READ),
-      params:createBuffer(device, 64, U.UNIFORM|U.COPY_DST)
+    const c = this.capacity = Math.min(this.maxChunk, nextPow2(count));
+    const n = Math.max(1, this.problem.components.length);
+    this.hostPlacements = new ArrayBuffer(c * n * 16);
+    const d = this.dynamic = {
+      placements: createBuffer(device, c * n * 16, U.STORAGE | U.COPY_DST),
+      hpwl: createBuffer(device, c * 8, U.STORAGE),
+      geometry: createBuffer(device, c * 8, U.STORAGE),
+      congestion: createBuffer(device, c * 4, U.STORAGE),
+      scores: createBuffer(device, c * 32, U.STORAGE | U.COPY_SRC),
+      readback: createBuffer(device, c * 32, U.COPY_DST | U.MAP_READ),
+    };
+    if (this.globalGrid) d.scratch = createBuffer(device, c * this.cells * 8, U.STORAGE);
+    const s = this.buffers, p = this.pipelines;
+    // Array index = binding slot; holes are skipped.
+    const group = (pl, list) => device.createBindGroup({ layout: pl.getBindGroupLayout(0), entries: list.flatMap((buffer, binding) => buffer ? [{ binding, resource: { buffer } }] : []) });
+    this.bindGroups = {
+      hpwl: group(p.hpwl, [d.placements, s.pins, s.netOffsets, s.netPins, s.netWeight, d.hpwl, s.params]),
+      geometry: group(p.geometry, [d.placements, s.componentSize, d.geometry, s.params]),
+      congestion: group(p.congestion, [d.placements, s.pins, s.netOffsets, s.netPins, s.netWeightQ, s.netOrder, d.congestion, d.scratch ?? null, s.params]),
+      reduce: group(p.reduce, [d.hpwl, d.geometry, d.congestion, d.scores, s.params]),
     };
   }
 
-  async scoreLayouts(layouts) {
-    if (!layouts.length) return [];
-    if (layouts.length > 65535) throw new Error('scoreLayouts supports at most 65535 candidates per dispatch; chunk larger populations');
-    const device = this.device;
-    this.#ensureCapacity(layouts.length);
-    const d=this.dynamic;
-    const placementsData=packLayoutsInto(layouts,this.problem.components.length,this.hostPlacementBuffer);
-    device.queue.writeBuffer(d.placements,0,placementsData.buffer,placementsData.byteOffset,placementsData.byteLength);
-
-    const dv = new DataView(this.paramsData);
-    dv.setUint32(0, layouts.length, true); dv.setUint32(4, this.problem.components.length, true);
-    dv.setUint32(8, this.problem.nets.length, true); dv.setUint32(12, this.static.pairCount, true);
-    dv.setFloat32(16, this.problem.canvas.width, true); dv.setFloat32(20, this.problem.canvas.height, true);
-    dv.setFloat32(24, this.weights.hpwl, true); dv.setFloat32(28, this.weights.overlap, true);
-    dv.setFloat32(32, this.weights.bounds, true); dv.setFloat32(36, this.weights.congestion, true);
-    dv.setUint32(48, this.coarse.gridWidth, true); dv.setUint32(52, this.coarse.gridHeight, true); dv.setUint32(56, this.coarse.capacity, true);
-    device.queue.writeBuffer(d.params,0,this.paramsData);
-
-    const enc=device.createCommandEncoder();const pass=enc.beginComputePass();
-    pass.setPipeline(this.pipelines.hpwl);
-    pass.setBindGroup(0,device.createBindGroup({layout:this.pipelines.hpwl.getBindGroupLayout(0),entries:[
-      {binding:0,resource:{buffer:d.placements}},{binding:1,resource:{buffer:this.buffers.pinComponent}},{binding:2,resource:{buffer:this.buffers.pinLocal}},
-      {binding:3,resource:{buffer:this.buffers.netOffsets}},{binding:4,resource:{buffer:this.buffers.netPins}},{binding:5,resource:{buffer:d.hpwl}},{binding:6,resource:{buffer:d.params}}
-    ]}));pass.dispatchWorkgroups(layouts.length);
-    pass.setPipeline(this.pipelines.overlap);
-    pass.setBindGroup(0,device.createBindGroup({layout:this.pipelines.overlap.getBindGroupLayout(0),entries:[
-      {binding:0,resource:{buffer:d.placements}},{binding:1,resource:{buffer:this.buffers.componentSize}},{binding:2,resource:{buffer:this.buffers.pairs}},
-      {binding:3,resource:{buffer:d.overlap}},{binding:4,resource:{buffer:d.params}}
-    ]}));pass.dispatchWorkgroups(layouts.length);
-    pass.setPipeline(this.pipelines.bounds);
-    pass.setBindGroup(0,device.createBindGroup({layout:this.pipelines.bounds.getBindGroupLayout(0),entries:[
-      {binding:0,resource:{buffer:d.placements}},{binding:1,resource:{buffer:this.buffers.componentSize}},{binding:2,resource:{buffer:d.bounds}},{binding:3,resource:{buffer:d.params}}
-    ]}));pass.dispatchWorkgroups(layouts.length);
-    pass.setPipeline(this.pipelines.congestion);
-    pass.setBindGroup(0,device.createBindGroup({layout:this.pipelines.congestion.getBindGroupLayout(0),entries:[
-      {binding:0,resource:{buffer:d.placements}},{binding:1,resource:{buffer:this.buffers.pinComponent}},{binding:2,resource:{buffer:this.buffers.pinLocal}},
-      {binding:3,resource:{buffer:this.buffers.netOffsets}},{binding:4,resource:{buffer:this.buffers.netPins}},{binding:5,resource:{buffer:d.congestion}},{binding:6,resource:{buffer:d.params}}
-    ]}));pass.dispatchWorkgroups(layouts.length);
-    pass.setPipeline(this.pipelines.reduce);
-    pass.setBindGroup(0,device.createBindGroup({layout:this.pipelines.reduce.getBindGroupLayout(0),entries:[
-      {binding:0,resource:{buffer:d.hpwl}},{binding:1,resource:{buffer:d.overlap}},{binding:2,resource:{buffer:d.bounds}},{binding:3,resource:{buffer:d.congestion}},
-      {binding:4,resource:{buffer:d.scores}},{binding:5,resource:{buffer:d.params}}
-    ]}));pass.dispatchWorkgroups(Math.ceil(layouts.length/256));pass.end();
-    enc.copyBufferToBuffer(d.scores,0,d.readback,0,layouts.length*32);
-    device.queue.submit([enc.finish()]);
-    await d.readback.mapAsync(GPUMapMode.READ,0,layouts.length*32);
-    const raw=new Float32Array(d.readback.getMappedRange(0,layouts.length*32).slice(0));
-    d.readback.unmap();
-    return Array.from({length:layouts.length},(_,i)=>({total:raw[8*i],hpwl:raw[8*i+1],overlap:raw[8*i+2],bounds:raw[8*i+3],congestion:raw[8*i+4]}));
+  /** Score candidate layouts given as arrays of {x, y, rotation}. */
+  scoreLayouts(layouts) {
+    const n = this.problem.components.length;
+    for (const l of layouts) if (l.length !== n) throw new Error('layout component count mismatch');
+    return this.#enqueue(layouts.length, (f32, u32, first, count) => {
+      for (let k = 0; k < count; k++) {
+        const layout = layouts[first + k];
+        for (let i = 0, o = k * n * 4; i < n; i++, o += 4) {
+          const p = layout[i]; f32[o] = p.x; f32[o + 1] = p.y; u32[o + 2] = p.rotation & 3;
+        }
+      }
+    });
   }
 
-  destroy() { for (const b of Object.values(this.buffers)) b.destroy(); if(this.dynamic)for(const b of Object.values(this.dynamic))b.destroy(); this.dynamic=null; this.capacity=0; }
+  /**
+   * Score `count` candidates stored as contiguous slabs: candidate k, component i is
+   * at index k*n+i of x/y/r (the FastDeltaLnsOptimizer layout).
+   */
+  scoreSlabs(x, y, r, count) {
+    const n = this.problem.components.length;
+    return this.#enqueue(count, (f32, u32, first, chunk) => {
+      const src = first * n;
+      for (let q = 0, o = 0; q < chunk * n; q++, o += 4) {
+        f32[o] = x[src + q]; f32[o + 1] = y[src + q]; u32[o + 2] = r[src + q] & 3;
+      }
+    });
+  }
+
+  #enqueue(count, pack) {
+    const job = this.queue.then(() => this.#score(count, pack));
+    this.queue = job.catch(() => {});
+    return job;
+  }
+
+  async #score(count, pack) {
+    const out = new Array(count);
+    for (let first = 0; first < count; first += this.maxChunk) {
+      const chunk = Math.min(this.maxChunk, count - first);
+      this.#ensureCapacity(chunk);
+      pack(new Float32Array(this.hostPlacements), new Uint32Array(this.hostPlacements), first, chunk);
+      const raw = await this.#dispatch(chunk);
+      for (let i = 0; i < chunk; i++) {
+        const o = 8 * i;
+        out[first + i] = { total: raw[o], hpwl: raw[o + 1], weightedHpwl: raw[o + 2], overlap: raw[o + 3], bounds: raw[o + 4], congestion: raw[o + 5] };
+      }
+    }
+    return out;
+  }
+
+  async #dispatch(count) {
+    const device = this.device, d = this.dynamic, n = this.problem.components.length, st = this.static;
+    device.queue.writeBuffer(d.placements, 0, this.hostPlacements, 0, count * n * 16);
+    const params = new ArrayBuffer(64), u = new Uint32Array(params), f = new Float32Array(params);
+    u[0] = count; u[1] = n; u[2] = this.problem.nets.length; u[3] = st.smallCount;
+    u[4] = st.largeCount; u[5] = this.coarse.gridWidth; u[6] = this.coarse.gridHeight;
+    f[8] = this.problem.canvas.width; f[9] = this.problem.canvas.height; f[10] = this.weights.hpwl; f[11] = this.weights.overlap;
+    f[12] = this.weights.bounds; f[13] = this.weights.congestion; f[14] = this.coarse.capacity; f[15] = 1 / st.demandScale;
+    device.queue.writeBuffer(this.buffers.params, 0, params);
+
+    const enc = device.createCommandEncoder(), pass = enc.beginComputePass();
+    for (const k of ['hpwl', 'geometry', 'congestion']) {
+      pass.setPipeline(this.pipelines[k]); pass.setBindGroup(0, this.bindGroups[k]); pass.dispatchWorkgroups(count);
+    }
+    pass.setPipeline(this.pipelines.reduce); pass.setBindGroup(0, this.bindGroups.reduce); pass.dispatchWorkgroups(Math.ceil(count / WG));
+    pass.end();
+    enc.copyBufferToBuffer(d.scores, 0, d.readback, 0, count * 32);
+    device.queue.submit([enc.finish()]);
+    await d.readback.mapAsync(GPUMapMode.READ, 0, count * 32);
+    const raw = new Float32Array(d.readback.getMappedRange(0, count * 32).slice(0));
+    d.readback.unmap();
+    return raw;
+  }
+
+  destroy() {
+    for (const b of Object.values(this.buffers)) b.destroy();
+    if (this.dynamic) for (const b of Object.values(this.dynamic)) b.destroy();
+    this.dynamic = null; this.capacity = 0; this.bindGroups = null;
+  }
+}
+
+/** GPU counterpart of PriorityCpuBatchScorer (same options, same score fields). */
+export class PriorityGpuBatchScorer extends GpuBatchScorer {
+  constructor(device, problem, options = {}) { super(device, problem, { ...options, priority: true }); }
 }
