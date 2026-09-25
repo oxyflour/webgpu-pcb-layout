@@ -2,7 +2,7 @@
 // negotiated router, next to the board's real KiCad copper for reference.
 //
 //   node bench/kicad-boards.mjs --backend gpu --budget large --only edk --save-layouts --out run.json
-//   node bench/render-kicad.mjs --in run.json [--out report.html] [--cell 0.25] [--rounds 8]
+//   node bench/render-kicad.mjs --in run.json [--out report.html] [--cell 0.4] [--rounds 12] [--only a,b]
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -18,6 +18,7 @@ const run = JSON.parse(fs.readFileSync(inFile, 'utf8'));
 const outFile = arg('out', inFile.replace(/\.json$/, '') + '.html');
 const cellMm = Number(arg('cell', 0.4));
 const maxRounds = Number(arg('rounds', 12));
+const only = (arg('only', '') ?? '').split(',').filter(Boolean);
 const parse = await loadKicadParser(run.placerRoot);
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -79,6 +80,7 @@ function panel({ problem, layout, sides, contours, routes, tracks, highlight }) 
 
 const sections = [];
 for (const row of run.rows) {
+  if (only.length && !only.includes(row.case)) continue;
   if (!row.layouts) { console.error(`skip ${row.case}: no layouts (re-run kicad-boards.mjs with --save-layouts)`); continue; }
   const text = fs.readFileSync(path.join(run.placerRoot, row.file), 'utf8');
   const adapted = designToProblem(parse(text, path.basename(row.file)), { preplace: String(row.mode ?? '').includes('preplace'), sides: (String(row.mode ?? '').match(/sides-(\w+)/) ?? [])[1] ?? 'single' });
@@ -138,8 +140,8 @@ svg { width:100%; height:auto; display:block; }
 .legend i { display:inline-block; width:12px; height:9px; margin-right:5px; vertical-align:-1px; border:1px solid; }
 </style></head><body><main>
 <h1>KiCad placement: original vs optimized</h1>
-<p class="lead">Middle and right panels use the same two-layer PathFinder router (${cellMm} mm grid, pads as obstacles, SMD pads on their footprint's original side, up to ${maxRounds} rounds, power/ground nets excluded) so the two placements are compared on equal terms. Every footprint shares one placement plane in this package, so bottom-side parts of the original board overlap top-side parts.</p>
-<p class="legend"><span><i style="background:#5fa8a044;border-color:#2f7d74"></i>top-side footprint</span><span><i style="background:#9a86c944;border-color:#6a55a3"></i>bottom-side footprint (original side)</span><span><i style="background:#e0452b40;border-color:#e0452b"></i>overlapping footprint</span><span><i style="border:0;border-top:2px solid #d0443a;height:0"></i>F.Cu</span><span><i style="border:0;border-top:2px solid #3b6fd6;height:0"></i>B.Cu</span><span><i style="border:0;border-top:2px solid #f0a020;height:0"></i>net sharing cells</span><span><i style="border:0;border-top:2px dashed #e0452b;height:0"></i>unrouted net</span></p>
+<p class="lead">Middle and right panels use the same two-layer PathFinder router (${cellMm} mm grid, pads as obstacles, SMD pads on the side the placement puts them, up to ${maxRounds} rounds, power/ground nets excluded) so the two placements are compared on equal terms. Footprint colour shows the side each placement puts it on; with <code>--sides single</code> every footprint shares one plane, so bottom-side parts of the original board overlap top-side parts.</p>
+<p class="legend"><span><i style="background:#5fa8a044;border-color:#2f7d74"></i>top-side footprint</span><span><i style="background:#9a86c944;border-color:#6a55a3"></i>bottom-side footprint</span><span><i style="background:#e0452b40;border-color:#e0452b"></i>overlapping footprint</span><span><i style="border:0;border-top:2px solid #d0443a;height:0"></i>F.Cu</span><span><i style="border:0;border-top:2px solid #3b6fd6;height:0"></i>B.Cu</span><span><i style="border:0;border-top:2px solid #f0a020;height:0"></i>net sharing cells</span><span><i style="border:0;border-top:2px dashed #e0452b;height:0"></i>unrouted net</span></p>
 ${sections.join('\n')}
 </main></body></html>`);
 console.error(`wrote ${outFile}`);

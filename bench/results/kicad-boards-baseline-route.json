@@ -1,0 +1,3082 @@
+{
+  "date": "2026-09-25T14:07:54.513Z",
+  "node": "v24.14.0",
+  "placerRoot": "C:\\Projects\\webgpu_pcb_placer",
+  "rows": [
+    {
+      "case": "z3r0",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 34,
+      "fixed": 0,
+      "nets": 46,
+      "density": 0.88,
+      "seed": 20260925,
+      "orig hpwl": 714,
+      "orig ovl": 102.8,
+      "rand hpwl": 1621,
+      "hpwl": 1446,
+      "hpwl/orig": 2.02,
+      "ovl mm2": 3.9,
+      "ovl pairs": 4,
+      "bounds": 2.89,
+      "global s": 0.7,
+      "lns s": 0.7,
+      "polish s": 0.3,
+      "total s": 1.7,
+      "orig clean": "46/46",
+      "clean": "5/46",
+      "orig ovf": 0,
+      "ovf": 274,
+      "file": "benchmark/ciaa-Hardware/PCB/Z3R0/ciaa-z3r0.kicad_pcb",
+      "stats": {
+        "footprints": 34,
+        "bottom": 3,
+        "locked": 0,
+        "mechanical": 9,
+        "nets": 46,
+        "pins": 141,
+        "droppedPower": 4,
+        "droppedDegree": 0,
+        "offQuarter": 1,
+        "canvas": [
+          18.8,
+          51.8
+        ],
+        "density": 0.8813544664757068
+      },
+      "original": {
+        "score": {
+          "total": 23223.92410057826,
+          "hpwl": 714.132497,
+          "weightedHpwl": 792.0378603090908,
+          "overlap": 102.83261824490046,
+          "bounds": 2.3980999999999923,
+          "congestion": 2771.485182578155
+        },
+        "legality": {
+          "overlapPairs": 11,
+          "overlappingComponents": 15,
+          "outside": 2
+        }
+      },
+      "random": {
+        "total": 93301.48229726618,
+        "hpwl": 1620.822077569672,
+        "weightedHpwl": 1797.639031486364,
+        "overlap": 397.57476143008734,
+        "bounds": 0,
+        "congestion": 23977.781959524706
+      },
+      "result": {
+        "score": {
+          "total": 12829.309325466493,
+          "hpwl": 1446.0542828621674,
+          "weightedHpwl": 1603.8056591744025,
+          "overlap": 3.914048042750314,
+          "bounds": 2.8851591026751704,
+          "congestion": 19731.32447441399
+        },
+        "searchScore": {
+          "total": 12829.185546875,
+          "hpwl": 1446.0543212890625,
+          "weightedHpwl": 1603.8056640625,
+          "overlap": 3.9140422344207764,
+          "bounds": 2.885150671005249,
+          "congestion": 19731.08203125
+        },
+        "legality": {
+          "overlapPairs": 4,
+          "overlappingComponents": 6,
+          "outside": 7
+        },
+        "globalScore": {
+          "total": 27357.634765625,
+          "hpwl": 1522.5040283203125,
+          "weightedHpwl": 1688.5953369140625,
+          "overlap": 71.17472076416016,
+          "bounds": 0,
+          "congestion": 22868.189453125
+        },
+        "fastScore": {
+          "total": 14663.578125,
+          "hpwl": 1434.41162109375,
+          "weightedHpwl": 1590.89306640625,
+          "overlap": 15.609918594360352,
+          "bounds": 0.00034243857953697443,
+          "congestion": 19901.265625
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 110,
+            "capacity": 1.6936936936936946
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 55,
+              "capacity": 6.774774774774778
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 0.37451305985239025,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 0.4681413248154878,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.24967537323492683,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 46,
+          "clean": 46,
+          "complete": 46,
+          "overflow": 0,
+          "vias": 32,
+          "length": 575,
+          "rounds": 8,
+          "ms": 42.64760000000001
+        },
+        "result": {
+          "nets": 46,
+          "clean": 5,
+          "complete": 45,
+          "overflow": 274,
+          "vias": 155,
+          "length": 1471,
+          "rounds": 12,
+          "ms": 313.81889999999976
+        }
+      }
+    },
+    {
+      "case": "pico",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 67,
+      "fixed": 2,
+      "nets": 86,
+      "density": 0.69,
+      "seed": 20260925,
+      "orig hpwl": 915,
+      "orig ovl": 124.7,
+      "rand hpwl": 3124,
+      "hpwl": 1522,
+      "hpwl/orig": 1.66,
+      "ovl mm2": 1.1,
+      "ovl pairs": 2,
+      "bounds": 2.38,
+      "global s": 0.9,
+      "lns s": 0.9,
+      "polish s": 0.4,
+      "total s": 2.2,
+      "orig clean": "86/86",
+      "clean": "46/86",
+      "orig ovf": 0,
+      "ovf": 76,
+      "file": "benchmark/ciaa-Hardware/PCB/pico/picociaa.kicad_pcb",
+      "stats": {
+        "footprints": 67,
+        "bottom": 33,
+        "locked": 2,
+        "mechanical": 13,
+        "nets": 86,
+        "pins": 208,
+        "droppedPower": 3,
+        "droppedDegree": 0,
+        "offQuarter": 0,
+        "canvas": [
+          51,
+          30
+        ],
+        "density": 0.6888291262640047
+      },
+      "original": {
+        "score": {
+          "total": 26027.934056252518,
+          "hpwl": 915.1870800000003,
+          "weightedHpwl": 1015.0256705454545,
+          "overlap": 124.71269447759991,
+          "bounds": 0.24999999999998646,
+          "congestion": 40.73898037416471
+        },
+        "legality": {
+          "overlapPairs": 36,
+          "overlappingComponents": 42,
+          "outside": 2
+        }
+      },
+      "random": {
+        "total": 67675.19072065446,
+        "hpwl": 3123.8493960110263,
+        "weightedHpwl": 3464.6329664849563,
+        "overlap": 305.20099397200573,
+        "bounds": 0.24999999999998646,
+        "congestion": 6240.717919536706
+      },
+      "result": {
+        "score": {
+          "total": 2509.1936093069567,
+          "hpwl": 1521.5500147854436,
+          "weightedHpwl": 1687.5372891256723,
+          "overlap": 1.1473987914675767,
+          "bounds": 2.378490617649109,
+          "congestion": 232.9568767158943
+        },
+        "searchScore": {
+          "total": 2509.1904296875,
+          "hpwl": 1521.550048828125,
+          "weightedHpwl": 1687.537353515625,
+          "overlap": 1.1473965644836426,
+          "bounds": 2.378493070602417,
+          "congestion": 232.949951171875
+        },
+        "legality": {
+          "overlapPairs": 2,
+          "overlappingComponents": 3,
+          "outside": 5
+        },
+        "globalScore": {
+          "total": 23503.830078125,
+          "hpwl": 1624.84765625,
+          "weightedHpwl": 1802.103759765625,
+          "overlap": 105.58837890625,
+          "bounds": 0.25,
+          "congestion": 1068.1024169921875
+        },
+        "fastScore": {
+          "total": 3360.357421875,
+          "hpwl": 1527.23095703125,
+          "weightedHpwl": 1693.837890625,
+          "overlap": 6.854605674743652,
+          "bounds": 0.8506243824958801,
+          "congestion": 250.9473876953125
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 24,
+            "capacity": 4.504504504504504
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 12,
+              "capacity": 18.018018018018015
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 0.4691524272557907,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 0.5864405340697383,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.3127682848371938,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 86,
+          "clean": 86,
+          "complete": 86,
+          "overflow": 0,
+          "vias": 59,
+          "length": 911,
+          "rounds": 8,
+          "ms": 78.44540000000006
+        },
+        "result": {
+          "nets": 86,
+          "clean": 46,
+          "complete": 86,
+          "overflow": 76,
+          "vias": 243,
+          "length": 1928,
+          "rounds": 12,
+          "ms": 315.8930999999993
+        }
+      }
+    },
+    {
+      "case": "edk",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 87,
+      "fixed": 0,
+      "nets": 124,
+      "density": 0.32,
+      "seed": 20260925,
+      "orig hpwl": 3089,
+      "orig ovl": 27.3,
+      "rand hpwl": 6330,
+      "hpwl": 2143,
+      "hpwl/orig": 0.69,
+      "ovl mm2": 0,
+      "ovl pairs": 0,
+      "bounds": 0,
+      "global s": 0.8,
+      "lns s": 1.5,
+      "polish s": 0.5,
+      "total s": 2.8,
+      "orig clean": "124/124",
+      "clean": "55/124",
+      "orig ovf": 0,
+      "ovf": 86,
+      "file": "benchmark/ciaa-Hardware/PCB/EDU-INTEL/edk.kicad_pcb",
+      "stats": {
+        "footprints": 87,
+        "bottom": 6,
+        "locked": 0,
+        "mechanical": 21,
+        "nets": 124,
+        "pins": 291,
+        "droppedPower": 4,
+        "droppedDegree": 0,
+        "offQuarter": 0,
+        "canvas": [
+          88.9,
+          80
+        ],
+        "density": 0.32193759682199474
+      },
+      "original": {
+        "score": {
+          "total": 9256.0089891463,
+          "hpwl": 3088.7448600000007,
+          "weightedHpwl": 3425.698844727271,
+          "overlap": 27.284619000000028,
+          "bounds": 0,
+          "congestion": 746.7726888380463
+        },
+        "legality": {
+          "overlapPairs": 5,
+          "overlappingComponents": 6,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 81730.43118245067,
+        "hpwl": 6330.089400635394,
+        "weightedHpwl": 7020.644607977439,
+        "overlap": 369.1558037714091,
+        "bounds": 0,
+        "congestion": 1757.2516403828427
+      },
+      "result": {
+        "score": {
+          "total": 2629.9884758822855,
+          "hpwl": 2143.2421313319073,
+          "weightedHpwl": 2377.0503638408427,
+          "overlap": 0.00005299161337857189,
+          "bounds": 0,
+          "congestion": 505.85502743753426
+        },
+        "searchScore": {
+          "total": 2629.9814453125,
+          "hpwl": 2143.24169921875,
+          "weightedHpwl": 2377.05029296875,
+          "overlap": 0.00005455623613670468,
+          "bounds": 0,
+          "congestion": 505.8401794433594
+        },
+        "legality": {
+          "overlapPairs": 0,
+          "overlappingComponents": 0,
+          "outside": 0
+        },
+        "globalScore": {
+          "total": 25491.68359375,
+          "hpwl": 2040.1004638671875,
+          "weightedHpwl": 2262.65673828125,
+          "overlap": 112.11276245117188,
+          "bounds": 0,
+          "congestion": 1612.9501953125
+        },
+        "fastScore": {
+          "total": 2636.118408203125,
+          "hpwl": 2148.768798828125,
+          "weightedHpwl": 2383.1796875,
+          "overlap": 0.00009325254359282553,
+          "bounds": 0,
+          "congestion": 505.8401794433594
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 36,
+            "capacity": 8.009009009009008
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 18,
+              "capacity": 32.03603603603603
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.012055342360288,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.26506917795036,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.6747035615735254,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 124,
+          "clean": 124,
+          "complete": 124,
+          "overflow": 0,
+          "vias": 64,
+          "length": 2921,
+          "rounds": 8,
+          "ms": 246.63380000000052
+        },
+        "result": {
+          "nets": 124,
+          "clean": 55,
+          "complete": 124,
+          "overflow": 86,
+          "vias": 267,
+          "length": 2400,
+          "rounds": 12,
+          "ms": 475.28569999999854
+        }
+      }
+    },
+    {
+      "case": "edu-fpga",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 138,
+      "fixed": 0,
+      "nets": 108,
+      "density": 0.58,
+      "seed": 20260925,
+      "orig hpwl": 2461,
+      "orig ovl": 215.9,
+      "rand hpwl": 5688,
+      "hpwl": 1857,
+      "hpwl/orig": 0.75,
+      "ovl mm2": 29.8,
+      "ovl pairs": 1,
+      "bounds": 5.45,
+      "global s": 1.1,
+      "lns s": 1.2,
+      "polish s": 0.6,
+      "total s": 2.9,
+      "orig clean": "108/108",
+      "clean": "99/108",
+      "orig ovf": 0,
+      "ovf": 9,
+      "file": "benchmark/ciaa-Hardware/PCB/EDU-FPGA/Schematic/FPGA para todos.kicad_pcb",
+      "stats": {
+        "footprints": 138,
+        "bottom": 5,
+        "locked": 0,
+        "mechanical": 20,
+        "nets": 108,
+        "pins": 257,
+        "droppedPower": 6,
+        "droppedDegree": 0,
+        "offQuarter": 0,
+        "canvas": [
+          80,
+          60
+        ],
+        "density": 0.5817086145914655
+      },
+      "original": {
+        "score": {
+          "total": 46251.485096186945,
+          "hpwl": 2460.6060660000003,
+          "weightedHpwl": 2729.0358186545463,
+          "overlap": 215.9018576584816,
+          "bounds": 0,
+          "congestion": 684.1554916721507
+        },
+        "legality": {
+          "overlapPairs": 33,
+          "overlappingComponents": 40,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 162833.985956725,
+        "hpwl": 5688.12627824217,
+        "weightedHpwl": 6308.649144959497,
+        "overlap": 774.2521273646529,
+        "bounds": 0,
+        "congestion": 3349.822677669855
+      },
+      "result": {
+        "score": {
+          "total": 9241.796739416666,
+          "hpwl": 1856.5337117661845,
+          "weightedHpwl": 2059.0646621406772,
+          "overlap": 29.814681799843186,
+          "bounds": 5.449576997970308,
+          "congestion": 259.7606354265818
+        },
+        "searchScore": {
+          "total": 9241.7890625,
+          "hpwl": 1856.53369140625,
+          "weightedHpwl": 2059.064697265625,
+          "overlap": 29.81466293334961,
+          "bounds": 5.449575424194336,
+          "congestion": 259.7536315917969
+        },
+        "legality": {
+          "overlapPairs": 1,
+          "overlappingComponents": 2,
+          "outside": 1
+        },
+        "globalScore": {
+          "total": 44164.23046875,
+          "hpwl": 1825.1724853515625,
+          "weightedHpwl": 2024.2822265625,
+          "overlap": 209.88494873046875,
+          "bounds": 0,
+          "congestion": 325.9210510253906
+        },
+        "fastScore": {
+          "total": 10355.0322265625,
+          "hpwl": 1844.3642578125,
+          "weightedHpwl": 2045.567626953125,
+          "overlap": 40.900264739990234,
+          "bounds": 0,
+          "congestion": 258.824951171875
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 30,
+            "capacity": 7.2072072072072055
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 15,
+              "capacity": 28.828828828828822
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 0.831384387633061,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.0392304845413263,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.5542562584220407,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 108,
+          "clean": 108,
+          "complete": 108,
+          "overflow": 0,
+          "vias": 77,
+          "length": 2224,
+          "rounds": 8,
+          "ms": 176.78870000000097
+        },
+        "result": {
+          "nets": 108,
+          "clean": 99,
+          "complete": 108,
+          "overflow": 9,
+          "vias": 175,
+          "length": 1987,
+          "rounds": 12,
+          "ms": 266.5596999999998
+        }
+      }
+    },
+    {
+      "case": "fsl-mini",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 142,
+      "fixed": 1,
+      "nets": 162,
+      "density": 0.83,
+      "seed": 20260925,
+      "orig hpwl": 4868,
+      "orig ovl": 1238.3,
+      "rand hpwl": 9856,
+      "hpwl": 7193,
+      "hpwl/orig": 1.48,
+      "ovl mm2": 219.1,
+      "ovl pairs": 6,
+      "bounds": 105.39,
+      "global s": 0.8,
+      "lns s": 1.9,
+      "polish s": 0.7,
+      "total s": 3.4,
+      "orig clean": "162/162",
+      "clean": "47/162",
+      "orig ovf": 0,
+      "ovf": 218,
+      "file": "benchmark/ciaa-Hardware/PCB/FSL-MINI/CIAA_FSL_MINI.kicad_pcb",
+      "stats": {
+        "footprints": 142,
+        "bottom": 0,
+        "locked": 1,
+        "mechanical": 18,
+        "nets": 162,
+        "pins": 448,
+        "droppedPower": 7,
+        "droppedDegree": 0,
+        "offQuarter": 0,
+        "canvas": [
+          71.1,
+          99.7
+        ],
+        "density": 0.8342215118008873
+      },
+      "original": {
+        "score": {
+          "total": 253467.4203539889,
+          "hpwl": 4867.898540000004,
+          "weightedHpwl": 5398.942017090908,
+          "overlap": 1238.3361729790747,
+          "bounds": 0,
+          "congestion": 802.487482166108
+        },
+        "legality": {
+          "overlapPairs": 90,
+          "overlappingComponents": 85,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 501726.18713427207,
+        "hpwl": 9856.051410721971,
+        "weightedHpwl": 10931.257019164364,
+        "overlap": 2402.1665402492863,
+        "bounds": 0,
+        "congestion": 20723.24413050082
+      },
+      "result": {
+        "score": {
+          "total": 76001.09148415203,
+          "hpwl": 7192.7937770730805,
+          "weightedHpwl": 7977.462189117417,
+          "overlap": 219.14260345146587,
+          "bounds": 105.39279702852726,
+          "congestion": 6233.098398071976
+        },
+        "searchScore": {
+          "total": 76001.0234375,
+          "hpwl": 7192.7939453125,
+          "weightedHpwl": 7977.46240234375,
+          "overlap": 219.14259338378906,
+          "bounds": 105.39274597167969,
+          "congestion": 6232.98681640625
+        },
+        "legality": {
+          "overlapPairs": 6,
+          "overlappingComponents": 9,
+          "outside": 6
+        },
+        "globalScore": {
+          "total": 168701.953125,
+          "hpwl": 6481.849609375,
+          "weightedHpwl": 7188.9609375,
+          "overlap": 798.8479614257812,
+          "bounds": 0,
+          "congestion": 3486.791748046875
+        },
+        "fastScore": {
+          "total": 101173.265625,
+          "hpwl": 6479.4169921875,
+          "weightedHpwl": 7186.2626953125,
+          "overlap": 463.81378173828125,
+          "bounds": 0,
+          "congestion": 2448.490234375
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 56,
+            "capacity": 6.407207207207208
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 28,
+              "capacity": 25.628828828828834
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.0104476283311274,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.2630595354139094,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.6736317522207517,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 162,
+          "clean": 162,
+          "complete": 162,
+          "overflow": 0,
+          "vias": 206,
+          "length": 4727,
+          "rounds": 8,
+          "ms": 646.8701000000001
+        },
+        "result": {
+          "nets": 162,
+          "clean": 47,
+          "complete": 139,
+          "overflow": 218,
+          "vias": 541,
+          "length": 6982,
+          "rounds": 12,
+          "ms": 8944.381300000001
+        }
+      }
+    },
+    {
+      "case": "edu-k60",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 187,
+      "fixed": 0,
+      "nets": 157,
+      "density": 0.33,
+      "seed": 20260925,
+      "orig hpwl": 5412,
+      "orig ovl": 43.8,
+      "rand hpwl": 13997,
+      "hpwl": 4233,
+      "hpwl/orig": 0.78,
+      "ovl mm2": 239.3,
+      "ovl pairs": 3,
+      "bounds": 0,
+      "global s": 0.7,
+      "lns s": 1.5,
+      "polish s": 0.7,
+      "total s": 3,
+      "orig clean": "157/157",
+      "clean": "65/157",
+      "orig ovf": 0,
+      "ovf": 317,
+      "file": "benchmark/ciaa-Hardware/PCB/EDU-FSL/EDU_CIAA_K60/EDU_CIAA_K60.kicad_pcb",
+      "stats": {
+        "footprints": 187,
+        "bottom": 0,
+        "locked": 0,
+        "mechanical": 15,
+        "nets": 157,
+        "pins": 469,
+        "droppedPower": 5,
+        "droppedDegree": 0,
+        "offQuarter": 16,
+        "canvas": [
+          85.5,
+          136.8
+        ],
+        "density": 0.33216699841635244
+      },
+      "original": {
+        "score": {
+          "total": 18853.16127714725,
+          "hpwl": 5412.366919999999,
+          "weightedHpwl": 6002.806947636361,
+          "overlap": 43.824271896799814,
+          "bounds": 11.549802249999923,
+          "congestion": 3551.079000301886
+        },
+        "legality": {
+          "overlapPairs": 25,
+          "overlappingComponents": 31,
+          "outside": 1
+        }
+      },
+      "random": {
+        "total": 142716.79140911408,
+        "hpwl": 13997.154716926985,
+        "weightedHpwl": 15524.117049682662,
+        "overlap": 603.4508490819487,
+        "bounds": 0,
+        "congestion": 13005.00908608338
+      },
+      "result": {
+        "score": {
+          "total": 52952.901003775965,
+          "hpwl": 4233.243246890404,
+          "weightedHpwl": 4695.051601096632,
+          "overlap": 239.33719507119312,
+          "bounds": 0.0038757857801849475,
+          "congestion": 779.270462569345
+        },
+        "searchScore": {
+          "total": 52952.87109375,
+          "hpwl": 4233.24365234375,
+          "weightedHpwl": 4695.0517578125,
+          "overlap": 239.33712768554688,
+          "bounds": 0.0038757920265197754,
+          "congestion": 779.2459716796875
+        },
+        "legality": {
+          "overlapPairs": 3,
+          "overlappingComponents": 4,
+          "outside": 1
+        },
+        "globalScore": {
+          "total": 72836.703125,
+          "hpwl": 4516.197265625,
+          "weightedHpwl": 5008.873046875,
+          "overlap": 329.6427001953125,
+          "bounds": 0,
+          "congestion": 3798.575927734375
+        },
+        "fastScore": {
+          "total": 53108.8671875,
+          "hpwl": 4348.4853515625,
+          "weightedHpwl": 4822.8662109375,
+          "overlap": 239.36961364746094,
+          "bounds": 0,
+          "congestion": 824.1558837890625
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 64,
+            "capacity": 7.6998873873873865
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 32,
+              "capacity": 30.799549549549546
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.2975615592333183,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.6219519490416476,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.8650410394888789,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 157,
+          "clean": 157,
+          "complete": 157,
+          "overflow": 0,
+          "vias": 179,
+          "length": 5278,
+          "rounds": 8,
+          "ms": 643.6765999999989
+        },
+        "result": {
+          "nets": 157,
+          "clean": 65,
+          "complete": 157,
+          "overflow": 317,
+          "vias": 575,
+          "length": 5310,
+          "rounds": 12,
+          "ms": 1064.8485999999975
+        }
+      }
+    },
+    {
+      "case": "edu-nxp",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 196,
+      "fixed": 0,
+      "nets": 163,
+      "density": 0.33,
+      "seed": 20260925,
+      "orig hpwl": 5399,
+      "orig ovl": 53.3,
+      "rand hpwl": 13493,
+      "hpwl": 5289,
+      "hpwl/orig": 0.98,
+      "ovl mm2": 32.4,
+      "ovl pairs": 2,
+      "bounds": 5.83,
+      "global s": 0.8,
+      "lns s": 2,
+      "polish s": 0.8,
+      "total s": 3.6,
+      "orig clean": "163/163",
+      "clean": "105/163",
+      "orig ovf": 0,
+      "ovf": 54,
+      "file": "benchmark/ciaa-Hardware/PCB/EDU-NXP/edu-ciaa-nxp.kicad_pcb",
+      "stats": {
+        "footprints": 196,
+        "bottom": 0,
+        "locked": 0,
+        "mechanical": 10,
+        "nets": 163,
+        "pins": 495,
+        "droppedPower": 3,
+        "droppedDegree": 0,
+        "offQuarter": 22,
+        "canvas": [
+          85.8,
+          137
+        ],
+        "density": 0.3344172971120627
+      },
+      "original": {
+        "score": {
+          "total": 17050.265563545396,
+          "hpwl": 5398.642973571509,
+          "weightedHpwl": 5987.585843415668,
+          "overlap": 53.315545338376076,
+          "bounds": 0,
+          "congestion": 799.1413049090247
+        },
+        "legality": {
+          "overlapPairs": 42,
+          "overlappingComponents": 47,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 139166.11286694606,
+        "hpwl": 13492.762379484637,
+        "weightedHpwl": 14964.70009361024,
+        "overlap": 603.8694593259627,
+        "bounds": 0,
+        "congestion": 6855.041816286585
+      },
+      "result": {
+        "score": {
+          "total": 14412.10395117585,
+          "hpwl": 5289.082504908632,
+          "weightedHpwl": 5866.073323625929,
+          "overlap": 32.400196710165375,
+          "bounds": 5.827929796033507,
+          "congestion": 1800.8106526202903
+        },
+        "searchScore": {
+          "total": 14412.0712890625,
+          "hpwl": 5289.08203125,
+          "weightedHpwl": 5866.07373046875,
+          "overlap": 32.400146484375,
+          "bounds": 5.8279314041137695,
+          "congestion": 1800.763427734375
+        },
+        "legality": {
+          "overlapPairs": 2,
+          "overlappingComponents": 4,
+          "outside": 2
+        },
+        "globalScore": {
+          "total": 70790.390625,
+          "hpwl": 4998.17529296875,
+          "weightedHpwl": 5543.43115234375,
+          "overlap": 313.5024108886719,
+          "bounds": 0,
+          "congestion": 5092.94921875
+        },
+        "fastScore": {
+          "total": 15815.2158203125,
+          "hpwl": 5338.0107421875,
+          "weightedHpwl": 5920.33935546875,
+          "overlap": 45.11042404174805,
+          "bounds": 0,
+          "congestion": 1745.584716796875
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 64,
+            "capacity": 7.715371621621621
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 32,
+              "capacity": 30.861486486486484
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.3013318446883564,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.6266648058604454,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.8675545631255709,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 163,
+          "clean": 163,
+          "complete": 163,
+          "overflow": 0,
+          "vias": 203,
+          "length": 5244,
+          "rounds": 9,
+          "ms": 1244.4918999999936
+        },
+        "result": {
+          "nets": 163,
+          "clean": 105,
+          "complete": 161,
+          "overflow": 54,
+          "vias": 630,
+          "length": 5983,
+          "rounds": 12,
+          "ms": 1393.806700000001
+        }
+      }
+    },
+    {
+      "case": "safety",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 283,
+      "fixed": 0,
+      "nets": 186,
+      "density": 0.72,
+      "seed": 20260925,
+      "orig hpwl": 5489,
+      "orig ovl": 942.5,
+      "rand hpwl": 15682,
+      "hpwl": 8161,
+      "hpwl/orig": 1.49,
+      "ovl mm2": 102.9,
+      "ovl pairs": 33,
+      "bounds": 4.89,
+      "global s": 0.8,
+      "lns s": 3.6,
+      "polish s": 1.3,
+      "total s": 5.8,
+      "orig clean": "184/186",
+      "clean": "59/186",
+      "orig ovf": 1,
+      "ovf": 451,
+      "file": "benchmark/ciaa-Hardware/PCB/Safety/CIAA_Safety_VTI_1.0.kicad_pcb",
+      "stats": {
+        "footprints": 283,
+        "bottom": 8,
+        "locked": 0,
+        "mechanical": 19,
+        "nets": 186,
+        "pins": 517,
+        "droppedPower": 5,
+        "droppedDegree": 0,
+        "offQuarter": 0,
+        "canvas": [
+          95.9,
+          90.2
+        ],
+        "density": 0.7232536669140169
+      },
+      "original": {
+        "score": {
+          "total": 195768.58680672865,
+          "hpwl": 5489.188739999999,
+          "weightedHpwl": 6088.009329818182,
+          "overlap": 942.543031012633,
+          "bounds": 0.04108073449999995,
+          "congestion": 2327.510254967748
+        },
+        "legality": {
+          "overlapPairs": 117,
+          "overlappingComponents": 122,
+          "outside": 2
+        }
+      },
+      "random": {
+        "total": 530158.6927390567,
+        "hpwl": 15682.340379368019,
+        "weightedHpwl": 17393.14114802635,
+        "overlap": 2499.276874098011,
+        "bounds": 0,
+        "congestion": 25820.353542856228
+      },
+      "result": {
+        "score": {
+          "total": 32917.245014895125,
+          "hpwl": 8160.855959281262,
+          "weightedHpwl": 9051.131154839211,
+          "overlap": 102.94553150611483,
+          "bounds": 4.888844726777616,
+          "congestion": 4598.477226954842
+        },
+        "searchScore": {
+          "total": 32917.1796875,
+          "hpwl": 8160.8564453125,
+          "weightedHpwl": 9051.1318359375,
+          "overlap": 102.94546508789062,
+          "bounds": 4.88884973526001,
+          "congestion": 4598.36962890625
+        },
+        "legality": {
+          "overlapPairs": 33,
+          "overlappingComponents": 36,
+          "outside": 7
+        },
+        "globalScore": {
+          "total": 101185.734375,
+          "hpwl": 8103.73974609375,
+          "weightedHpwl": 8987.78515625,
+          "overlap": 437.201171875,
+          "bounds": 0,
+          "congestion": 9515.4384765625
+        },
+        "fastScore": {
+          "total": 35577.97265625,
+          "hpwl": 8255.87890625,
+          "weightedHpwl": 9156.521484375,
+          "overlap": 119.932373046875,
+          "bounds": 0.024164661765098572,
+          "congestion": 4860.2900390625
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 38,
+            "capacity": 8.550972024656236
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 19,
+              "capacity": 34.203888098624944
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.115832329339852,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.394790411674815,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.7438882195599014,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 186,
+          "clean": 184,
+          "complete": 186,
+          "overflow": 1,
+          "vias": 239,
+          "length": 5242,
+          "rounds": 12,
+          "ms": 895.0803000000014
+        },
+        "result": {
+          "nets": 186,
+          "clean": 59,
+          "complete": 186,
+          "overflow": 451,
+          "vias": 1101,
+          "length": 9615,
+          "rounds": 12,
+          "ms": 2943.381199999996
+        }
+      }
+    },
+    {
+      "case": "pic",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 435,
+      "fixed": 0,
+      "nets": 310,
+      "density": 0.56,
+      "seed": 20260925,
+      "orig hpwl": 5955,
+      "orig ovl": 809.3,
+      "rand hpwl": 29413,
+      "hpwl": 11749,
+      "hpwl/orig": 1.97,
+      "ovl mm2": 189.3,
+      "ovl pairs": 55,
+      "bounds": 0.06,
+      "global s": 0.8,
+      "lns s": 4.1,
+      "polish s": 1.8,
+      "total s": 6.7,
+      "orig clean": "310/310",
+      "clean": "92/310",
+      "orig ovf": 0,
+      "ovf": 1223,
+      "file": "benchmark/ciaa-Hardware/PCB/PIC/ciaa-pic.kicad_pcb",
+      "stats": {
+        "footprints": 435,
+        "bottom": 210,
+        "locked": 0,
+        "mechanical": 11,
+        "nets": 310,
+        "pins": 963,
+        "droppedPower": 5,
+        "droppedDegree": 0,
+        "offQuarter": 0,
+        "canvas": [
+          138.7,
+          86.2
+        ],
+        "density": 0.5607810425264735
+      },
+      "original": {
+        "score": {
+          "total": 168583.97752132037,
+          "hpwl": 5954.886360000002,
+          "weightedHpwl": 6604.510326545452,
+          "overlap": 809.2933739234008,
+          "bounds": 0,
+          "congestion": 241.58482018951733
+        },
+        "legality": {
+          "overlapPairs": 247,
+          "overlappingComponents": 301,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 430518.0582243474,
+        "hpwl": 29413.27821534144,
+        "weightedHpwl": 32621.999475196895,
+        "overlap": 1928.2259297541618,
+        "bounds": 0,
+        "congestion": 24501.74559663631
+      },
+      "result": {
+        "score": {
+          "total": 53334.04239392823,
+          "hpwl": 11748.893588060198,
+          "weightedHpwl": 13030.591070394044,
+          "overlap": 189.32268916398002,
+          "bounds": 0.05605139176244783,
+          "congestion": 4855.406424771371
+        },
+        "searchScore": {
+          "total": 53333.9765625,
+          "hpwl": 11748.89453125,
+          "weightedHpwl": 13030.591796875,
+          "overlap": 189.3227081298828,
+          "bounds": 0.05605129897594452,
+          "congestion": 4855.26904296875
+        },
+        "legality": {
+          "overlapPairs": 55,
+          "overlappingComponents": 59,
+          "outside": 5
+        },
+        "globalScore": {
+          "total": 141586.359375,
+          "hpwl": 11460.3720703125,
+          "weightedHpwl": 12710.59375,
+          "overlap": 621.704345703125,
+          "bounds": 0,
+          "congestion": 9069.7724609375
+        },
+        "fastScore": {
+          "total": 55479.8359375,
+          "hpwl": 11778.81640625,
+          "weightedHpwl": 13063.779296875,
+          "overlap": 198.99916076660156,
+          "bounds": 0,
+          "congestion": 5232.45703125
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 25,
+            "capacity": 12.429981981981982
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 13,
+              "capacity": 49.71992792792793
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.3125344160095767,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.6406680200119705,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.8750229440063844,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 310,
+          "clean": 310,
+          "complete": 310,
+          "overflow": 0,
+          "vias": 342,
+          "length": 5673,
+          "rounds": 11,
+          "ms": 688.6085999999996
+        },
+        "result": {
+          "nets": 310,
+          "clean": 92,
+          "complete": 310,
+          "overflow": 1223,
+          "vias": 1691,
+          "length": 14346,
+          "rounds": 12,
+          "ms": 5193.7235
+        }
+      }
+    },
+    {
+      "case": "nxp",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 443,
+      "fixed": 0,
+      "nets": 370,
+      "density": 0.63,
+      "seed": 20260925,
+      "orig hpwl": 8759,
+      "orig ovl": 1107.7,
+      "rand hpwl": 33391,
+      "hpwl": 15149,
+      "hpwl/orig": 1.73,
+      "ovl mm2": 64.6,
+      "ovl pairs": 58,
+      "bounds": 0.65,
+      "global s": 0.8,
+      "lns s": 4,
+      "polish s": 1.9,
+      "total s": 6.8,
+      "orig clean": "292/370",
+      "clean": "107/370",
+      "orig ovf": 67,
+      "ovf": 1675,
+      "file": "benchmark/ciaa-Hardware/PCB/NXP/ciaa-nxp.kicad_pcb",
+      "stats": {
+        "footprints": 443,
+        "bottom": 212,
+        "locked": 0,
+        "mechanical": 10,
+        "nets": 370,
+        "pins": 1088,
+        "droppedPower": 5,
+        "droppedDegree": 0,
+        "offQuarter": 1,
+        "canvas": [
+          138.6,
+          86.2
+        ],
+        "density": 0.6302370872657532
+      },
+      "original": {
+        "score": {
+          "total": 232268.33271437834,
+          "hpwl": 8758.748001000005,
+          "weightedHpwl": 9714.247782927272,
+          "overlap": 1107.7060019478013,
+          "bounds": 0,
+          "congestion": 2025.7690837816465
+        },
+        "legality": {
+          "overlapPairs": 269,
+          "overlappingComponents": 296,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 483548.58338836354,
+        "hpwl": 33390.61884916086,
+        "weightedHpwl": 37033.23181452383,
+        "overlap": 2120.4417932667557,
+        "bounds": 0,
+        "congestion": 44853.985840977184
+      },
+      "result": {
+        "score": {
+          "total": 35941.77311293899,
+          "hpwl": 15149.35177660454,
+          "weightedHpwl": 16802.008334052294,
+          "overlap": 64.58338076698783,
+          "bounds": 0.6483904488475966,
+          "congestion": 12186.821071439208
+        },
+        "searchScore": {
+          "total": 35941.61328125,
+          "hpwl": 15149.3515625,
+          "weightedHpwl": 16802.0078125,
+          "overlap": 64.58330535888672,
+          "bounds": 0.648390531539917,
+          "congestion": 12186.537109375
+        },
+        "legality": {
+          "overlapPairs": 58,
+          "overlappingComponents": 63,
+          "outside": 3
+        },
+        "globalScore": {
+          "total": 186821.96875,
+          "hpwl": 14249.798828125,
+          "weightedHpwl": 15804.32421875,
+          "overlap": 811.480224609375,
+          "bounds": 0,
+          "congestion": 17443.203125
+        },
+        "fastScore": {
+          "total": 39956.10546875,
+          "hpwl": 15189.1953125,
+          "weightedHpwl": 16846.19921875,
+          "overlap": 84.39692687988281,
+          "bounds": 1.1641532182693481e-10,
+          "congestion": 12461.041015625
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 25,
+            "capacity": 12.424792792792791
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 13,
+              "capacity": 49.699171171171166
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.3116227372228646,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.6395284215285808,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.8744151581485765,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 370,
+          "clean": 292,
+          "complete": 369,
+          "overflow": 67,
+          "vias": 752,
+          "length": 8764,
+          "rounds": 12,
+          "ms": 1616.160800000005
+        },
+        "result": {
+          "nets": 370,
+          "clean": 107,
+          "complete": 370,
+          "overflow": 1675,
+          "vias": 2178,
+          "length": 18312,
+          "rounds": 12,
+          "ms": 6843.979999999996
+        }
+      }
+    },
+    {
+      "case": "rx",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 450,
+      "fixed": 0,
+      "nets": 400,
+      "density": 0.71,
+      "seed": 20260925,
+      "orig hpwl": 8270,
+      "orig ovl": 1369.3,
+      "rand hpwl": 32165,
+      "hpwl": 15139,
+      "hpwl/orig": 1.83,
+      "ovl mm2": 362.9,
+      "ovl pairs": 157,
+      "bounds": 7.3,
+      "global s": 0.6,
+      "lns s": 4,
+      "polish s": 2.1,
+      "total s": 6.8,
+      "orig clean": "369/400",
+      "clean": "96/400",
+      "orig ovf": 18,
+      "ovf": 2001,
+      "file": "benchmark/ciaa-Hardware/PCB/RX/hw/ciaa-rx.kicad_pcb",
+      "stats": {
+        "footprints": 450,
+        "bottom": 236,
+        "locked": 0,
+        "mechanical": 11,
+        "nets": 400,
+        "pins": 1138,
+        "droppedPower": 5,
+        "droppedDegree": 0,
+        "offQuarter": 1,
+        "canvas": [
+          136.6,
+          84.2
+        ],
+        "density": 0.7050975087286554
+      },
+      "original": {
+        "score": {
+          "total": 283730.68494712916,
+          "hpwl": 8269.664500000004,
+          "weightedHpwl": 9171.809718181821,
+          "overlap": 1369.341784174701,
+          "bounds": 0,
+          "congestion": 1381.0367880142833
+        },
+        "legality": {
+          "overlapPairs": 289,
+          "overlappingComponents": 325,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 720119.9840052396,
+        "hpwl": 32165.413893059467,
+        "weightedHpwl": 35674.36813593866,
+        "overlap": 3283.500598995884,
+        "bounds": 0,
+        "congestion": 55490.99214024818
+      },
+      "result": {
+        "score": {
+          "total": 94352.55162176157,
+          "hpwl": 15139.367367421342,
+          "weightedHpwl": 16790.934716594562,
+          "overlap": 362.92245093277694,
+          "bounds": 7.304198365894304,
+          "congestion": 7032.5740908654925
+        },
+        "searchScore": {
+          "total": 94352.453125,
+          "hpwl": 15139.3671875,
+          "weightedHpwl": 16790.93359375,
+          "overlap": 362.9224548339844,
+          "bounds": 7.304213523864746,
+          "congestion": 7032.3779296875
+        },
+        "legality": {
+          "overlapPairs": 157,
+          "overlappingComponents": 159,
+          "outside": 12
+        },
+        "globalScore": {
+          "total": 225706.703125,
+          "hpwl": 14671.6884765625,
+          "weightedHpwl": 16272.236328125,
+          "overlap": 1017.4197387695312,
+          "bounds": 0,
+          "congestion": 11901.033203125
+        },
+        "fastScore": {
+          "total": 106399.7421875,
+          "hpwl": 15087.302734375,
+          "weightedHpwl": 16733.19140625,
+          "overlap": 426.7126159667969,
+          "bounds": 3.553956985473633,
+          "congestion": 7226.4736328125
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 25,
+            "capacity": 12.136936936936934
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 13,
+              "capacity": 48.547747747747735
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.2869528662697791,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.6086910828372238,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.8579685775131861,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 400,
+          "clean": 369,
+          "complete": 399,
+          "overflow": 18,
+          "vias": 659,
+          "length": 8084,
+          "rounds": 12,
+          "ms": 1817.1928000000044
+        },
+        "result": {
+          "nets": 400,
+          "clean": 96,
+          "complete": 400,
+          "overflow": 2001,
+          "vias": 2296,
+          "length": 18567,
+          "rounds": 12,
+          "ms": 6673.116300000009
+        }
+      }
+    },
+    {
+      "case": "k60",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 467,
+      "fixed": 0,
+      "nets": 318,
+      "density": 0.69,
+      "seed": 20260925,
+      "orig hpwl": 5799,
+      "orig ovl": 1146.6,
+      "rand hpwl": 29124,
+      "hpwl": 14547,
+      "hpwl/orig": 2.51,
+      "ovl mm2": 240.6,
+      "ovl pairs": 141,
+      "bounds": 0.18,
+      "global s": 0.9,
+      "lns s": 4.8,
+      "polish s": 2,
+      "total s": 7.6,
+      "orig clean": "318/318",
+      "clean": "66/318",
+      "orig ovf": 0,
+      "ovf": 2045,
+      "file": "benchmark/ciaa-Hardware/PCB/FSL/CIAA_K60/CIAA_K60.kicad_pcb",
+      "stats": {
+        "footprints": 467,
+        "bottom": 0,
+        "locked": 0,
+        "mechanical": 22,
+        "nets": 318,
+        "pins": 1040,
+        "droppedPower": 8,
+        "droppedDegree": 0,
+        "offQuarter": 1,
+        "canvas": [
+          137,
+          86
+        ],
+        "density": 0.6875265619849894
+      },
+      "original": {
+        "score": {
+          "total": 235874.07676106525,
+          "hpwl": 5799.279700000005,
+          "weightedHpwl": 6431.928394545441,
+          "overlap": 1146.599690426983,
+          "bounds": 0,
+          "congestion": 244.42056224641038
+        },
+        "legality": {
+          "overlapPairs": 310,
+          "overlappingComponents": 323,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 645993.5828687152,
+        "hpwl": 29124.17391520607,
+        "weightedHpwl": 32301.356524137656,
+        "overlap": 2996.956520155121,
+        "bounds": 0,
+        "congestion": 28601.84462710645
+      },
+      "result": {
+        "score": {
+          "total": 66618.67528136479,
+          "hpwl": 14547.141964567945,
+          "weightedHpwl": 16134.102906157194,
+          "overlap": 240.59550853160002,
+          "bounds": 0.18358127129264373,
+          "congestion": 4657.508829258117
+        },
+        "searchScore": {
+          "total": 66618.71875,
+          "hpwl": 14547.142578125,
+          "weightedHpwl": 16134.103515625,
+          "overlap": 240.59609985351562,
+          "bounds": 0.18357813358306885,
+          "congestion": 4657.365234375
+        },
+        "legality": {
+          "overlapPairs": 141,
+          "overlappingComponents": 138,
+          "outside": 6
+        },
+        "globalScore": {
+          "total": 191416.4375,
+          "hpwl": 14164.13671875,
+          "weightedHpwl": 15709.314453125,
+          "overlap": 859.8345947265625,
+          "bounds": 0,
+          "congestion": 7480.41943359375
+        },
+        "fastScore": {
+          "total": 74867.375,
+          "hpwl": 14483.859375,
+          "weightedHpwl": 16063.9169921875,
+          "overlap": 281.37591552734375,
+          "bounds": 0,
+          "congestion": 5056.5458984375
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 25,
+            "capacity": 12.34234234234234
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 13,
+              "capacity": 49.36936936936936
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.3025390589153172,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.6281738236441463,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.8683593726102113,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 318,
+          "clean": 318,
+          "complete": 318,
+          "overflow": 0,
+          "vias": 345,
+          "length": 5447,
+          "rounds": 9,
+          "ms": 759.8668000000034
+        },
+        "result": {
+          "nets": 318,
+          "clean": 66,
+          "complete": 318,
+          "overflow": 2045,
+          "vias": 2196,
+          "length": 18348,
+          "rounds": 12,
+          "ms": 7409.406999999992
+        }
+      }
+    },
+    {
+      "case": "acc",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 569,
+      "fixed": 7,
+      "nets": 617,
+      "density": 0.86,
+      "seed": 20260925,
+      "orig hpwl": 17115,
+      "orig ovl": 1515.1,
+      "rand hpwl": 42977,
+      "hpwl": 19862,
+      "hpwl/orig": 1.16,
+      "ovl mm2": 902.2,
+      "ovl pairs": 212,
+      "bounds": 35.2,
+      "global s": 0.9,
+      "lns s": 5.6,
+      "polish s": 2.6,
+      "total s": 9.2,
+      "orig clean": "230/617",
+      "clean": "62/617",
+      "orig ovf": 6789,
+      "ovf": 14283,
+      "file": "benchmark/ciaa-Hardware/PCB/ACC/CIAA_ACC/ciaa_acc.kicad_pcb",
+      "stats": {
+        "footprints": 569,
+        "bottom": 0,
+        "locked": 7,
+        "mechanical": 45,
+        "nets": 617,
+        "pins": 1953,
+        "droppedPower": 6,
+        "droppedDegree": 0,
+        "offQuarter": 0,
+        "canvas": [
+          95.9,
+          90.2
+        ],
+        "density": 0.8619858892046521
+      },
+      "original": {
+        "score": {
+          "total": 364824.27796828316,
+          "hpwl": 17115.008400000017,
+          "weightedHpwl": 18982.100225454542,
+          "overlap": 1515.1386065898037,
+          "bounds": 1.3282800000000345,
+          "congestion": 85097.60084973575
+        },
+        "legality": {
+          "overlapPairs": 705,
+          "overlappingComponents": 523,
+          "outside": 4
+        }
+      },
+      "random": {
+        "total": 832938.6785461799,
+        "hpwl": 42977.03071625873,
+        "weightedHpwl": 47665.4340671234,
+        "overlap": 3068.648140662875,
+        "bounds": 0,
+        "congestion": 343087.2326929629
+      },
+      "result": {
+        "score": {
+          "total": 264071.7323627401,
+          "hpwl": 19861.50301814231,
+          "weightedHpwl": 22028.212438303304,
+          "overlap": 902.2299279580444,
+          "bounds": 35.19777600946835,
+          "congestion": 109115.95826186839
+        },
+        "searchScore": {
+          "total": 264071,
+          "hpwl": 19861.50390625,
+          "weightedHpwl": 22028.2109375,
+          "overlap": 902.2301635742188,
+          "bounds": 35.197792053222656,
+          "congestion": 109114.3515625
+        },
+        "legality": {
+          "overlapPairs": 212,
+          "overlappingComponents": 205,
+          "outside": 28
+        },
+        "globalScore": {
+          "total": 445664.125,
+          "hpwl": 19074.912109375,
+          "weightedHpwl": 21155.8125,
+          "overlap": 1800.3565673828125,
+          "bounds": 0,
+          "congestion": 128874.0078125
+        },
+        "fastScore": {
+          "total": 276393.3125,
+          "hpwl": 19819.19140625,
+          "weightedHpwl": 21981.28515625,
+          "overlap": 993.447509765625,
+          "bounds": 3.875023603439331,
+          "congestion": 109895.0625
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 38,
+            "capacity": 8.550972024656234
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 19,
+              "capacity": 34.20388809862494
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 1.115832329339852,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 1.394790411674815,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 0.7438882195599014,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 617,
+          "clean": 230,
+          "complete": 617,
+          "overflow": 6789,
+          "vias": 1852,
+          "length": 19372,
+          "rounds": 12,
+          "ms": 7574.933899999989
+        },
+        "result": {
+          "nets": 617,
+          "clean": 62,
+          "complete": 595,
+          "overflow": 14283,
+          "vias": 2602,
+          "length": 25349,
+          "rounds": 12,
+          "ms": 14833.453700000013
+        }
+      }
+    },
+    {
+      "case": "ppc-n3",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 2207,
+      "fixed": 12,
+      "nets": 1607,
+      "density": 0.5,
+      "seed": 20260925,
+      "orig hpwl": 54188,
+      "orig ovl": 2607,
+      "rand hpwl": 292881,
+      "hpwl": 93614,
+      "hpwl/orig": 1.73,
+      "ovl mm2": 1299.5,
+      "ovl pairs": 1157,
+      "bounds": 3.06,
+      "global s": 1.2,
+      "lns s": 21.3,
+      "polish s": 9.6,
+      "total s": 32.1,
+      "orig clean": "945/1607",
+      "clean": "56/1607",
+      "orig ovf": 10841,
+      "ovf": 62063,
+      "file": "benchmark/powerpc-laptop-mobo/KiCAD/openPPCnotebook/Mas100n3 ACB_0001_2.kicad_pcb",
+      "stats": {
+        "footprints": 2207,
+        "bottom": 1517,
+        "locked": 12,
+        "mechanical": 126,
+        "nets": 1607,
+        "pins": 4529,
+        "droppedPower": 61,
+        "droppedDegree": 0,
+        "offQuarter": 0,
+        "canvas": [
+          296.4,
+          149.9
+        ],
+        "density": 0.5022926548277655
+      },
+      "original": {
+        "score": {
+          "total": 617373.3280873935,
+          "hpwl": 54187.56555999997,
+          "weightedHpwl": 60098.93634836361,
+          "overlap": 2606.9649956960243,
+          "bounds": 0,
+          "congestion": 71762.78519965013
+        },
+        "legality": {
+          "overlapPairs": 1258,
+          "overlappingComponents": 1544,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 2480696.390178147,
+        "hpwl": 292880.6508048866,
+        "weightedHpwl": 324831.26725632884,
+        "overlap": 6253.686324741745,
+        "bounds": 0,
+        "congestion": 1810255.7159469384
+      },
+      "result": {
+        "score": {
+          "total": 617320.5666557438,
+          "hpwl": 93613.65625624332,
+          "weightedHpwl": 103826.0551205608,
+          "overlap": 1299.4660133895338,
+          "bounds": 3.0562563565449827,
+          "congestion": 505980.1151719345
+        },
+        "searchScore": {
+          "total": 617316.375,
+          "hpwl": 93613.65625,
+          "weightedHpwl": 103826.046875,
+          "overlap": 1299.464111328125,
+          "bounds": 3.056248188018799,
+          "congestion": 505972.5625
+        },
+        "legality": {
+          "overlapPairs": 1157,
+          "overlappingComponents": 1077,
+          "outside": 27
+        },
+        "globalScore": {
+          "total": 1379521.375,
+          "hpwl": 92836.921875,
+          "weightedHpwl": 102964.59375,
+          "overlap": 4658,
+          "bounds": 0,
+          "congestion": 689913.5625
+        },
+        "fastScore": {
+          "total": 651696.0625,
+          "hpwl": 93635.140625,
+          "weightedHpwl": 103849.890625,
+          "overlap": 1432.733642578125,
+          "bounds": 0.3350405991077423,
+          "congestion": 522464.875
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 20,
+            "capacity": 26.70422162162162
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 10,
+              "capacity": 106.81688648648648
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 2.5291556717810786,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 3.161444589726348,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 1.6861037811873858,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 1607,
+          "clean": 945,
+          "complete": 1606,
+          "overflow": 10841,
+          "vias": 4310,
+          "length": 58192,
+          "rounds": 12,
+          "ms": 29756.172299999977
+        },
+        "result": {
+          "nets": 1607,
+          "clean": 56,
+          "complete": 1589,
+          "overflow": 62063,
+          "vias": 7145,
+          "length": 115314,
+          "rounds": 12,
+          "ms": 136536.28780000002
+        }
+      }
+    },
+    {
+      "case": "ppc-n1",
+      "backend": "gpu",
+      "budget": "large",
+      "mode": "plain",
+      "n": 2275,
+      "fixed": 8,
+      "nets": 1669,
+      "density": 0.6,
+      "seed": 20260925,
+      "orig hpwl": 53985,
+      "orig ovl": 5954.7,
+      "rand hpwl": 280613,
+      "hpwl": 96977,
+      "hpwl/orig": 1.8,
+      "ovl mm2": 2263.6,
+      "ovl pairs": 1401,
+      "bounds": 0.12,
+      "global s": 1.2,
+      "lns s": 21.9,
+      "polish s": 9.7,
+      "total s": 32.8,
+      "orig clean": "950/1669",
+      "clean": "62/1669",
+      "orig ovf": 12773,
+      "ovf": 68825,
+      "file": "benchmark/powerpc-laptop-mobo/KiCAD/openPPCnotebook/Mas100n1 ACUBE_PORTABILE R_0.kicad_pcb",
+      "stats": {
+        "footprints": 2275,
+        "bottom": 1513,
+        "locked": 8,
+        "mechanical": 156,
+        "nets": 1669,
+        "pins": 4657,
+        "droppedPower": 68,
+        "droppedDegree": 0,
+        "offQuarter": 0,
+        "canvas": [
+          294.3,
+          150
+        ],
+        "density": 0.5991643321461223
+      },
+      "original": {
+        "score": {
+          "total": 1289376.2694868313,
+          "hpwl": 53985.026575000076,
+          "weightedHpwl": 59874.30220136356,
+          "overlap": 5954.697666910038,
+          "bounds": 0,
+          "congestion": 77124.86780692029
+        },
+        "legality": {
+          "overlapPairs": 1672,
+          "overlappingComponents": 1795,
+          "outside": 0
+        }
+      },
+      "random": {
+        "total": 3086364.695848152,
+        "hpwl": 280613.05209118733,
+        "weightedHpwl": 311225.3850465894,
+        "overlap": 9410.057946053481,
+        "bounds": 0,
+        "congestion": 1786255.4431817324
+      },
+      "result": {
+        "score": {
+          "total": 824800.6535490393,
+          "hpwl": 96976.5888521617,
+          "weightedHpwl": 107555.85309057921,
+          "overlap": 2263.572170573782,
+          "bounds": 0.11834768838729146,
+          "congestion": 529013.3936120522
+        },
+        "searchScore": {
+          "total": 824795.625,
+          "hpwl": 96976.59375,
+          "weightedHpwl": 107555.8515625,
+          "overlap": 2263.56689453125,
+          "bounds": 0.11834946274757385,
+          "congestion": 529005.375
+        },
+        "legality": {
+          "overlapPairs": 1401,
+          "overlappingComponents": 1258,
+          "outside": 42
+        },
+        "globalScore": {
+          "total": 1502008.75,
+          "hpwl": 98437.6875,
+          "weightedHpwl": 109176.3515625,
+          "overlap": 5227.8486328125,
+          "bounds": 0,
+          "congestion": 694525.3125
+        },
+        "fastScore": {
+          "total": 866581.5,
+          "hpwl": 97072.6875,
+          "weightedHpwl": 107662.4375,
+          "overlap": 2432.05078125,
+          "bounds": 0.057171307504177094,
+          "congestion": 544994.8125
+        }
+      },
+      "config": {
+        "scorerOptions": {
+          "weights": {
+            "hpwl": 1,
+            "overlap": 200,
+            "bounds": 200,
+            "congestion": 0.5
+          },
+          "coarse": {
+            "gridWidth": 40,
+            "gridHeight": 20,
+            "capacity": 26.509626666666666
+          }
+        },
+        "optimizer": {
+          "seed": 20260925,
+          "approximate": {
+            "weights": {
+              "hpwl": 1,
+              "overlap": 200,
+              "bounds": 200,
+              "congestion": 0.5
+            },
+            "coarse": {
+              "gridWidth": 20,
+              "gridHeight": 10,
+              "capacity": 106.03850666666666
+            }
+          },
+          "global": {
+            "starts": 32,
+            "coarseIterations": 150,
+            "finalists": 4,
+            "fineIterations": 220,
+            "placer": {
+              "wireStrength": 0.92,
+              "densityStrength": 0.86,
+              "overlapStrength": 4,
+              "macroStrength": 7.4,
+              "boundaryStrength": 2.6,
+              "clearance": 0.2,
+              "macroClearance": 0.5,
+              "egressGap": 1,
+              "fixedAnchorBoost": 4.8,
+              "movableNetScale": 0.72,
+              "damping": 0.66,
+              "step": 0.58,
+              "maxMove": 2.5211005710998524,
+              "cooling": 0.9986,
+              "gridDensity": {
+                "strength": 0,
+                "bins": 64,
+                "target": 0.65,
+                "pinArea": 0.6
+              }
+            }
+          },
+          "fastLns": {
+            "iterations": 400,
+            "population": 1024,
+            "movesPerCandidate": 2,
+            "translationScale": 3.151375713874815,
+            "rotationProbability": 0.1,
+            "temperature": 0.025,
+            "cooling": 0.992
+          },
+          "polish": {
+            "iterations": 200,
+            "population": 1024,
+            "movesPerCandidate": 1,
+            "translationScale": 1.6807337140665681,
+            "rotationProbability": 0.05,
+            "temperature": 0.012,
+            "cooling": 0.985
+          }
+        }
+      },
+      "route": {
+        "original": {
+          "nets": 1669,
+          "clean": 950,
+          "complete": 1644,
+          "overflow": 12773,
+          "vias": 4493,
+          "length": 56305,
+          "rounds": 12,
+          "ms": 138948.37070000003
+        },
+        "result": {
+          "nets": 1669,
+          "clean": 62,
+          "complete": 1668,
+          "overflow": 68825,
+          "vias": 8545,
+          "length": 121530,
+          "rounds": 12,
+          "ms": 137558.01580000005
+        }
+      }
+    }
+  ]
+}

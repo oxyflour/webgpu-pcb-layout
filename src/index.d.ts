@@ -1,10 +1,10 @@
 /// <reference types="@webgpu/types" />
 export interface Pin { id:string; x:number; y:number; normal?:[number,number]; side?:'left'|'right'|'top'|'bottom' }
-export interface Component { id:string; width:number; height:number; pins:Pin[]; rotatable?:boolean; fixed?:Placement }
+export interface Component { id:string; width:number; height:number; pins:Pin[]; rotatable?:boolean; fixed?:Placement; sides?:'top'|'bottom'|'any'; twoSided?:boolean }
 export interface PinRef { componentId:string; pinId:string }
 export interface Net { id:string; pins:PinRef[] }
 export interface LayoutProblem { canvas:{width:number;height:number}; components:Component[]; nets:Net[] }
-export interface Placement { x:number; y:number; rotation:number }
+export interface Placement { x:number; y:number; rotation:number; /** 0 = top (default), 1 = bottom; pins are mirrored in local x on the bottom. */ side?:0|1 }
 export interface Score { total:number; hpwl:number; overlap:number; bounds:number; congestion:number }
 export interface RouteBranch { cells:number[]; polyline:[number,number][] }
 export interface NetRoute { netId:string; ok:boolean; branches:RouteBranch[] }
@@ -80,3 +80,7 @@ export class GpuAnalyticalGlobalPlacer {
   optimize(initial:Placement[]):Promise<{layout:Placement[];trace:any[]}>;
   destroy():void;
 }
+export function localPin(x:number,y:number,side?:number):[number,number];
+export function sharesSide(problem:NormalizedProblem,i:number,pi:Placement,j:number,pj:Placement):boolean;
+export function placementSide(p:Placement):0|1;
+export function legalizeLayout(problem:NormalizedProblem,layout:Placement[],options?:{cell?:number;clearance?:number;maxRadius?:number}):{layout:Placement[];moved:number;failed:number;maxDisplacement:number;meanDisplacement:number};

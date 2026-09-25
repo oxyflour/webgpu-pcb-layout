@@ -49,6 +49,25 @@ test('WebGPU global placer tracks the CPU placer step by step', async (t) => {
   gpu.destroy(); device.destroy();
 });
 
+test('grid density potential matches the CPU placer', async (t) => {
+  const device = await getGpuOrSkip(t); if (!device) return;
+  const { problem, layout } = problemAndLayout(13, 120);
+  const withGrid = { ...options, gridDensity: { strength: 3, bins: 40, target: 0.6, pinArea: 0.8, scales: [1, 2, 4, 8] } };
+  const gpu = new GpuAnalyticalGlobalPlacer(device, problem, withGrid);
+  for (const iterations of [1, 3]) {
+    const cpu = await new AnalyticalGlobalPlacer(problem, { ...withGrid, iterations, recordEvery: 1e9 }).optimize(layout);
+    const [got] = await gpu.optimizeBatch([layout], iterations);
+    let worst = 0;
+    got.forEach((p, i) => { worst = Math.max(worst, Math.abs(p.x - cpu.layout[i].x), Math.abs(p.y - cpu.layout[i].y)); });
+    assert.ok(worst < 2e-3, `${iterations} iterations: max position error ${worst}`);
+  }
+  // The grid force actually moves parts compared with the plain model.
+  const [plain] = await new GpuAnalyticalGlobalPlacer(device, problem, options).optimizeBatch([layout], 3);
+  const [grid] = await gpu.optimizeBatch([layout], 3);
+  assert.ok(grid.some((p, i) => Math.abs(p.x - plain[i].x) > 1e-3));
+  gpu.destroy(); device.destroy();
+});
+
 test('batched starts equal individual runs', async (t) => {
   const device = await getGpuOrSkip(t); if (!device) return;
   const { problem, layout } = problemAndLayout(9, 60);

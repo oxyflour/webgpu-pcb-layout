@@ -1,9 +1,10 @@
 import { createBuffer } from './device.js';
 import { worldPin, rotatedSize } from '../problem.js';
-import { resolveGlobalPlacerOptions, pinAnchorOutsideFixed } from '../optimizer/global-placement.js';
+import { resolveGlobalPlacerOptions, pinAnchorOutsideFixed, densityGridSpec, DENSITY_FIXED_POINT } from '../optimizer/global-placement.js';
 
 const WG = 128;
 const NET_WG = 64;
+const GRID_WG = 16;
 // Iterations encoded per command buffer; keeps individual submissions short.
 const ITERATIONS_PER_SUBMIT = 25;
 
@@ -17,7 +18,7 @@ const lit = (v) => {
  * (`topo`) and float data in one f32 buffer (`stat`); section offsets are baked into
  * the WGSL so each kernel stays within the default 8 storage buffers per stage.
  */
-function buildTables(problem, o) {
+function buildTables(problem, o, grid) {
   const n = problem.components.length, pins = problem.pins, nets = problem.nets;
   const movable = [], fixed = [];
   problem.components.forEach((c, i) => (c.fixed ? fixed : movable).push(i));
@@ -67,6 +68,7 @@ function buildTables(problem, o) {
     return pinFlags[i] & 2 ? pinAnchorOutsideFixed(problem, fixedLayout, i, o.egressGap) : worldPin(problem, fixedLayout, i);
   }));
   fput('netWeight', netWeight);
+  fput('inflate', grid ? grid.inflate : [0]);
 
   return {
     n, nets: nets.length, movable, fixed, sections,
@@ -77,7 +79,7 @@ function buildTables(problem, o) {
 function shaderHeader(t, o, canvas) {
   const S = t.sections;
   return /* wgsl */`
-struct Iter { density: f32, overlap: f32, wire: f32, step: f32 };
+struct Iter { density: f32, overlap: f32, wire: f32, step: f32, grid: f32, pad0: f32, pad1: f32, pad2: f32 };
 @group(0) @binding(0) var<storage, read> posIn: array<vec4<f32>>;
 @group(0) @binding(1) var<storage, read> topo: array<u32>;
 @group(0) @binding(2) var<storage, read> stat: array<f32>;
@@ -118,6 +120,96 @@ fn sharesSide(i: u32, si: u32, j: u32, sj: u32) -> bool {
 `;
 }
 
+/** Grid density pass 1: scatter inflated component coverage into per-side bins. */
+function scatterWgsl(t, o, canvas, g) {
+  const S = t.sections, B = g.gw * g.gh;
+  return shaderHeader(t, o, canvas) + /* wgsl */`
+@group(0) @binding(4) var<storage, read_write> density: array<atomic<u32>>;
+@compute @workgroup_size(${NET_WG})
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let i = gid.x;
+  let start = gid.y;
+  if (i >= N) { return; }
+  let p = posIn[start * N + i];
+  let half = 0.5 * compSize(i, bitcast<u32>(p.z)) * stat[${S.inflate}u + i];
+  let lo = p.xy - half;
+  let hi = p.xy + half;
+  let bin = vec2<f32>(${lit(g.binW)}, ${lit(g.binH)});
+  let b0 = max(vec2<i32>(floor(lo / bin)), vec2<i32>(0));
+  let b1 = min(vec2<i32>(floor(hi / bin)), vec2<i32>(${g.gw - 1}, ${g.gh - 1}));
+  let twoSided = topo[${S.twoSided}u + i] != 0u;
+  let side = bitcast<u32>(p.w);
+  for (var by = b0.y; by <= b1.y; by++) {
+    for (var bx = b0.x; bx <= b1.x; bx++) {
+      let cell0 = vec2<f32>(f32(bx), f32(by)) * bin;
+      let ov = min(hi, cell0 + bin) - max(lo, cell0);
+      if (ov.x <= 0.0 || ov.y <= 0.0) { continue; }
+      let q = u32(round(ov.x * ov.y / (bin.x * bin.y) * ${DENSITY_FIXED_POINT}.0));
+      let cell = u32(by) * ${g.gw}u + u32(bx);
+      if (twoSided || side == 0u) { atomicAdd(&density[(start * 2u) * ${B}u + cell], q); }
+      if (twoSided || side == 1u) { atomicAdd(&density[(start * 2u + 1u) * ${B}u + cell], q); }
+    }
+  }
+}
+`;
+}
+
+const kernelConst = (g) => g.kernels.map((k, s) => `const K${s} = array<f32, ${k.weights.length}>(${k.weights.map(lit).join(', ')});`).join('\n');
+
+/** Grid density pass 2: horizontal blur of (coverage - target) at every scale. */
+function blurXWgsl(g, target) {
+  const B = g.gw * g.gh, S = g.kernels.length;
+  const scales = g.kernels.map((k, s) => `  {
+    var acc = 0.0;
+    for (var k = -${k.radius}; k <= ${k.radius}; k++) {
+      let xx = x + k;
+      if (xx >= 0 && xx < ${g.gw}) { acc += K${s}[k + ${k.radius}] * (f32(density[row + u32(xx)]) / ${DENSITY_FIXED_POINT}.0 - ${lit(target)}); }
+    }
+    tmp[(g * ${S}u + ${s}u) * ${B}u + y * ${g.gw}u + u32(x)] = acc;
+  }`).join('\n');
+  return /* wgsl */`
+@group(0) @binding(0) var<storage, read> density: array<u32>;
+@group(0) @binding(1) var<storage, read_write> tmp: array<f32>;
+${kernelConst(g)}
+@compute @workgroup_size(${GRID_WG}, ${GRID_WG})
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let x = i32(gid.x);
+  let y = gid.y;
+  let g = gid.z;
+  if (x >= ${g.gw} || y >= ${g.gh}u) { return; }
+  let row = g * ${B}u + y * ${g.gw}u;
+${scales}
+}
+`;
+}
+
+/** Grid density pass 3: vertical blur, sum over scales -> potential; clears coverage. */
+function blurYWgsl(g) {
+  const B = g.gw * g.gh, S = g.kernels.length;
+  const scales = g.kernels.map((k, s) => `  for (var k = -${k.radius}; k <= ${k.radius}; k++) {
+    let yy = y + k;
+    if (yy >= 0 && yy < ${g.gh}) { acc += K${s}[k + ${k.radius}] * tmp[(g * ${S}u + ${s}u) * ${B}u + u32(yy) * ${g.gw}u + x]; }
+  }`).join('\n');
+  return /* wgsl */`
+@group(0) @binding(0) var<storage, read> tmp: array<f32>;
+@group(0) @binding(1) var<storage, read_write> phi: array<f32>;
+@group(0) @binding(2) var<storage, read_write> density: array<u32>;
+${kernelConst(g)}
+@compute @workgroup_size(${GRID_WG}, ${GRID_WG})
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let x = gid.x;
+  let y = i32(gid.y);
+  let g = gid.z;
+  if (x >= ${g.gw}u || y >= ${g.gh}) { return; }
+  var acc = 0.0;
+${scales}
+  let cell = g * ${B}u + u32(y) * ${g.gw}u + x;
+  phi[cell] = acc;
+  density[cell] = 0u;
+}
+`;
+}
+
 /** Pass 1: centroid of every multi-pin net, per start. */
 function centroidWgsl(t, o, canvas) {
   return shaderHeader(t, o, canvas) + /* wgsl */`
@@ -138,12 +230,42 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 
 /** Pass 2: per-component force accumulation and velocity integration. */
-function forceWgsl(t, o, canvas) {
+function forceWgsl(t, o, canvas, g) {
   const S = t.sections;
+  const gridFns = g ? /* wgsl */`
+@group(0) @binding(7) var<storage, read> phi: array<f32>;
+fn phiAt(side: u32, ix: i32, iy: i32) -> f32 { return phi[side * ${g.gw * g.gh}u + u32(iy) * ${g.gw}u + u32(ix)]; }
+fn phiGrad(side: u32, ix: i32, iy: i32) -> vec2<f32> {
+  var gx: f32;
+  var gy: f32;
+  if (ix == 0) { gx = phiAt(side, 1, iy) - phiAt(side, 0, iy); }
+  else if (ix == ${g.gw - 1}) { gx = phiAt(side, ${g.gw - 1}, iy) - phiAt(side, ${g.gw - 2}, iy); }
+  else { gx = 0.5 * (phiAt(side, ix + 1, iy) - phiAt(side, ix - 1, iy)); }
+  if (iy == 0) { gy = phiAt(side, ix, 1) - phiAt(side, ix, 0); }
+  else if (iy == ${g.gh - 1}) { gy = phiAt(side, ix, ${g.gh - 1}) - phiAt(side, ix, ${g.gh - 2}); }
+  else { gy = 0.5 * (phiAt(side, ix, iy + 1) - phiAt(side, ix, iy - 1)); }
+  return vec2<f32>(gx, gy);
+}
+/** Bilinear potential gradient (per bin) of grid \`side\` (start * 2 + board side) at xy mm. */
+fn densityGradient(side: u32, xy: vec2<f32>) -> vec2<f32> {
+  let f = xy / vec2<f32>(${lit(g.binW)}, ${lit(g.binH)}) - vec2<f32>(0.5);
+  let i0 = clamp(vec2<i32>(floor(f)), vec2<i32>(0), vec2<i32>(${g.gw - 1}, ${g.gh - 1}));
+  let i1 = min(i0 + vec2<i32>(1), vec2<i32>(${g.gw - 1}, ${g.gh - 1}));
+  let tt = clamp(f - vec2<f32>(i0), vec2<f32>(0.0), vec2<f32>(1.0));
+  let a = mix(phiGrad(side, i0.x, i0.y), phiGrad(side, i1.x, i0.y), tt.x);
+  let b = mix(phiGrad(side, i0.x, i1.y), phiGrad(side, i1.x, i1.y), tt.x);
+  return mix(a, b, tt.y);
+}` : '';
+  const gridForce = g ? /* wgsl */`
+    if (topo[${S.twoSided}u + i] != 0u) {
+      force -= iter.grid * 0.5 * (densityGradient(start * 2u, p.xy) + densityGradient(start * 2u + 1u, p.xy));
+    } else {
+      force -= iter.grid * densityGradient(start * 2u + bitcast<u32>(p.w), p.xy);
+    }` : '';
   return shaderHeader(t, o, canvas) + /* wgsl */`
 @group(0) @binding(4) var<storage, read> centroid: array<vec2<f32>>;
 @group(0) @binding(5) var<storage, read_write> posOut: array<vec4<f32>>;
-@group(0) @binding(6) var<storage, read_write> vel: array<vec2<f32>>;
+@group(0) @binding(6) var<storage, read_write> vel: array<vec2<f32>>;${gridFns}
 var<workgroup> tilePos: array<vec2<f32>, ${WG}>;
 var<workgroup> tileSize: array<vec2<f32>, ${WG}>;
 var<workgroup> tileIndex: array<u32, ${WG}>;
@@ -242,7 +364,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
     if (p.x < half.x) { force.x += bs * (half.x - p.x) / hs.x; }
     if (p.x > CANVAS.x - half.x) { force.x -= bs * (p.x - (CANVAS.x - half.x)) / hs.x; }
     if (p.y < half.y) { force.y += bs * (half.y - p.y) / hs.y; }
-    if (p.y > CANVAS.y - half.y) { force.y -= bs * (p.y - (CANVAS.y - half.y)) / hs.y; }
+    if (p.y > CANVAS.y - half.y) { force.y -= bs * (p.y - (CANVAS.y - half.y)) / hs.y; }${gridForce}
   }
 
   // Movable-movable density/overlap, tiled through workgroup memory.
@@ -289,23 +411,29 @@ export class GpuAnalyticalGlobalPlacer {
   constructor(device, problem, options = {}) {
     this.device = device; this.problem = problem;
     this.options = resolveGlobalPlacerOptions(options);
-    this.tables = buildTables(problem, this.options);
+    this.grid = this.options.gridDensity.strength > 0 ? densityGridSpec(problem, this.options.gridDensity) : null;
+    this.tables = buildTables(problem, this.options, this.grid);
     const t = this.tables, U = GPUBufferUsage;
     this.topo = createBuffer(device, t.topo.byteLength, U.STORAGE, t.topo);
     this.stat = createBuffer(device, Math.max(4, t.stat.byteLength), U.STORAGE, t.stat.length ? t.stat : new Float32Array(1));
-    this.iterUniform = createBuffer(device, 16, U.UNIFORM | U.COPY_DST);
+    this.iterUniform = createBuffer(device, 32, U.UNIFORM | U.COPY_DST);
     const pipeline = (code) => device.createComputePipeline({ layout: 'auto', compute: { module: device.createShaderModule({ code }), entryPoint: 'main' } });
     this.centroidPipeline = pipeline(centroidWgsl(t, this.options, problem.canvas));
-    this.forcePipeline = pipeline(forceWgsl(t, this.options, problem.canvas));
+    this.forcePipeline = pipeline(forceWgsl(t, this.options, problem.canvas, this.grid));
+    if (this.grid) {
+      this.scatterPipeline = pipeline(scatterWgsl(t, this.options, problem.canvas, this.grid));
+      this.blurXPipeline = pipeline(blurXWgsl(this.grid, this.options.gridDensity.target));
+      this.blurYPipeline = pipeline(blurYWgsl(this.grid));
+    }
   }
 
   /** Per-iteration schedule, identical to AnalyticalGlobalPlacer.optimize(). */
   #schedule(iterations) {
-    const o = this.options, out = new Float32Array(iterations * 4);
+    const o = this.options, out = new Float32Array(iterations * 8);
     let step = o.step;
     for (let it = 0; it < iterations; it++) {
       const phase = it / Math.max(1, iterations - 1);
-      out.set([o.densityStrength * (1.25 - 0.45 * phase), o.overlapStrength * (1.15 - 0.15 * phase), o.wireStrength * (0.75 + 0.45 * phase), step], it * 4);
+      out.set([o.densityStrength * (1.25 - 0.45 * phase), o.overlapStrength * (1.15 - 0.15 * phase), o.wireStrength * (0.75 + 0.45 * phase), step, o.gridDensity.strength], it * 8);
       step *= o.cooling;
     }
     return out;
@@ -335,7 +463,16 @@ export class GpuAnalyticalGlobalPlacer {
     const shared = [this.topo, this.stat, this.iterUniform];
     // The centroid pass does not read the iteration uniform (binding 3), so 'auto' drops it.
     const centroidGroups = pos.map((p) => device.createBindGroup({ layout: this.centroidPipeline.getBindGroupLayout(0), entries: entries([p, this.topo, this.stat, null, centroid]) }));
-    const forceGroups = pos.map((p, k) => device.createBindGroup({ layout: this.forcePipeline.getBindGroupLayout(0), entries: entries([p, ...shared, centroid, pos[1 - k], vel]) }));
+    const g = this.grid, gridCells = g ? starts * 2 * g.gw * g.gh : 0;
+    const density = g ? createBuffer(device, gridCells * 4, U.STORAGE) : null;
+    const tmp = g ? createBuffer(device, gridCells * g.kernels.length * 4, U.STORAGE) : null;
+    const phi = g ? createBuffer(device, gridCells * 4, U.STORAGE) : null;
+    const forceGroups = pos.map((p, k) => device.createBindGroup({ layout: this.forcePipeline.getBindGroupLayout(0), entries: entries([p, ...shared, centroid, pos[1 - k], vel, phi]) }));
+    const gridGroups = g && {
+      scatter: pos.map((p) => device.createBindGroup({ layout: this.scatterPipeline.getBindGroupLayout(0), entries: entries([p, this.topo, this.stat, null, density]) })),
+      blurX: device.createBindGroup({ layout: this.blurXPipeline.getBindGroupLayout(0), entries: entries([density, tmp]) }),
+      blurY: device.createBindGroup({ layout: this.blurYPipeline.getBindGroupLayout(0), entries: entries([tmp, phi, density]) }),
+    };
     const netGroups = Math.ceil(t.nets / NET_WG), compGroups = Math.ceil(t.movable.length / WG);
 
     try {
@@ -343,8 +480,14 @@ export class GpuAnalyticalGlobalPlacer {
       for (let first = 0; first < iterations; first += ITERATIONS_PER_SUBMIT) {
         const enc = device.createCommandEncoder();
         for (let it = first; it < Math.min(iterations, first + ITERATIONS_PER_SUBMIT); it++) {
-          enc.copyBufferToBuffer(scheduleBuf, it * 16, this.iterUniform, 0, 16);
+          enc.copyBufferToBuffer(scheduleBuf, it * 32, this.iterUniform, 0, 32);
           const pass = enc.beginComputePass();
+          if (g) {
+            pass.setPipeline(this.scatterPipeline); pass.setBindGroup(0, gridGroups.scatter[cur]); pass.dispatchWorkgroups(Math.ceil(n / NET_WG), starts);
+            const gx = Math.ceil(g.gw / GRID_WG), gy = Math.ceil(g.gh / GRID_WG);
+            pass.setPipeline(this.blurXPipeline); pass.setBindGroup(0, gridGroups.blurX); pass.dispatchWorkgroups(gx, gy, starts * 2);
+            pass.setPipeline(this.blurYPipeline); pass.setBindGroup(0, gridGroups.blurY); pass.dispatchWorkgroups(gx, gy, starts * 2);
+          }
           if (t.nets) { pass.setPipeline(this.centroidPipeline); pass.setBindGroup(0, centroidGroups[cur]); pass.dispatchWorkgroups(netGroups, starts); }
           pass.setPipeline(this.forcePipeline); pass.setBindGroup(0, forceGroups[cur]); pass.dispatchWorkgroups(compGroups, starts);
           pass.end();
@@ -358,7 +501,7 @@ export class GpuAnalyticalGlobalPlacer {
       readback.unmap();
       return this.#toLayouts(new Float32Array(raw), new Uint32Array(raw), starts);
     } finally {
-      for (const b of [...pos, vel, centroid, scheduleBuf, readback]) b.destroy();
+      for (const b of [...pos, vel, centroid, scheduleBuf, readback, density, tmp, phi]) b?.destroy();
     }
   }
 

@@ -1,4 +1,4 @@
-export { normalizeProblem, worldPin, rotateQuarter, rotatedSize } from './problem.js';
+export { normalizeProblem, worldPin, rotateQuarter, rotatedSize, localPin, sharesSide, placementSide } from './problem.js';
 export { scoreLayoutCpu, coarseCongestionCpu } from './cpu-score.js';
 export { requestWebGpuDevice } from './gpu/device.js';
 export { GpuBatchScorer, PriorityGpuBatchScorer } from './gpu/batch-scorer.js';
@@ -22,3 +22,4 @@ export { FastDeltaLnsOptimizer } from './optimizer/fast-delta-lns.js';
 export { MultiStartGlobalPlacer } from './optimizer/multistart-global.js';
 export { GpuAnalyticalGlobalPlacer } from './gpu/global-placer.js';
 export { HighPerformancePlacementOptimizer } from './optimizer/high-performance-placement.js';
+export { legalizeLayout } from './optimizer/legalizer.js';

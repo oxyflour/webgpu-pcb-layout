@@ -3,6 +3,8 @@
 //   node bench/kicad-boards.mjs [--placer ../webgpu_pcb_placer] [--only name,name] [--seeds 1]
 //                               [--backend cpu|gpu] [--budget same|large] [--out file.json] [--save-layouts]
 //                               [--preplace] [--power] [--route] [--sides single|original|free]
+//                               [--density s] [--density-target t] [--pin-area a] [--congestion w]
+//                               [--legalize] [--no-lns] [--quality]
 //
 // --preplace  fix connector/mechanical/edge footprints at their original position
 // --power     pull small parts toward the nearest IC pin of their supply nets (see
@@ -10,6 +12,10 @@
 //             supply edges are assigned, refined and re-assigned before LNS
 // --sides     'single' puts every footprint on one plane; 'original' keeps KiCad sides;
 //             'free' lets SMD parts use either side (LNS flip moves)
+// --density   long-range bin density force of strength s in the global placer (target
+//             coverage t, `a` mm² routing area reserved per pin)
+// --legalize  greedy overlap legalization after LNS (src/optimizer/legalizer.js)
+// --quality   --preplace --power --sides free --density 3 --congestion 3 --legalize
 // --route     route original and optimized placements with the two-layer PathFinder
 //             router (pcb-router.mjs) and report clean nets
 // Every board starts from a uniform random placement (locked footprints stay put) and is
@@ -33,8 +39,11 @@ import { GpuAnalyticalGlobalPlacer } from '../src/gpu/global-placer.js';
 import { loadKicadParser, designToProblem } from './kicad-adapter.mjs';
 import { withPowerEdges, isPowerEdge } from './power-edges.mjs';
 import { routeBoard } from './pcb-router.mjs';
+import { legalizeLayout } from '../src/optimizer/legalizer.js';
 
 const args = process.argv.slice(2);
+// --quality: every placement-quality option at its tuned setting.
+if (args.includes('--quality')) args.push('--preplace', '--power', '--legalize', '--sides', 'free', '--density', '3', '--congestion', '3');
 const arg = (name, def) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : def; };
 const placerRoot = path.resolve(arg('placer', path.join(import.meta.dirname, '..', '..', 'webgpu_pcb_placer')));
 const only = arg('only', '')?.split(',').filter(Boolean) ?? [];
@@ -48,7 +57,13 @@ const powerMode = args.includes('--power');
 const routeEval = args.includes('--route');
 const routeCell = Number(arg('route-cell', 0.4));
 const sidesMode = arg('sides', 'single');
-const mode = [preplace && 'preplace', powerMode && 'power', sidesMode !== 'single' && `sides-${sidesMode}`].filter(Boolean).join('+') || 'plain';
+const densityStrength = Number(arg('density', 0));
+const densityTarget = Number(arg('density-target', 0.65));
+const pinArea = Number(arg('pin-area', 0.6));
+const legalize = args.includes('--legalize');
+const noLns = args.includes('--no-lns');
+const congestionWeight = Number(arg('congestion', 0.5));
+const mode = [preplace && 'preplace', powerMode && 'power', sidesMode !== 'single' && `sides-${sidesMode}`, densityStrength > 0 && `density${densityStrength}`, noLns && 'nolns', congestionWeight !== 0.5 && `cong${congestionWeight}`, legalize && 'legal'].filter(Boolean).join('+') || 'plain';
 const device = backend === 'gpu' ? await (await import('../src/node.js')).createNodeWebGpuDevice() : null;
 
 const CIAA = 'benchmark/ciaa-Hardware/PCB';
@@ -114,21 +129,23 @@ function configFor(problem, seed, budget) {
   const gw = 40, gh = Math.max(8, Math.round(gw * H / W));
   // Two signal layers, 0.5 mm track pitch, expressed in default-priority net weights (~1.11).
   const capacity = 2 * Math.min(W / gw, H / gh) / 0.5 / 1.11;
-  const scorerOptions = { weights: { hpwl: 1, overlap: 200, bounds: 200, congestion: 0.5 }, coarse: { gridWidth: gw, gridHeight: gh, capacity } };
+  const scorerOptions = { weights: { hpwl: 1, overlap: 200, bounds: 200, congestion: congestionWeight }, coarse: { gridWidth: gw, gridHeight: gh, capacity } };
   const approximate = { ...scorerOptions, coarse: { gridWidth: Math.ceil(gw / 2), gridHeight: Math.ceil(gh / 2), capacity: capacity * 4 } };
   const placer = {
     wireStrength: .92, densityStrength: .86, overlapStrength: 4.0, macroStrength: 7.4, boundaryStrength: 2.6,
     clearance: 0.2, macroClearance: 0.5, egressGap: 1.0, fixedAnchorBoost: 4.8, movableNetScale: .72,
     damping: .66, step: .58, maxMove: 0.012 * L, cooling: .9986,
+    gridDensity: { strength: densityStrength, bins: 64, target: densityTarget, pinArea },
   };
+  const lnsScale = noLns ? 0 : 1;
   if (budget === 'large') return {
     scorerOptions,
     optimizer: {
       seed,
       approximate,
       global: { starts: 32, coarseIterations: 150, finalists: 4, fineIterations: 220, placer },
-      fastLns: { iterations: 400, population: 1024, movesPerCandidate: 2, translationScale: 0.015 * L, rotationProbability: 0.1, temperature: .025, cooling: .992 },
-      polish: { iterations: 200, population: 1024, movesPerCandidate: 1, translationScale: 0.008 * L, rotationProbability: 0.05, temperature: .012, cooling: .985 },
+      fastLns: { iterations: 400 * lnsScale, population: 1024, movesPerCandidate: 2, translationScale: 0.015 * L, rotationProbability: 0.1, temperature: .025, cooling: .992 },
+      polish: { iterations: 200 * lnsScale, population: 1024, movesPerCandidate: 1, translationScale: 0.008 * L, rotationProbability: 0.05, temperature: .012, cooling: .985 },
     },
   };
   return {
@@ -207,6 +224,8 @@ for (const [name, rel] of CASES) {
     const out = powerMode
       ? await placeWithPower(adapted, init, cfg)
       : await new HighPerformancePlacementOptimizer(problem, searchScorer, { ...cfg.optimizer, device }).optimize(init);
+    let legal = null;
+    if (legalize) { const tl = performance.now(); legal = legalizeLayout(problem, out.layout); out.layout = legal.layout; out.timing.legalizeMs = performance.now() - tl; }
     const wall = performance.now() - t0;
     if (searchScorer !== scorer) searchScorer.destroy();
     const fin = scorer.scoreLayout(out.layout), finLegal = legality(problem, out.layout);
@@ -217,7 +236,7 @@ for (const [name, rel] of CASES) {
       'rand hpwl': Math.round(start.hpwl),
       'hpwl': Math.round(fin.hpwl), 'hpwl/orig': +(fin.hpwl / orig.hpwl).toFixed(2),
       'ovl mm2': r1(fin.overlap), 'ovl pairs': finLegal.overlapPairs, 'bounds': +fin.bounds.toFixed(2),
-      'global s': r1(out.timing.globalMs / 1000), 'lns s': r1(out.timing.fastLnsMs / 1000), 'polish s': r1(out.timing.polishMs / 1000), 'total s': r1(wall / 1000),
+      'global s': r1(out.timing.globalMs / 1000), 'lns s': r1(out.timing.fastLnsMs / 1000), 'polish s': r1(out.timing.polishMs / 1000), 'total s': r1(wall / 1000), ...(legal ? { 'legal fail': legal.failed, 'legal disp': r1(legal.meanDisplacement) } : {}),
       ...(routeEval ? { 'orig clean': `${origRoute.clean}/${origRoute.nets}`, 'clean': `${newRoute.clean}/${newRoute.nets}`, 'orig ovf': origRoute.overflow, 'ovf': newRoute.overflow } : {}),
     };
     rows.push(row);

@@ -45,7 +45,87 @@ export function resolveGlobalPlacerOptions(options={}){
     recordEvery: options.recordEvery ?? 5,
     onIteration: options.onIteration ?? null,
     netWeight: options.netWeight ?? null,
+    // Long-range bin density (off when strength is 0); see densityGridSpec().
+    gridDensity: {
+      strength: 0, bins: 64, target: 0.7, pinArea: 0, scales: [1, 2, 4, 8, 16],
+      ...options.gridDensity,
+    },
   };
+}
+
+/** Fixed-point resolution of bin coverage (shared with the WebGPU placer's atomics). */
+export const DENSITY_FIXED_POINT = 4096;
+
+/**
+ * Density grid shared by the CPU and WebGPU placers. Each side of the board has a
+ * grid of `bins` cells along its longer edge. A component covers its rectangle,
+ * scaled by `inflate` so that its area grows by `pinArea` mm² per pin (routing
+ * whitespace). The potential is sum over scales of Gaussian-blurred
+ * (coverage - target); parts move down its gradient.
+ */
+export function densityGridSpec(problem, gd) {
+  const W = problem.canvas.width, H = problem.canvas.height, bin = Math.max(W, H) / gd.bins;
+  const gw = Math.max(2, Math.ceil(W / bin)), gh = Math.max(2, Math.ceil(H / bin));
+  const inflate = problem.components.map((c) => Math.sqrt((c.width * c.height + gd.pinArea * c.pins.length) / (c.width * c.height)));
+  const kernels = gd.scales.map((sigma) => {
+    const r = Math.ceil(3 * sigma), w = [];
+    for (let k = -r; k <= r; k++) w.push(Math.exp(-k * k / (2 * sigma * sigma)));
+    const sum = w.reduce((a, b) => a + b, 0);
+    return { sigma, radius: r, weights: w.map((v) => v / sum) };
+  });
+  return { gw, gh, binW: W / gw, binH: H / gh, inflate, kernels };
+}
+
+/** CPU reference of the density potential; returns phi[side][gy*gw+gx]. */
+export function densityPotential(problem, layout, gd, spec) {
+  const { gw, gh, binW, binH, inflate, kernels } = spec, B = gw * gh;
+  const cover = [new Float64Array(B), new Float64Array(B)];
+  problem.components.forEach((c, i) => {
+    const p = layout[i], [w, h] = rotatedSize(c, p.rotation), hw = 0.5 * w * inflate[i], hh = 0.5 * h * inflate[i];
+    const x0 = p.x - hw, x1 = p.x + hw, y0 = p.y - hh, y1 = p.y + hh;
+    const bx0 = Math.max(0, Math.floor(x0 / binW)), bx1 = Math.min(gw - 1, Math.floor(x1 / binW));
+    const by0 = Math.max(0, Math.floor(y0 / binH)), by1 = Math.min(gh - 1, Math.floor(y1 / binH));
+    const sides = c.twoSided ? [0, 1] : [p.side ? 1 : 0];
+    for (let by = by0; by <= by1; by++) for (let bx = bx0; bx <= bx1; bx++) {
+      const ox = Math.min(x1, (bx + 1) * binW) - Math.max(x0, bx * binW), oy = Math.min(y1, (by + 1) * binH) - Math.max(y0, by * binH);
+      if (ox <= 0 || oy <= 0) continue;
+      const q = Math.round(ox * oy / (binW * binH) * DENSITY_FIXED_POINT) / DENSITY_FIXED_POINT;
+      for (const s of sides) cover[s][by * gw + bx] += q;
+    }
+  });
+  return cover.map((cv) => {
+    const phi = new Float64Array(B);
+    for (const { radius: r, weights } of kernels) {
+      const tmp = new Float64Array(B);
+      for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+        let acc = 0;
+        for (let k = -r; k <= r; k++) { const xx = x + k; if (xx >= 0 && xx < gw) acc += weights[k + r] * (cv[y * gw + xx] - gd.target); }
+        tmp[y * gw + x] = acc;
+      }
+      for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+        let acc = 0;
+        for (let k = -r; k <= r; k++) { const yy = y + k; if (yy >= 0 && yy < gh) acc += weights[k + r] * tmp[yy * gw + x]; }
+        phi[y * gw + x] += acc;
+      }
+    }
+    return phi;
+  });
+}
+
+/** Bilinearly interpolated gradient (per bin) of one side's potential at (x, y) mm. */
+export function densityGradient(phi, spec, x, y) {
+  const { gw, gh, binW, binH } = spec;
+  const at = (ix, iy) => phi[iy * gw + ix];
+  const grad = (ix, iy) => [
+    ix === 0 ? at(1, iy) - at(0, iy) : ix === gw - 1 ? at(gw - 1, iy) - at(gw - 2, iy) : 0.5 * (at(ix + 1, iy) - at(ix - 1, iy)),
+    iy === 0 ? at(ix, 1) - at(ix, 0) : iy === gh - 1 ? at(ix, gh - 1) - at(ix, gh - 2) : 0.5 * (at(ix, iy + 1) - at(ix, iy - 1)),
+  ];
+  const fx = x / binW - 0.5, fy = y / binH - 0.5;
+  const ix0 = clamp(Math.floor(fx), 0, gw - 1), iy0 = clamp(Math.floor(fy), 0, gh - 1);
+  const ix1 = Math.min(ix0 + 1, gw - 1), iy1 = Math.min(iy0 + 1, gh - 1);
+  const tx = clamp(fx - ix0, 0, 1), ty = clamp(fy - iy0, 0, 1);
+  const g00 = grad(ix0, iy0), g10 = grad(ix1, iy0), g01 = grad(ix0, iy1), g11 = grad(ix1, iy1);
+  return [0, 1].map((k) => (1 - ty) * ((1 - tx) * g00[k] + tx * g10[k]) + ty * ((1 - tx) * g01[k] + tx * g11[k]));
 }
 
 /**
@@ -171,6 +251,20 @@ export class AnalyticalGlobalPlacer {
     }
   }
 
+  #gridDensity(layout, fx, fy, strength){
+    const p=this.problem, gd=this.options.gridDensity;
+    this.densitySpec ??= densityGridSpec(p, gd);
+    const phi=densityPotential(p,layout,gd,this.densitySpec);
+    for(let i=0;i<p.components.length;i++){
+      const c=p.components[i]; if(c.fixed) continue;
+      const sides=c.twoSided?[0,1]:[layout[i].side?1:0];
+      for(const s of sides){
+        const [gx,gy]=densityGradient(phi[s],this.densitySpec,layout[i].x,layout[i].y);
+        fx[i]-=strength*gx/sides.length; fy[i]-=strength*gy/sides.length;
+      }
+    }
+  }
+
   async optimize(initial){
     const p=this.problem,o=this.options,layout=cloneLayout(initial);
     const vx=new Float64Array(p.components.length),vy=new Float64Array(p.components.length);
@@ -186,6 +280,7 @@ export class AnalyticalGlobalPlacer {
       this.#netForces(layout,fx,fy,wire);
       this.#densityAndOverlap(layout,fx,fy,density,overlap);
       this.#macroAndBoundary(layout,fx,fy,o.macroStrength,o.boundaryStrength);
+      if(o.gridDensity.strength>0)this.#gridDensity(layout,fx,fy,o.gridDensity.strength);
 
       let maxDelta=0;
       for(let i=0;i<p.components.length;i++){

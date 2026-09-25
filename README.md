@@ -161,7 +161,9 @@ interface LayoutProblem {
     width: number;
     height: number;
     rotatable?: boolean;
-    fixed?: { x: number; y: number; rotation: number };
+    sides?: 'top' | 'bottom' | 'any';   // default 'top'
+    twoSided?: boolean;                 // through-hole: occupies both sides
+    fixed?: { x: number; y: number; rotation: number; side?: 0 | 1 };
     pins: Array<{
       id: string;
       x: number;
@@ -178,6 +180,16 @@ interface LayoutProblem {
 ```
 
 One physical pin may belong to at most one net.
+
+### Double-sided boards
+
+A placement is `{ x, y, rotation, side }` with `side` 0 (top, default) or 1 (bottom). Pin coordinates are given as seen from the top; on the bottom a part is mirrored in its local x before rotation. Parts only overlap parts on the same side, except `twoSided` (through-hole) parts, which collide with both. `sides: 'any'` lets the LNS optimizers flip a part (`flipProbability`, default 0.08). In flat slabs (`scoreSlabs`, the LNS optimizers) the side is bit 2 of the orientation byte.
+
+### Global density and legalization
+
+`AnalyticalGlobalPlacer` / `GpuAnalyticalGlobalPlacer` accept `gridDensity: { strength, bins, target, pinArea, scales }`. With `strength > 0` every part is spread into a per-side bin grid (its area grows by `pinArea` mm² per pin to reserve routing space), the potential is the sum of Gaussian blurs of (coverage − target) over `scales` bins, and parts move down its gradient. This long-range term stops the short-range pair repulsion from packing everything into one clump.
+
+`legalizeLayout(problem, layout, { cell, clearance })` removes the remaining overlaps: fixed parts first, then movable parts by decreasing area take the nearest free spot on an occupancy grid per side.
 
 ## Topology model
 
@@ -308,7 +320,19 @@ The included benchmark scores 4,096 candidate layouts containing 100 components 
 npm run bench:kicad -- --backend gpu --budget large --out bench/results/kicad-boards-gpu-large.json
 ```
 
-`bench/kicad-adapter.mjs` converts footprints to rectangles (pad bounding box + 0.25 mm), KiCad rotations to quarter turns, and drops ground/supply nets. All footprints share one plane, so double-sided boards are denser here than in reality. Use `--backend cpu` for the CPU reference scorer, `--budget same` for the CPU-sized search budget, `--only name,...` to select boards and `--placer <dir>` if the placer checkout lives elsewhere.
+`bench/kicad-adapter.mjs` converts footprints to rectangles (pad bounding box + 0.25 mm) and KiCad rotations to quarter turns, re-reading pad geometry with KiCad's own transform, and drops ground/supply nets from the signal objective. Use `--backend cpu` for the CPU reference scorer, `--budget same` for the CPU-sized search budget, `--only name,...` to select boards and `--placer <dir>` if the placer checkout lives elsewhere.
+
+Placement quality options (`--quality` enables all of them):
+
+| flag | effect |
+|---|---|
+| `--preplace` | connectors, mounting holes, test points and parts touching the outline stay at their original position |
+| `--power` | each supply pin of a small part is tied to the nearest IC pin of the same supply net (re-assigned between stages, `bench/power-edges.mjs`) |
+| `--sides original\|free` | double-sided placement; `free` lets SMD parts choose a side |
+| `--density 3 --congestion 3` | global bin-density force and a stronger coarse-congestion term |
+| `--legalize` | overlap legalization after LNS |
+
+`--route` evaluates both the original and the optimized placement with `bench/pcb-router.mjs`, a two-layer PathFinder router on the real pads (0.4 mm grid, vias, SMD pads on their side), and reports nets routed without sharing cells. `bench/render-kicad.mjs --in <results with --save-layouts>` draws the original copper and both routed placements side by side.
 
 ## Architecture
 
