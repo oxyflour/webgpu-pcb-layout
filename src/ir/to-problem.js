@@ -4,6 +4,8 @@ export const PLACEMENT_FORMAT = 'webgpu-pin-layout/placement@1';
 
 // Parts whose position is dictated by the enclosure, not by wiring.
 const MECHANICAL_LIB = /conn|usb|rj\d\d|header|pin_?head|jack|terminal|socket|barrel|hdmi|sd_?card|micro_?sd|sim_?card|mounting|hole|fiducial|test_?point|dsub|db\d|idc|molex|jst|battery|bnc|sma/i;
+// Reference designators of connectors, mounting holes, test points and fiducials.
+const MECHANICAL_REF = /^(J|P|CN|CON|X|XS|XP|H|MH|MK|TP|FID|FD)\d/i;
 const ANCHOR_PADS = 8;
 
 /** Rotation of a local vector by θ (counter-clockwise seen from the top) in y-down coordinates. */
@@ -144,7 +146,7 @@ export function irToProblem(irIn, options = {}) {
       const [w, h] = (rotation & 1) ? [height, width] : [width, height];
       atEdge = place.x - w / 2 < 0.5 || place.y - h / 2 < 0.5 || place.x + w / 2 > canvas.width - 0.5 || place.y + h / 2 > canvas.height - 0.5;
     }
-    const mech = f.mechanical ?? (MECHANICAL_LIB.test(f.library ?? '') || !pads.length || atEdge);
+    const mech = f.mechanical ?? (MECHANICAL_LIB.test(f.library ?? '') || MECHANICAL_REF.test(f.id) || !pads.length || atEdge);
     mechanical.push(mech);
     const c = { id: f.id, width: Math.max(0.2, width), height: Math.max(0.2, height), pins, rotatable: !bake && (f.allowedRotations ? new Set(f.allowedRotations.map(quarterOf)).size > 1 : true) };
     if (sideMode !== 'single') {
