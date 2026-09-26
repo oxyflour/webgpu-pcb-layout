@@ -83,7 +83,7 @@ function panel({ problem, layout, sides, contours, routes, tracks, highlight, mo
  * @param run {placerRoot, rows:[{case, file, mode|adapt, layouts:{original,result}, original, result, ...}]}
  *        row.adapt = designToProblem options; row.moduleOf / row.moduleNames enable module maps.
  */
-export async function renderReport(run, { out, cell = 0.4, rounds = 12, only = [], layers = 'board' } = {}) {
+export async function renderReport(run, { out, cell = 0.4, rounds = 12, only = [], layers = 'board', intro = '', title = 'KiCad placement: original vs optimized', lang = 'en' } = {}) {
   const parse = await loadKicadParser(run.placerRoot);
   const route = (adapted, layout) => { const t0 = performance.now(); const r = routeBoard(layers === 'board' ? adapted.routing : { ...adapted.routing, layers: Number(layers) }, layout, adapted.sides, { cell, maxRounds: rounds }); return { ...r, lines: r.polylines(), ms: performance.now() - t0 }; };
   const sections = [];
@@ -131,7 +131,7 @@ export async function renderReport(run, { out, cell = 0.4, rounds = 12, only = [
   }
 
   fs.writeFileSync(out, `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KiCad Placement Comparison</title>
 <style>
 :root { --bg:#f7f7f5; --fg:#1d1d1b; --muted:#6b6b66; --card:#fff; --line:#deded8; --canvas:#fbfbf8; }
@@ -158,9 +158,12 @@ svg { width:100%; height:auto; display:block; }
 .tf { stroke:#d0443a; stroke-opacity:.75; stroke-linecap:round; } .tb { stroke:#3b6fd6; stroke-opacity:.75; stroke-linecap:round; } .ti { stroke:#c08a1e; stroke-opacity:.7; }
 .via { fill:#8a8a84; }
 .legend span { display:inline-block; margin-right:14px; color:var(--muted); font-size:12px; }
+.intro { max-width:1100px; } .intro td, .intro th { text-align:right; } .intro td:first-child, .intro th:first-child { text-align:left; }
+.intro ul { padding-left:20px; } .intro li { margin:3px 0; }
 .legend i { display:inline-block; width:12px; height:9px; margin-right:5px; vertical-align:-1px; border:1px solid; }
 </style></head><body><main>
-<h1>KiCad placement: original vs optimized</h1>
+<h1>${esc(title)}</h1>
+${intro}
 <p class="lead">Middle and right panels use the same multi-layer PathFinder router (the board's signal layers, planes excluded) (${cell} mm grid, pads as obstacles, SMD pads on the side the placement puts them, up to ${rounds} rounds, power/ground nets excluded) so the two placements are compared on equal terms. Footprint colour shows the side each placement puts it on; with <code>--sides single</code> every footprint shares one plane, so bottom-side parts of the original board overlap top-side parts.</p>
 <p class="legend"><span><i style="background:#5fa8a044;border-color:#2f7d74"></i>top-side footprint</span><span><i style="background:#9a86c944;border-color:#6a55a3"></i>bottom-side footprint</span><span><i style="background:#e0452b40;border-color:#e0452b"></i>overlapping footprint</span><span><i style="border:0;border-top:2px solid #d0443a;height:0"></i>F.Cu</span><span><i style="border:0;border-top:2px solid #3b6fd6;height:0"></i>B.Cu</span><span><i style="border:0;border-top:2px solid #2fa36b;height:0"></i>inner layers</span><span><i style="border:0;border-top:2px solid #f0a020;height:0"></i>net sharing cells</span><span><i style="border:0;border-top:2px dashed #e0452b;height:0"></i>unrouted net</span></p>
 ${sections.join('\n')}

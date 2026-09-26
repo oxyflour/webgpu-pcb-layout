@@ -64,7 +64,10 @@ export function legalizeLayout(problem, layout, options = {}) {
   };
 
   const movable = [];
+  // options.ignore: indices that neither occupy space nor get moved (e.g. zero-area terminals).
+  const ignore = new Set(options.ignore ?? []);
   problem.components.forEach((c, i) => {
+    if (ignore.has(i)) return;
     if (c.fixed) { const [sw, sh] = span(i), [cx, cy] = toCell(i); stamp(rectAt(sw, sh, cx, cy), sidesOf(i)); }
     else movable.push(i);
   });

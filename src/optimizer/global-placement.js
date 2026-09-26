@@ -246,9 +246,14 @@ export class AnalyticalGlobalPlacer {
       if(p.components[i].fixed) continue;
       const c=p.components[i],[wi,hi]=rotatedSize(c,layout[i].rotation);
       for(const j of fixed){
-        if(!sharesSide(p,i,layout[i],j,layout[j])) continue;
-        const fcomp=p.components[j],[wj,hj]=rotatedSize(fcomp,layout[j].rotation);
+        const fcomp=p.components[j];
         let dx=layout[i].x-layout[j].x,dy=layout[i].y-layout[j].y;
+        // Exact cull: beyond 1.8 normalised units in x or y there is neither an overlap
+        // push nor a near-field force (bounds use the largest possible extents).
+        const rx=Math.max((Math.max(wi,hi)+Math.max(fcomp.width,fcomp.height))/2+mc,1)*1.8;
+        if(Math.abs(dx)>=rx||Math.abs(dy)>=rx) continue;
+        if(!sharesSide(p,i,layout[i],j,layout[j])) continue;
+        const [wj,hj]=rotatedSize(fcomp,layout[j].rotation);
         if(Math.abs(dx)+Math.abs(dy)<1e-8){const u=deterministicUnit(i,j);dx=u[0]*1e-3;dy=u[1]*1e-3;}
         const ax=(wi+wj)/2+mc, ay=(hi+hj)/2+mc;
         const ox=ax-Math.abs(dx),oy=ay-Math.abs(dy);
