@@ -73,29 +73,34 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
 }
 `;
 
-/** Masked (outline / hole / keepout) area under a body, from summed-area tables. */
-const maskWgsl = (m) => m ? /* wgsl */`
+/**
+ * Masked (outline / hole / keepout) area under a body, from summed-area tables. The
+ * shader is generic: the sat buffer starts with a header [gw, gh, layers, bitcast(res),
+ * side of each layer...] so one compiled pipeline serves every board and sub-problem.
+ */
+const MASK_HEADER = 4 + 32;
+const maskWgsl = (hasMask) => hasMask ? /* wgsl */`
 @group(0) @binding(4) var<storage, read> sat: array<u32>;
-const MASK_SIDE = array<u32, ${m.layers.length}>(${m.layers.map((l) => `${l.side}u`).join(', ')});
 fn satSum(k: u32, c: vec4<u32>) -> u32 {
-  let b = k * ${(m.gw + 1) * (m.gh + 1)}u;
-  let w = ${m.gw + 1}u;
+  let w = sat[0] + 1u;
+  let b = ${MASK_HEADER}u + k * w * (sat[1] + 1u);
   return (sat[b + c.w * w + c.z] + sat[b + c.y * w + c.x]) - (sat[b + c.y * w + c.z] + sat[b + c.w * w + c.x]);
 }
 fn blockedArea(pos: vec2<f32>, half: vec2<f32>, bits: u32, side: u32, twoSided: bool) -> f32 {
-  let g = vec2<f32>(${m.gw}.0, ${m.gh}.0);
-  let lo = clamp(ceil((pos - half) / ${m.res.toExponential(9)} - vec2<f32>(0.5)), vec2<f32>(0.0), g);
-  let hi = max(lo, clamp(ceil((pos + half) / ${m.res.toExponential(9)} - vec2<f32>(0.5)), vec2<f32>(0.0), g));
+  let res = bitcast<f32>(sat[3]);
+  let g = vec2<f32>(f32(sat[0]), f32(sat[1]));
+  let lo = clamp(ceil((pos - half) / res - vec2<f32>(0.5)), vec2<f32>(0.0), g);
+  let hi = max(lo, clamp(ceil((pos + half) / res - vec2<f32>(0.5)), vec2<f32>(0.0), g));
   let c = vec4<u32>(vec2<u32>(lo), vec2<u32>(hi));
   var count = 0u;
-  for (var k = 0u; k < ${m.layers.length}u; k++) {
-    if ((bits & (1u << k)) != 0u && (twoSided || MASK_SIDE[k] == side)) { count += satSum(k, c); }
+  for (var k = 0u; k < sat[2]; k++) {
+    if ((bits & (1u << k)) != 0u && (twoSided || sat[4u + k] == side)) { count += satSum(k, c); }
   }
-  return f32(count) * ${(m.res * m.res).toExponential(9)};
+  return f32(count) * res * res;
 }` : '';
 
 /** Pairwise overlap area and canvas/mask violation; lane i scans pairs (i, j>i). */
-const geometryWgsl = (masks) => COMMON + maskWgsl(masks) + /* wgsl */`
+const geometryWgsl = (hasMask) => COMMON + maskWgsl(hasMask) + /* wgsl */`
 @group(0) @binding(0) var<storage, read> placements: array<Placement>;
 // (width, height, twoSided, bitcast(mask layer bits))
 @group(0) @binding(1) var<storage, read> componentSize: array<vec4<f32>>;
@@ -119,7 +124,7 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
     let ah = 0.5 * rotatedSize(ai.xy, a.rot);
     let lo = max(vec2<f32>(0.0), ah - a.pos);
     let hi = max(vec2<f32>(0.0), a.pos + ah - canvas);
-    bounds += dot(lo, lo) + dot(hi, hi);${masks ? `
+    bounds += dot(lo, lo) + dot(hi, hi);${hasMask ? `
     bounds += blockedArea(a.pos, ah, bitcast<u32>(ai.w), a.side, ai.z != 0.0);` : ''}
     let amin = a.pos - ah;
     let amax = a.pos + ah;
@@ -300,16 +305,36 @@ function staticData(problem, netWeights) {
   problem.nets.forEach((n, i) => { if (n.pins.length >= 2) (n.pins.length <= SMALL_NET ? small : large).push(i); });
   return {
     componentSize, pins, netOffsets, netPins, masks,
-    sat: masks ? concatU32(masks.sats) : null,
+    sat: masks ? maskBuffer(masks) : null,
     netWeight: Float32Array.from(netWeights), netWeightQ, demandScale,
     netOrder: Uint32Array.from([...small, ...large]), smallCount: small.length, largeCount: large.length,
   };
+}
+
+/** Header + summed-area tables of every mask layer (see maskWgsl). */
+function maskBuffer(m) {
+  const head = new Uint32Array(MASK_HEADER), f = new Float32Array(head.buffer);
+  head[0] = m.gw; head[1] = m.gh; head[2] = m.layers.length; f[3] = m.res;
+  m.layers.forEach((l, k) => { head[4 + k] = l.side; });
+  return concatU32([head, ...m.sats]);
 }
 
 function concatU32(arrays) {
   const out = new Uint32Array(arrays.reduce((s, a) => s + a.length, 0));
   let o = 0; for (const a of arrays) { out.set(a, o); o += a.length; }
   return out;
+}
+
+// Compiled pipelines per device, keyed by WGSL source: shader compilation costs
+// ~0.5 s on Dawn/D3D12 and none of these shaders embeds per-problem data except the
+// congestion grid size, so sessions creating many small scorers reuse them.
+const pipelineCache = new WeakMap();
+export function cachedPipeline(device, code) {
+  let cache = pipelineCache.get(device);
+  if (!cache) { cache = new Map(); pipelineCache.set(device, cache); }
+  let p = cache.get(code);
+  if (!p) { p = device.createComputePipeline({ layout: 'auto', compute: { module: device.createShaderModule({ code }), entryPoint: 'main' } }); cache.set(code, p); }
+  return p;
 }
 
 function nextPow2(v) { let n = 1; while (n < v) n <<= 1; return n; }
@@ -353,9 +378,9 @@ export class GpuBatchScorer {
       sat: d.sat ? buf(d.sat) : null,
       params: createBuffer(device, 64, U.UNIFORM | U.COPY_DST),
     };
-    const pipeline = (code) => device.createComputePipeline({ layout: 'auto', compute: { module: device.createShaderModule({ code }), entryPoint: 'main' } });
+    const pipeline = (code) => cachedPipeline(device, code);
     this.pipelines = {
-      hpwl: pipeline(HPWL_WGSL), geometry: pipeline(geometryWgsl(d.masks)),
+      hpwl: pipeline(HPWL_WGSL), geometry: pipeline(geometryWgsl(!!d.masks)),
       congestion: pipeline(congestionWgsl(cells, this.globalGrid)), reduce: pipeline(REDUCE_WGSL),
     };
 

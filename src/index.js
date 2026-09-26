@@ -26,3 +26,5 @@ export { legalizeLayout } from './optimizer/legalizer.js';
 export { autoModules, componentGraph, louvain, moduleStats, moduleProblem, expandModules, withModuleNets, isModuleNet, moduleNetWeight } from './optimizer/modules.js';
 export { irToProblem, placementResult, toYDown, BOARD_FORMAT, PLACEMENT_FORMAT } from './ir/to-problem.js';
 export { validateBoardIR, assertValidBoardIR } from './ir/validate.js';
+export { PlacementSession } from './session.js';
+export { relayoutMembers, moduleHpwl, memberOverlaps } from './optimizer/relayout.js';

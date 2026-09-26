@@ -14,6 +14,7 @@ export class GpuLnsOptimizer {
       translationScale:options.translationScale ?? 0.08*Math.min(problem.canvas.width,problem.canvas.height),
       rotationProbability:options.rotationProbability ?? 0.15,
       flipProbability:options.flipProbability ?? 0.08,
+      deadline:options.deadline,
       temperature:options.temperature ?? 0.05,
       cooling:options.cooling ?? 0.97,
       seed:options.seed ?? 1
@@ -67,6 +68,8 @@ export class GpuLnsOptimizer {
     let temp=this.options.temperature,scale=this.options.translationScale;
     const trace=[];
     for(let it=0;it<this.options.iterations;it++) {
+      // Optional wall-clock deadline (performance.now() ms) for interactive use.
+      if(this.options.deadline!==undefined && performance.now()>=this.options.deadline) break;
       let cand,candScore;
       if(typeof this.scorer.scoreSlabs==='function') {
         ({layout:cand,score:candScore}=await this.#scorePopulationSlabs(current,rnd,scale));

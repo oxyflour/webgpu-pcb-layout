@@ -44,14 +44,28 @@ export function legalizeLayout(problem, layout, options = {}) {
   const unmasked = (i, [x0, y0, x1, y1], sides) => !masks || blockedCells(masks, masks.componentLayers[i], sides[0], sides.length > 1,
     maskCellRect(masks, x0 * cell, y0 * cell, (x1 + 1) * cell, (y1 + 1) * cell)) === 0;
   const within = (rect, rc) => !rc || (rect[0] >= rc[0] && rect[1] >= rc[1] && rect[2] <= rc[2] && rect[3] <= rc[3]);
+  // Occupancy summed-area tables, rebuilt lazily for parts that need a long search.
+  const sat = [null, null], dirty = [true, true];
+  const buildSat = (s) => {
+    const o = occ[s], t = sat[s] ?? (sat[s] = new Uint32Array((GW + 1) * (GH + 1)));
+    for (let y = 0; y < GH; y++) { let row = 0; for (let x = 0; x < GW; x++) { row += o[y * GW + x]; t[(y + 1) * (GW + 1) + x + 1] = t[y * (GW + 1) + x + 1] + row; } }
+    dirty[s] = false;
+  };
+  let useSat = false;
   const free = ([x0, y0, x1, y1], sides) => {
     for (const s of sides) {
+      if (useSat) {
+        const t = sat[s], W1 = GW + 1;
+        if (t[(y1 + 1) * W1 + x1 + 1] - t[y0 * W1 + x1 + 1] - t[(y1 + 1) * W1 + x0] + t[y0 * W1 + x0]) return false;
+        continue;
+      }
       const o = occ[s];
       for (let y = y0; y <= y1; y++) { const row = y * GW; for (let x = x0; x <= x1; x++) if (o[row + x]) return false; }
     }
     return true;
   };
   const stamp = ([x0, y0, x1, y1], sides) => {
+    for (const s of sides) dirty[s] = true;
     for (const s of sides) {
       const o = occ[s];
       for (let y = Math.max(0, y0); y <= Math.min(GH - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(GW - 1, x1); x++) o[y * GW + x] = 1;
@@ -80,7 +94,10 @@ export function legalizeLayout(problem, layout, options = {}) {
     if (rc && (rc[2] - rc[0] + 1 < sw || rc[3] - rc[1] + 1 < sh)) { rc = null; outsideRegion++; }
     const ox = out[i].x, oy = out[i].y;
     let best = null;
+    useSat = false;
     for (let r = 0; r <= maxRadius && !best; r++) {
+      // Long searches switch to O(1) rectangle tests on a fresh occupancy SAT.
+      if (r === 4) { for (const s of sides) if (dirty[s]) buildSat(s); useSat = true; }
       // Candidates on the ring at Chebyshev distance r, nearest first.
       const ring = [];
       if (r === 0) ring.push([cx, cy]);

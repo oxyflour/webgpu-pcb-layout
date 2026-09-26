@@ -3,6 +3,18 @@ import { AnalyticalGlobalPlacer } from './global-placement.js';
 import { GpuLnsOptimizer } from './lns.js';
 import { PriorityCpuBatchScorer } from '../cpu/priority-batch-scorer.js';
 import { legalizeLayout } from './legalizer.js';
+import { PriorityGpuBatchScorer } from '../gpu/batch-scorer.js';
+
+/** Shapes and outline of the board canvas, shifted into a region's local frame. */
+function shiftCanvas(canvas, x0, y0) {
+  const P = ([x, y]) => [x - x0, y - y0];
+  const shape = (s) => s.type === 'rect' ? { ...s, x: s.x - x0, y: s.y - y0 } : s.type === 'circle' ? { ...s, center: P(s.center) } : { ...s, points: s.points.map(P), ...(s.holes ? { holes: s.holes.map((h) => h.map(P)) } : {}) };
+  return {
+    ...(canvas.outline ? { outline: canvas.outline.map((o) => ({ outer: o.outer.map(P), ...(o.holes ? { holes: o.holes.map((h) => h.map(P)) } : {}) })) } : {}),
+    ...(canvas.blocked?.length ? { blocked: canvas.blocked.map((b) => ({ ...b, shape: shape(b.shape) })) } : {}),
+    ...(canvas.edgeClearance ? { edgeClearance: canvas.edgeClearance } : {}),
+  };
+}
 
 const now = () => performance.now();
 
@@ -66,7 +78,8 @@ export async function relayoutMembers(problem, layout, members, options = {}) {
   }
   components.push({ id: 'hub', width: 0.01, height: 0.01, rotatable: false, twoSided: true, pins: hubPins, fixed: { x: 0, y: 0, rotation: 0 } });
   subLayout.push({ x: 0, y: 0, rotation: 0 });
-  const sub = normalizeProblem({ canvas: { width: x1 - x0, height: y1 - y0 }, components, nets });
+  // The board's outline/holes/keepouts, shifted into the region.
+  const sub = normalizeProblem({ canvas: { width: x1 - x0, height: y1 - y0, ...shiftCanvas(problem.canvas, x0, y0) }, components, nets });
   // Terminals are zero-area and twoSided so they never collide or get legalized.
   const t1 = now();
 
@@ -84,10 +97,17 @@ export async function relayoutMembers(problem, layout, members, options = {}) {
   let cur = (await placer.optimize(init)).layout;
   const t2 = now();
 
-  // Optional short LNS on the exact CPU objective.
-  if (options.lnsIterations) {
-    const scorer = new PriorityCpuBatchScorer(sub, { weights: { hpwl: 1, overlap: 200, bounds: 200, congestion: 0 } });
-    cur = (await new GpuLnsOptimizer(sub, scorer, { iterations: options.lnsIterations, population: options.lnsPopulation ?? 32, movesPerCandidate: 1, translationScale: 0.02 * L, rotationProbability: 0.1, temperature: .01, cooling: .95, seed: options.seed ?? 1 }).optimize(cur)).layout;
+  // LNS on the exact objective: on the GPU (cached pipelines, ~1 ms per 1024 candidates)
+  // until the deadline minus a legalization reserve, or a few CPU iterations.
+  if (options.device || options.lnsIterations) {
+    const scorerOptions = { weights: { hpwl: 1, overlap: 200, bounds: 200, congestion: 0 }, coarse: { gridWidth: 16, gridHeight: 12, capacity: 4 } };
+    const scorer = options.device ? new PriorityGpuBatchScorer(options.device, sub, scorerOptions) : new PriorityCpuBatchScorer(sub, scorerOptions);
+    const deadline = options.deadline !== undefined ? options.deadline - (options.legalizeReserveMs ?? 15) : undefined;
+    cur = (await new GpuLnsOptimizer(sub, scorer, {
+      iterations: options.lnsIterations ?? (options.device ? 200 : 0), population: options.lnsPopulation ?? (options.device ? 512 : 32),
+      movesPerCandidate: 1, translationScale: 0.02 * L, rotationProbability: 0.1, temperature: .01, cooling: .97, seed: options.seed ?? 1, deadline,
+    }).optimize(cur)).layout;
+    scorer.destroy?.();
   }
   const t3 = now();
 
