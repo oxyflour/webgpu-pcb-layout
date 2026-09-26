@@ -109,10 +109,17 @@ export function kicadToIR(design, name = design.name) {
   const area = (c) => Math.abs(c.reduce((s, [x, y], k) => { const [x2, y2] = c[(k + 1) % c.length]; return s + x * y2 - x2 * y; }, 0)) / 2;
   const inside = ([px, py], poly) => { let hit = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) hit = !hit; } return hit; };
   const sorted = [...contours].sort((a, b) => area(b) - area(a));
-  const outline = [];
+  let outline = [];
   for (const c of sorted) {
     const parent = outline.find((o) => inside(c[0], o.outer));
     if (parent) (parent.holes ??= []).push(c); else outline.push({ outer: c });
+  }
+  // Outer edge not recovered as a closed contour (e.g. unchained segments): the closed
+  // pieces cover a fraction of the Edge.Cuts extent. Use the extent as the outline and
+  // treat the closed pieces as cut-outs.
+  const b = design.board, extent = (b.maxX - b.minX) * (b.maxY - b.minY);
+  if (!outline.length || outline.reduce((s, o) => s + area(o.outer), 0) < 0.5 * extent) {
+    outline = [{ outer: [[b.minX, b.minY], [b.maxX, b.minY], [b.maxX, b.maxY], [b.minX, b.maxY]], ...(sorted.length ? { holes: sorted } : {}) }];
   }
   const netName = (pi) => { const n = design.pads[pi].net; return n >= 0 ? design.nets[n].name : null; };
   return {
