@@ -67,7 +67,8 @@ function panel({ problem, layout, sides, contours, routes, tracks, highlight, mo
         const pins = problem.nets[ni].pins.map((pi) => worldPin(problem, layout, pi));
         for (let k = 1; k < pins.length; k++) parts.push(`<line class="rat" x1="${pins[0][0].toFixed(2)}" y1="${pins[0][1].toFixed(2)}" x2="${pins[k][0].toFixed(2)}" y2="${pins[k][1].toFixed(2)}"/>`);
       }
-      for (const b of lines) parts.push(`<polyline class="${b.layer ? 'rb' : 'rf'}${st === 2 ? ' conflict' : ''}" points="${b.points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ')}"><title>${esc(problem.nets[ni].id)}</title></polyline>`);
+      const last = (routes.grid?.layers ?? 2) - 1;
+      for (const b of lines) parts.push(`<polyline class="${b.layer === 0 ? 'rf' : b.layer === last ? 'rb' : 'ri'}${st === 2 ? ' conflict' : ''}" points="${b.points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ')}"><title>${esc(problem.nets[ni].id)}</title></polyline>`);
     });
   }
   if (!moduleOf) problem.pins.forEach((pin, pi) => {
@@ -82,9 +83,9 @@ function panel({ problem, layout, sides, contours, routes, tracks, highlight, mo
  * @param run {placerRoot, rows:[{case, file, mode|adapt, layouts:{original,result}, original, result, ...}]}
  *        row.adapt = designToProblem options; row.moduleOf / row.moduleNames enable module maps.
  */
-export async function renderReport(run, { out, cell = 0.4, rounds = 12, only = [] } = {}) {
+export async function renderReport(run, { out, cell = 0.4, rounds = 12, only = [], layers = 'board' } = {}) {
   const parse = await loadKicadParser(run.placerRoot);
-  const route = (adapted, layout) => { const t0 = performance.now(); const r = routeBoard(adapted.routing, layout, adapted.sides, { cell, maxRounds: rounds }); return { ...r, lines: r.polylines(), ms: performance.now() - t0 }; };
+  const route = (adapted, layout) => { const t0 = performance.now(); const r = routeBoard(layers === 'board' ? adapted.routing : { ...adapted.routing, layers: Number(layers) }, layout, adapted.sides, { cell, maxRounds: rounds }); return { ...r, lines: r.polylines(), ms: performance.now() - t0 }; };
   const sections = [];
   for (const row of run.rows) {
     if (only.length && !only.includes(row.case)) continue;
@@ -115,7 +116,7 @@ export async function renderReport(run, { out, cell = 0.4, rounds = 12, only = [
 <section>
   <h2>${esc(row.case)} <small>${esc(path.basename(file))} · ${row.n} footprints · ${problem.nets.length} signal nets · ${f1(problem.canvas.width)}×${f1(problem.canvas.height)} mm</small></h2>
   <table>
-    <thead><tr><th>Placement</th><th>HPWL, signal nets (mm)</th><th>Overlapping parts (count)</th><th>Clean two-layer nets (count / total)</th><th>Cells shared by nets (count)</th><th>Vias (count)</th><th>Route length (mm)</th><th>Routing time (s)</th></tr></thead>
+    <thead><tr><th>Placement</th><th>HPWL, signal nets (mm)</th><th>Overlapping parts (count)</th><th>Clean nets, board signal layers (count / total)</th><th>Cells shared by nets (count)</th><th>Vias (count)</th><th>Route length (mm)</th><th>Routing time (s)</th></tr></thead>
     <tbody>
       ${original ? stat('Input (original) placement', row.original.score.hpwl, origBad, rOrig) : ''}
       ${stat(`Optimized: ${esc(row.backend)} backend, ${esc(row.budget)} budget, ${esc(row.mode ?? 'plain')} (placement ${row['total s']} s)`, row.result.score.hpwl, newBad, rNew)}
@@ -152,7 +153,7 @@ svg { width:100%; height:auto; display:block; }
 .mod { fill-opacity:.7; stroke-width:.12; } .modbot { fill-opacity:.3; }
 .modlabel { fill:var(--fg); font-weight:600; text-anchor:middle; dominant-baseline:middle; paint-order:stroke; stroke:var(--card); stroke-width:.4; }
 .pin { fill:var(--fg); fill-opacity:.55; }
-.rf, .rb { fill:none; stroke-width:.28; stroke-linejoin:round; stroke-opacity:.85; } .rf { stroke:#d0443a; } .rb { stroke:#3b6fd6; } .conflict { stroke:#f0a020 !important; }
+.rf, .rb { fill:none; stroke-width:.28; stroke-linejoin:round; stroke-opacity:.85; } .rf { stroke:#d0443a; } .rb { stroke:#3b6fd6; } .ri { stroke:#2fa36b; stroke-opacity:.6; } .conflict { stroke:#f0a020 !important; }
 .rat { stroke:#e0452b; stroke-width:.12; stroke-dasharray:.5 .4; }
 .tf { stroke:#d0443a; stroke-opacity:.75; stroke-linecap:round; } .tb { stroke:#3b6fd6; stroke-opacity:.75; stroke-linecap:round; } .ti { stroke:#c08a1e; stroke-opacity:.7; }
 .via { fill:#8a8a84; }
@@ -160,8 +161,8 @@ svg { width:100%; height:auto; display:block; }
 .legend i { display:inline-block; width:12px; height:9px; margin-right:5px; vertical-align:-1px; border:1px solid; }
 </style></head><body><main>
 <h1>KiCad placement: original vs optimized</h1>
-<p class="lead">Middle and right panels use the same two-layer PathFinder router (${cell} mm grid, pads as obstacles, SMD pads on the side the placement puts them, up to ${rounds} rounds, power/ground nets excluded) so the two placements are compared on equal terms. Footprint colour shows the side each placement puts it on; with <code>--sides single</code> every footprint shares one plane, so bottom-side parts of the original board overlap top-side parts.</p>
-<p class="legend"><span><i style="background:#5fa8a044;border-color:#2f7d74"></i>top-side footprint</span><span><i style="background:#9a86c944;border-color:#6a55a3"></i>bottom-side footprint</span><span><i style="background:#e0452b40;border-color:#e0452b"></i>overlapping footprint</span><span><i style="border:0;border-top:2px solid #d0443a;height:0"></i>F.Cu</span><span><i style="border:0;border-top:2px solid #3b6fd6;height:0"></i>B.Cu</span><span><i style="border:0;border-top:2px solid #f0a020;height:0"></i>net sharing cells</span><span><i style="border:0;border-top:2px dashed #e0452b;height:0"></i>unrouted net</span></p>
+<p class="lead">Middle and right panels use the same multi-layer PathFinder router (the board's signal layers, planes excluded) (${cell} mm grid, pads as obstacles, SMD pads on the side the placement puts them, up to ${rounds} rounds, power/ground nets excluded) so the two placements are compared on equal terms. Footprint colour shows the side each placement puts it on; with <code>--sides single</code> every footprint shares one plane, so bottom-side parts of the original board overlap top-side parts.</p>
+<p class="legend"><span><i style="background:#5fa8a044;border-color:#2f7d74"></i>top-side footprint</span><span><i style="background:#9a86c944;border-color:#6a55a3"></i>bottom-side footprint</span><span><i style="background:#e0452b40;border-color:#e0452b"></i>overlapping footprint</span><span><i style="border:0;border-top:2px solid #d0443a;height:0"></i>F.Cu</span><span><i style="border:0;border-top:2px solid #3b6fd6;height:0"></i>B.Cu</span><span><i style="border:0;border-top:2px solid #2fa36b;height:0"></i>inner layers</span><span><i style="border:0;border-top:2px solid #f0a020;height:0"></i>net sharing cells</span><span><i style="border:0;border-top:2px dashed #e0452b;height:0"></i>unrouted net</span></p>
 ${sections.join('\n')}
 </main></body></html>`);
   console.error(`wrote ${out}`);

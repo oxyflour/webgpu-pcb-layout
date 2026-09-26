@@ -44,6 +44,7 @@ export class MultiStartGlobalPlacer {
     const scores=await this.exactScorer.scoreLayouts(runs);const ord=scores.map((_,i)=>i).sort((a,b)=>scores[a].total-scores[b].total).slice(0,o.finalists);
     const fine=await this.#run(ord.map(i=>runs[i]),o.fineIterations);
     const fineScores=await this.exactScorer.scoreLayouts(fine);let bi=0;for(let i=1;i<fine.length;i++)if(fineScores[i].total<fineScores[bi].total)bi=i;
-    return {layout:fine[bi],score:fineScores[bi],coarseLayouts:runs,coarseScores:scores,finalistIndices:ord};
+    // fineLayouts/fineScores: every refined finalist, for callers that want alternatives.
+    return {layout:fine[bi],score:fineScores[bi],fineLayouts:fine,fineScores,coarseLayouts:runs,coarseScores:scores,finalistIndices:ord};
   }
 }

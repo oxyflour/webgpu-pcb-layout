@@ -28,6 +28,8 @@ export function parseOptions(argv, defaults = {}) {
     power: has('power'),
     route: has('route'),
     routeCell: Number(arg('route-cell', 0.4)),
+    // Evaluation routing layers: 'board' (the board's signal layers) or a number (e.g. 2).
+    routeLayers: arg('route-layers', 'board'),
     sides: arg('sides', 'single'),
     density: Number(arg('density', 0)),
     densityTarget: Number(arg('density-target', 0.65)),
@@ -38,8 +40,8 @@ export function parseOptions(argv, defaults = {}) {
     modules: arg('modules', null),
     cohesion: Number(arg('cohesion', 0.4)),
     moduleResolution: Number(arg('module-resolution', 1)),
-    // Diagnostics: scale global iterations; parts moved per LNS candidate.
-    globalScale: Number(arg('global-scale', 1)),
+    // Global iterations scale with the part count unless given; parts moved per LNS candidate.
+    globalScale: arg('global-scale', null) === null ? null : Number(arg('global-scale')),
     lnsMoves: arg('lns-moves', null) === null ? null : Number(arg('lns-moves')),
   };
   o.mode = [o.preplace && 'preplace', o.power && 'power', o.sides !== 'single' && `sides-${o.sides}`, o.density > 0 && `density${o.density}`,
@@ -99,11 +101,13 @@ export function configFor(problem, seed, o) {
     gridDensity: { strength: o.density, bins: 64, target: o.densityTarget, pinArea: o.pinArea },
   };
   const lnsScale = o.noLns ? 0 : 1;
+  // Larger boards need more global iterations (x3 measured +90 clean nets on ppc-n3, +43 on k60).
+  const globalScale = o.globalScale ?? Math.min(3, Math.max(1, Math.sqrt(n / 50)));
   if (o.budget === 'large') return {
     scorerOptions, L,
     optimizer: {
       seed, approximate,
-      global: { starts: 32, coarseIterations: Math.round(150 * o.globalScale), finalists: 4, fineIterations: Math.round(220 * o.globalScale), placer },
+      global: { starts: 32, coarseIterations: Math.round(150 * globalScale), finalists: 4, fineIterations: Math.round(220 * globalScale), placer }, globalScale,
       fastLns: { iterations: 400 * lnsScale, population: 1024, movesPerCandidate: o.lnsMoves ?? 2, translationScale: 0.015 * L, rotationProbability: 0.1, temperature: .025, cooling: .992 },
       polish: { iterations: 200 * lnsScale, population: 1024, movesPerCandidate: 1, translationScale: 0.008 * L, rotationProbability: 0.05, temperature: .012, cooling: .985 },
     },
@@ -159,15 +163,19 @@ const priorityWeight = (adapted, net) => { const p = adapted.policy?.[net.id]?.p
  * Module-level placement: soft macros placed by the (GPU) multi-start global placer,
  * then expanded into `starts` component-level starting layouts.
  */
-async function placeModules(problem, modules, o, cfg, device, seed, starts) {
+async function placeModules(problem, modules, o, cfg, device, seed, starts, alternatives = 4) {
   const t0 = performance.now();
   const mp = moduleProblem(problem, randomLayout(problem, seed), modules, { target: o.densityTarget, pinArea: o.pinArea });
   const p = normalizeProblem(mp.input);
   const scorer = scorerFor(device, p, cfg.scorerOptions);
   const placer = { ...cfg.optimizer.global.placer, gridDensity: { ...cfg.optimizer.global.placer.gridDensity, strength: Math.max(3, o.density), pinArea: 0 } };
-  const res = await new MultiStartGlobalPlacer(p, scorer, { seed: seed ^ 0x3D17, device, starts: 32, coarseIterations: 200, finalists: 4, fineIterations: 300, placer }).optimize();
+  // Several module-level structures, each expanded into starts/alternatives component layouts;
+  // the component-level multi-start then picks among them with the full objective.
+  const gs = cfg.optimizer.globalScale ?? 1;
+  const res = await new MultiStartGlobalPlacer(p, scorer, { seed: seed ^ 0x3D17, device, starts: 64, coarseIterations: Math.round(200 * gs), finalists: alternatives, fineIterations: Math.round(300 * gs), placer }).optimize();
   scorer.destroy?.();
-  const initials = Array.from({ length: starts }, (_, k) => expandModules(problem, mp, res.layout, modules, seed + 101 * k));
+  const order = res.fineScores.map((_, k) => k).sort((a, b) => res.fineScores[a].total - res.fineScores[b].total);
+  const initials = Array.from({ length: starts }, (_, k) => expandModules(problem, mp, res.fineLayouts[order[k % order.length]], modules, seed + 101 * k));
   return { initials, moduleLayout: res.layout, moduleProblem: mp, ms: performance.now() - t0 };
 }
 
@@ -245,8 +253,9 @@ export async function placeBoard(adapted, o, { device = null, seed = 1, plan = n
   return { layout, init, cfg, timing, global, fast, legal, modules: moduleInfo };
 }
 
-export function routeStats(adapted, layout, cell = 0.4) {
+export function routeStats(adapted, layout, cell = 0.4, layers = 'board') {
   const t = performance.now();
-  const r = routeBoard(adapted.routing, layout, adapted.sides, { cell });
-  return { nets: r.nets, clean: r.clean, complete: r.complete, overflow: r.overflow, vias: r.vias, length: Math.round(r.length), rounds: r.rounds, ms: performance.now() - t };
+  const board = layers === 'board' ? adapted.routing : { ...adapted.routing, layers: Number(layers) };
+  const r = routeBoard(board, layout, adapted.sides, { cell });
+  return { layers: r.grid.layers, nets: r.nets, clean: r.clean, complete: r.complete, overflow: r.overflow, vias: r.vias, length: Math.round(r.length), rounds: r.rounds, ms: performance.now() - t };
 }

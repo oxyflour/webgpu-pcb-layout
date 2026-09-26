@@ -77,7 +77,7 @@ for (const [name, rel] of CASES) {
   const adapted = designToProblem(design, adapt);
   const { originalLayout, stats } = adapted;
   const problem = normalizeProblem(adapted.input);
-  const origRoute = o.route ? routeStats(adapted, originalLayout, o.routeCell) : null;
+  const origRoute = o.route ? routeStats(adapted, originalLayout, o.routeCell, o.routeLayers) : null;
 
   for (let s = 0; s < seeds; s++) {
     const seed = 20260925 + 7919 * s;
@@ -91,7 +91,7 @@ for (const [name, rel] of CASES) {
     const orig = scorer.scoreLayout(originalLayout), origLegal = legality(problem, originalLayout);
     const start = scorer.scoreLayout(out.init);
     const fin = scorer.scoreLayout(out.layout), finLegal = legality(problem, out.layout);
-    const newRoute = o.route ? routeStats(adapted, out.layout, o.routeCell) : null;
+    const newRoute = o.route ? routeStats(adapted, out.layout, o.routeCell, o.routeLayers) : null;
     const t = out.timing;
     const row = {
       case: name, backend: o.backend, budget: o.budget, mode: o.mode, n: stats.footprints, fixed: stats.locked, nets: stats.nets, density: +stats.density.toFixed(2), seed,

@@ -208,7 +208,8 @@ export function irToProblem(irIn, options = {}) {
     input: { canvas, components, nets },
     originalLayout, placed, origin, sides, policy, plan, power, mechanical,
     contours: ir.board.outline.flatMap((o) => [o.outer, ...(o.holes ?? [])]).map((c) => c.map(([x, y]) => [x - origin.x, y - origin.y])),
-    routing: { canvas, pads: routingPads, netCount: nets.length, outline, blocked: routingBlocked },
+    // Evaluation routing layers: every copper layer except planes (at least the two outer ones).
+    routing: { canvas, pads: routingPads, netCount: nets.length, outline, blocked: routingBlocked, layers: Math.max(2, (ir.board.copperLayers ?? []).filter((l) => l.type !== 'plane').length) },
     // The IR exactly as given (its yAxis and coordinates are used for results).
     bodyFrame, ir: irIn,
     stats: {

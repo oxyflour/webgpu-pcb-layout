@@ -100,3 +100,27 @@ test('the minimal IR example routes around its hole and antenna keepout', async 
     assert.ok(!(q.x + w / 2 > 30 + e && q.x - w / 2 < 36 - e && q.y + h / 2 > 20 + e && q.y - h / 2 < 26 - e) || p.components[i].fixed, `${p.components[i].id} in the hole`);
   });
 });
+
+test('evaluation router uses inner layers when the board has them', async () => {
+  const { routeBoard } = await import('../bench/pcb-router.mjs');
+  // 12 nets from the left edge to the right edge, SMD pads on the top.
+  const pads = [], layout = [], sides = [], n = 12;
+  for (let k = 0; k < n; k++) {
+    const y = 2 + k * 1.4;
+    layout.push({ x: 1, y, rotation: 0 }, { x: 19, y, rotation: 0 }); sides.push(1, 1);
+    pads.push({ comp: 2 * k, lx: 0, ly: 0, w: 0.4, h: 0.4, rot: 0, tht: false, hole: false, net: k }, { comp: 2 * k + 1, lx: 0, ly: 0, w: 0.4, h: 0.4, rot: 0, tht: false, hole: false, net: k });
+  }
+  // SMD walls at x = 10 on the top and on the bottom, each with a single one-cell gap:
+  // two layers give two channels, inner layers are open.
+  for (const side of [1, -1]) for (let y = 0.2; y < 20; y += 0.4) {
+    if (Math.abs(y - 10.2) < 0.1) continue;
+    pads.push({ comp: layout.length, lx: 0, ly: 0, w: 0.4, h: 0.4, rot: 0, tht: false, hole: false, net: -1 });
+    layout.push({ x: 10.2, y, rotation: 0 }); sides.push(side);
+  }
+  const board = { canvas: { width: 20, height: 20 }, pads, netCount: n };
+  const two = routeBoard({ ...board, layers: 2 }, layout, sides, { cell: 0.4, maxRounds: 8 });
+  const four = routeBoard({ ...board, layers: 4 }, layout, sides, { cell: 0.4, maxRounds: 8 });
+  assert.equal(four.grid.layers, 4);
+  assert.ok(two.clean <= 2, `${two.clean} clean nets through two one-cell gaps`);
+  assert.equal(four.clean, n, `${four.clean} clean nets with open inner layers`);
+});

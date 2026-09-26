@@ -1,9 +1,11 @@
-// Two-layer PathFinder router used to evaluate placements on real KiCad boards.
+// Multi-layer PathFinder router used to evaluate placements on real boards.
 //
-// Grid model: square cells of `cell` mm on F.Cu (layer 0) and B.Cu (layer 1). Pads are
-// the only obstacles: SMD pads occupy their footprint's side, through-hole pads both
-// layers; a cell claimed by several pads goes to the nearest pad centre. A net may use
-// its own pad cells and any free cell; vias cost `viaCost` cells. Nets are grown as
+// Grid model: square cells of `cell` mm on L routing layers (board.layers, default 2):
+// layer 0 is the top copper, L-1 the bottom, the rest inner signal layers. Pads are the
+// only obstacles: SMD pads occupy the outer layer of their footprint's side, through-hole
+// pads every layer; a cell claimed by several pads goes to the nearest pad centre. A net
+// may use its own pad cells and any free cell; a via between adjacent layers costs
+// `viaCost` cells. Nets are grown as
 // trees with A* (multi-source from the tree) and negotiated with present/history
 // congestion costs until no cell is shared or `maxRounds` is reached.
 import { rotateQuarter, localPin } from '../src/problem.js';
@@ -43,12 +45,20 @@ class MinHeap {
 export function routeBoard(board, layout, sides, options = {}) {
   const cell = options.cell ?? 0.3, viaCost = options.viaCost ?? 6, maxRounds = options.maxRounds ?? 12;
   const margin = options.windowMargin ?? 12;
-  const W = Math.ceil(board.canvas.width / cell), H = Math.ceil(board.canvas.height / cell), P = W * H, N = 2 * P;
+  const L = Math.max(2, board.layers ?? 2), BOTTOM = L - 1;
+  const W = Math.ceil(board.canvas.width / cell), H = Math.ceil(board.canvas.height / cell), P = W * H, N = L * P;
   const owner = new Int32Array(N).fill(-1), ownerPad = new Int32Array(N).fill(-1), ownerDist = new Float32Array(N).fill(Infinity);
   // Outside the outline, board holes and routing keepouts are closed to every net.
   if (board.outline || board.blocked?.length) {
     const m = buildPlacementMasks({ canvas: { width: W * cell, height: H * cell, outline: board.outline, blocked: board.blocked ?? [] }, components: [] }, { resolution: cell });
-    m.layers.forEach((l, k) => { const g = m.grids[k]; for (let c = 0; c < P; c++) if (g[c]) owner[l.side * P + c] = -2; });
+    // Mask side 0 -> top layer, side 1 -> bottom layer; cells blocked on both sides
+    // (outline, holes, two-sided keepouts) are blocked on the inner layers too.
+    const top = m.grids[m.layers.findIndex((l) => l.side === 0 && l.maxHeight === null)], bot = m.grids[m.layers.findIndex((l) => l.side === 1 && l.maxHeight === null)];
+    for (let c = 0; c < P; c++) {
+      if (top[c]) owner[c] = -2;
+      if (bot[c]) owner[BOTTOM * P + c] = -2;
+      if (top[c] && bot[c]) for (let l = 1; l < BOTTOM; l++) owner[l * P + c] = -2;
+    }
   }
 
   // Rasterize pads (nearest-centre wins shared cells).
@@ -65,7 +75,8 @@ export function routeBoard(board, layout, sides, options = {}) {
     return [Math.max(0, Math.floor((cx - hx) / cell)), Math.max(0, Math.floor((cy - hy) / cell)), Math.min(W - 1, Math.floor((cx + hx) / cell)), Math.min(H - 1, Math.floor((cy + hy) / cell))];
   });
   const bottom = (c) => layout[c].side === undefined ? sides[c] < 0 : layout[c].side === 1;
-  const padLayers = board.pads.map((pad) => pad.tht || pad.hole ? [0, 1] : [bottom(pad.comp) ? 1 : 0]);
+  const allLayers = Array.from({ length: L }, (_, l) => l);
+  const padLayers = board.pads.map((pad) => pad.tht || pad.hole ? allLayers : [bottom(pad.comp) ? BOTTOM : 0]);
   board.pads.forEach((pad, pi) => {
     const [x0, y0, x1, y1] = padBox[pi], [cx, cy] = padCenter[pi];
     for (const l of padLayers[pi]) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -99,7 +110,7 @@ export function routeBoard(board, layout, sides, options = {}) {
     while (heap.n) {
       const c = heap.pop();
       if (mark[c] === targetMark) return c;
-      const gc = g[c], l = c >= P ? 1 : 0, q = c - l * P, x = q % W, y = (q / W) | 0;
+      const gc = g[c], l = (c / P) | 0, q = c - l * P, x = q % W, y = (q / W) | 0;
       const step = (n, nx, ny, base) => {
         const o = owner[n];
         if (o !== -1 && o !== net) return;
@@ -113,7 +124,8 @@ export function routeBoard(board, layout, sides, options = {}) {
       if (x < wx1) step(c + 1, x + 1, y, 1);
       if (y > wy0) step(c - W, x, y - 1, 1);
       if (y < wy1) step(c + W, x, y + 1, 1);
-      step(l ? c - P : c + P, x, y, viaCost);
+      if (l > 0) step(c - P, x, y, viaCost);
+      if (l < BOTTOM) step(c + P, x, y, viaCost);
     }
     return -1;
   }
@@ -178,12 +190,12 @@ export function routeBoard(board, layout, sides, options = {}) {
     for (const path of r.paths) for (let k = 1; k < path.length; k++) { if (Math.abs(path[k] - path[k - 1]) === P) vias++; else length += cell; }
   }
   return {
-    grid: { W, H, cell }, rounds, overflow, nets: order.length, complete, clean, vias, length, status,
+    grid: { W, H, cell, layers: L }, rounds, overflow, nets: order.length, complete, clean, vias, length, status,
     /** Polylines per net as [{layer, points:[[x,y],...]}] in mm. */
     polylines: () => routes.map((r) => r ? r.paths.flatMap((path) => {
       const out = []; let cur = null;
       for (const c of path) {
-        const l = c >= P ? 1 : 0, q = c - l * P, pt = [(q % W + .5) * cell, (((q / W) | 0) + .5) * cell];
+        const l = (c / P) | 0, q = c - l * P, pt = [(q % W + .5) * cell, (((q / W) | 0) + .5) * cell];
         if (!cur || cur.layer !== l) { if (cur && cur.points.length > 1) out.push(cur); cur = { layer: l, points: [pt] }; } else cur.points.push(pt);
       }
       if (cur && cur.points.length > 1) out.push(cur);

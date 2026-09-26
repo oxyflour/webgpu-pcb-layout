@@ -78,7 +78,7 @@ device?.destroy();
 const cfg = out.cfg;
 const scorer = new PriorityCpuBatchScorer(problem, cfg.scorerOptions);
 const orig = hasOriginal ? scorer.scoreLayout(adapted.originalLayout) : null, fin = scorer.scoreLayout(out.layout);
-const origRoute = hasOriginal ? routeStats(adapted, adapted.originalLayout, o.routeCell) : null, newRoute = routeStats(adapted, out.layout, o.routeCell);
+const origRoute = hasOriginal ? routeStats(adapted, adapted.originalLayout, o.routeCell, o.routeLayers) : null, newRoute = routeStats(adapted, out.layout, o.routeCell, o.routeLayers);
 const legal = legality(problem, out.layout);
 
 if (plan && o.arg('export-modules', null)) {

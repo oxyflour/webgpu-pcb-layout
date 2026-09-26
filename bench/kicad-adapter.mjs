@@ -22,6 +22,7 @@ export async function loadKicadParser(placerRoot) {
   return (text, name) => {
     const design = mod.parseKicadPCB(text, name);
     const copper = copperSideNames(text);
+    design.copperLayers = copperLayerTable(text);
     // Same block order as the parser: footprints, then legacy modules; pads in order.
     const blocks = [...mod.extractBlocks(text, 'footprint'), ...mod.extractBlocks(text, 'module')];
     design.raw = blocks.map((b, fi) => {
@@ -47,13 +48,28 @@ export async function loadKicadParser(placerRoot) {
  * numbers them 15 (front) and 0 (back); later versions 0 (front) and 31 (back).
  */
 export function copperSideNames(text) {
+  const layers = copperLayerTable(text);
+  return { front: layers[0]?.name ?? 'F.Cu', back: layers[layers.length - 1]?.name ?? 'B.Cu' };
+}
+
+/**
+ * Copper layers from top to bottom: {name, number, type: 'signal' | 'plane'}. KiCad
+ * "power" layers are planes; "mixed" layers with a supply-like name (GND, PWR, VCC...) too.
+ */
+export function copperLayerTable(text) {
   const start = text.indexOf('(layers');
   // The table is short; entries after it (net classes etc.) never match the copper pattern.
   const table = start < 0 ? '' : text.slice(start, start + 4000).split(/\n\s*\)\s*\n/)[0];
   const byNumber = new Map();
-  for (const m of table.matchAll(/\((\d+)\s+"?([^"\s)]+)"?\s+(signal|power|mixed|jumper)/g)) byNumber.set(+m[1], m[2]);
+  for (const m of table.matchAll(/\((\d+)\s+"?([^"\s)]+)"?\s+(signal|power|mixed|jumper)/g)) byNumber.set(+m[1], { name: m[2], type: m[3] });
   const modern = byNumber.has(31) || !byNumber.has(15);
-  return { front: byNumber.get(modern ? 0 : 15) ?? 'F.Cu', back: byNumber.get(modern ? 31 : 0) ?? 'B.Cu' };
+  const front = modern ? 0 : 15, back = modern ? 31 : 0;
+  const inner = [...byNumber.keys()].filter((k) => k !== front && k !== back).sort((a, b) => a - b);
+  return [front, ...inner, back].filter((k) => byNumber.has(k)).map((k) => {
+    const { name, type } = byNumber.get(k);
+    const plane = k !== front && k !== back && (type === 'power' || (type === 'mixed' && /GND|PWR|POWER|VCC|VDD|VSS|PLANE/i.test(name)));
+    return { name, number: k, type: plane ? 'plane' : 'signal' };
+  });
 }
 
 function parseAt(block) {
@@ -102,7 +118,10 @@ export function kicadToIR(design, name = design.name) {
   return {
     format: 'webgpu-pin-layout/board@1', yAxis: 'down', name,
     source: { tool: 'kicad', file: name },
-    board: { outline, sides: ['top', 'bottom'] },
+    board: {
+      outline, sides: ['top', 'bottom'],
+      copperLayers: (design.copperLayers ?? []).map((l, k, all) => ({ name: l.name, type: l.type, ...(k === 0 ? { side: 'top' } : k === all.length - 1 ? { side: 'bottom' } : {}) })),
+    },
     nets: design.nets.map((n) => ({ name: n.name, class: isPowerNet(n.name) ? (/GND|VSS/i.test(n.name.split('/').pop()) ? 'ground' : 'power') : 'signal' })),
     footprints: design.footprints.map((f, fi) => {
       const raw = design.raw[fi], bottom = f.side < 0, mx = bottom ? -1 : 1;
