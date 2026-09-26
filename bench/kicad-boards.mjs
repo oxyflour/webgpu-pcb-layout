@@ -93,6 +93,9 @@ for (const [name, rel] of CASES) {
     const fin = scorer.scoreLayout(out.layout), finLegal = legality(problem, out.layout);
     const newRoute = o.route ? routeStats(adapted, out.layout, o.routeCell, o.routeLayers) : null;
     const t = out.timing;
+    // Side usage: bottom-side share and modules spread over both sides (>= 20% and >= 2 parts on the minority side).
+    const bottomPct = (L) => Math.round(100 * L.filter((q, i) => (q.side ?? (adapted.sides[i] < 0 ? 1 : 0)) === 1).length / L.length);
+    const mixedPct = (L) => { if (!plan) return null; const big = plan.modules.filter((m) => m.members.length >= 4); if (!big.length) return 0; return Math.round(100 * big.filter((m) => { const b = m.members.filter((i) => (L[i].side ?? 0) === 1).length, mn = Math.min(b, m.members.length - b); return mn >= Math.max(2, 0.2 * m.members.length); }).length / big.length); };
     const row = {
       case: name, backend: o.backend, budget: o.budget, mode: o.mode, n: stats.footprints, fixed: stats.locked, nets: stats.nets, density: +stats.density.toFixed(2), seed,
       'orig hpwl': Math.round(orig.hpwl), 'orig ovl': r1(orig.overlap),
@@ -100,6 +103,8 @@ for (const [name, rel] of CASES) {
       'hpwl': Math.round(fin.hpwl), 'hpwl/orig': +(fin.hpwl / orig.hpwl).toFixed(2),
       'ovl mm2': r1(fin.overlap), 'ovl pairs': finLegal.overlapPairs, 'bounds': +fin.bounds.toFixed(2),
       ...(plan ? { modules: plan.modules.length, 'modules s': r1(t.modulesMs / 1000) } : {}),
+      backside: out.backside, 'orig bottom %': bottomPct(originalLayout), 'bottom %': bottomPct(out.layout),
+      ...(plan ? { 'orig mixed %': mixedPct(originalLayout), 'mixed %': mixedPct(out.layout) } : {}),
       'global s': r1(t.globalMs / 1000), 'lns s': r1(t.fastLnsMs / 1000), 'polish s': r1(t.polishMs / 1000), 'total s': r1(t.totalMs / 1000),
       ...(out.legal ? { 'legal fail': out.legal.failed, 'legal disp': r1(out.legal.meanDisplacement) } : {}),
       ...(o.route ? { 'orig clean': `${origRoute.clean}/${origRoute.nets}`, 'clean': `${newRoute.clean}/${newRoute.nets}`, 'orig ovf': origRoute.overflow, 'ovf': newRoute.overflow } : {}),

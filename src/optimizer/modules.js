@@ -157,7 +157,9 @@ export function moduleStats(problem, modules, options = {}) {
  * member area / target density), every part outside a module as itself (fixed parts
  * keep their position), and one pin per (owner, net) for nets spanning owners.
  *
- * @param modules [{members, side?: 0|1, region?: {x,y,width,height}}] (canvas coords)
+ * @param modules [{members, side?: 0|1, region?: {x,y,width,height}, memberSide?: Map<index, 0|1>}]
+ *        (canvas coords). A module whose members use both sides (memberSide) becomes a
+ *        two-sided macro sized by its larger side.
  * @returns {input, owners} where owners[k] = {module: k} | {component: i}
  */
 export function moduleProblem(problem, layout, modules, options = {}) {
@@ -166,9 +168,14 @@ export function moduleProblem(problem, layout, modules, options = {}) {
   const ownerOf = new Int32Array(problem.components.length).fill(-1);
   const owners = [], components = [];
   modules.forEach((m, k) => {
-    const area = m.members.reduce((s, i) => { const c = problem.components[i]; return s + areaOf(c) + pinArea * c.pins.length; }, 0);
-    const side = Math.min(0.9 * Math.min(W, H), Math.sqrt(area / target));
-    const comp = { id: `module:${k}`, width: side, height: side, rotatable: false, pins: [], sides: m.side ? 'bottom' : 'top' };
+    const load = [0, 0];
+    for (const i of m.members) {
+      const c = problem.components[i], a = areaOf(c) + pinArea * c.pins.length;
+      if (c.twoSided) { load[0] += a; load[1] += a; } else load[m.memberSide?.get(i) ?? (m.side ? 1 : 0)] += a;
+    }
+    const split = load[0] > 0 && load[1] > 0;
+    const side = Math.min(0.9 * Math.min(W, H), Math.sqrt(Math.max(load[0], load[1]) / target));
+    const comp = { id: `module:${k}`, width: side, height: side, rotatable: false, pins: [], sides: m.side ? 'bottom' : 'top', twoSided: split };
     if (m.region) comp.fixed = { x: m.region.x + m.region.width / 2, y: m.region.y + m.region.height / 2, rotation: 0, side: m.side ? 1 : 0 };
     m.members.forEach((i) => { ownerOf[i] = owners.length; });
     owners.push({ module: k }); components.push(comp);
@@ -219,12 +226,39 @@ export function expandModules(problem, modProblem, modLayout, modules, seed = 1)
       const x = Math.min(problem.canvas.width - w / 2, Math.max(w / 2, pl.x + (rnd() * 2 - 1) * half));
       const y = Math.min(problem.canvas.height - h / 2, Math.max(h / 2, pl.y + (rnd() * 2 - 1) * half));
       const p = { x, y, rotation: 0 };
-      if (c.sides === 'any') p.side = c.twoSided ? 0 : (pl.side ? 1 : 0);
+      if (c.sides === 'any') p.side = c.twoSided ? 0 : (m.memberSide?.get(i) ?? (pl.side ? 1 : 0));
       else if (c.sides === 'bottom') p.side = 1;
       out[i] = p;
     }
   });
   return out;
+}
+
+/**
+ * Split a module across both board sides the way layouts usually do it: ICs,
+ * through-hole and large parts stay on the module's side; small SMD parts that may
+ * flip move to the opposite side, largest first, until they fill the area under the
+ * large parts (fill x their footprint area). Returns Map<component index, side>.
+ */
+export function splitModuleSides(problem, module, options = {}) {
+  const fill = options.fill ?? 1, bigArea = options.bigArea ?? 25, icPins = options.icPins ?? 8;
+  const primary = module.side ? 1 : 0, sides = new Map();
+  const small = [];
+  let shadow = 0;
+  for (const i of module.members) {
+    const c = problem.components[i], a = areaOf(c);
+    sides.set(i, primary);
+    if (c.twoSided || c.sides !== 'any' || c.pins.length >= icPins || a >= bigArea) shadow += a;
+    else small.push(i);
+  }
+  small.sort((a, b) => areaOf(problem.components[b]) - areaOf(problem.components[a]));
+  let used = 0;
+  for (const i of small) {
+    const a = areaOf(problem.components[i]);
+    if (used + a > fill * shadow) continue;
+    sides.set(i, 1 - primary); used += a;
+  }
+  return sides;
 }
 
 export const MODULE_NET_PREFIX = '~module';

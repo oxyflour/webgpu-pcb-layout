@@ -88,3 +88,24 @@ test('module JSON round-trips and reports editing mistakes', async () => {
   bad.modules[2].region = { x: 0, y: 0, width: 5, height: 5 };
   assert.throws(() => importModules(bad, adapted, problem), (e) => /unknown component "NOPE"/.test(e.message) && /already in/.test(e.message) && /side must be/.test(e.message) && /outside the board/.test(e.message));
 });
+
+test('splitModuleSides puts small parts under the large ones on the other side', async () => {
+  const { splitModuleSides } = await import('../src/index.js');
+  const pins = (n) => Array.from({ length: n }, (_, k) => ({ id: `p${k}`, x: 0, y: 0 }));
+  const problem = normalizeProblem({ canvas: { width: 50, height: 50 }, components: [
+    { id: 'U1', width: 5, height: 5, sides: 'any', pins: pins(16) },          // IC: stays, 25 mm² of shadow
+    { id: 'J1', width: 6, height: 2, sides: 'any', twoSided: true, pins: pins(4) },
+    { id: 'C1', width: 3, height: 3, sides: 'any', pins: pins(2) },           // 9
+    { id: 'C2', width: 3, height: 2, sides: 'any', pins: pins(2) },           // 6
+    { id: 'R1', width: 2, height: 1, sides: 'any', pins: pins(2) },           // 2
+    { id: 'L1', width: 4, height: 4, sides: 'top', pins: pins(2) },           // cannot flip, adds 16 of shadow
+    { id: 'C3', width: 4.9, height: 5, sides: 'any', pins: pins(2) },         // 24.5 (below the 25 mm² "large" limit)
+    { id: 'C4', width: 4.9, height: 4.9, sides: 'any', pins: pins(2) },       // 24.01
+  ], nets: [] });
+  const sides = splitModuleSides(problem, { members: [0, 1, 2, 3, 4, 5, 6, 7], side: 0 });
+  const id = (s) => problem.components.filter((_, i) => sides.get(i) === s).map((c) => c.id).sort();
+  // Shadow = U1 25 + J1 12 + L1 16 = 53. Largest first: C3 24.5, C4 24.01 (48.51);
+  // C1 (+9) and C2 (+6) would exceed 53, R1 (+2) still fits.
+  assert.deepEqual(id(1), ['C3', 'C4', 'R1']);
+  assert.deepEqual(id(0), ['C1', 'C2', 'J1', 'L1', 'U1']);
+});

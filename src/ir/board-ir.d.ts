@@ -121,6 +121,8 @@ export interface Module {
 
 export interface Rules {
   componentClearance?: number;
+  /** Cost of a bottom-side part in HPWL-mm per mm² of its area (0: sides equal; ~20: single-sided). */
+  backsideCost?: number;
   /** reserved */ edgeClearance?: number;
   /** reserved */ track?: { width?: number; clearance?: number };
   /** reserved */ via?: { diameter?: number; drill?: number };

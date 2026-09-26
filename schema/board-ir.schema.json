@@ -144,6 +144,7 @@
       "type": "object",
       "properties": {
         "componentClearance": { "type": "number", "minimum": 0 },
+        "backsideCost": { "type": "number", "minimum": 0 },
         "edgeClearance": { "type": "number", "minimum": 0 },
         "track": { "type": "object", "properties": { "width": { "type": "number", "exclusiveMinimum": 0 }, "clearance": { "type": "number", "minimum": 0 } } },
         "via": { "type": "object", "properties": { "diameter": { "type": "number", "exclusiveMinimum": 0 }, "drill": { "type": "number", "exclusiveMinimum": 0 } } }

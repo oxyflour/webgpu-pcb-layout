@@ -139,6 +139,7 @@ export function validateBoardIR(ir) {
   // Rules
   const rules = ir.rules ?? {};
   if (rules.componentClearance !== undefined && !(finite(rules.componentClearance) && rules.componentClearance >= 0)) err('rules.componentClearance must be a number >= 0');
+  if (rules.backsideCost !== undefined && !(finite(rules.backsideCost) && rules.backsideCost >= 0)) err('rules.backsideCost must be a number >= 0');
   if (rules.edgeClearance !== undefined && !(finite(rules.edgeClearance) && rules.edgeClearance >= 0)) err('rules.edgeClearance must be a number >= 0');
   for (const k of ['track', 'via']) if (rules[k] !== undefined) warn(`rules.${k} is not used by the engine yet`);
 

@@ -44,7 +44,7 @@ test('priority GPU scorer matches PriorityCpuBatchScorer, including large nets',
   const problem = randomProblem(11);
   const policy = {};
   problem.nets.forEach((n, i) => { policy[n.id] = { priority: (i * 37) % 101, topLocked: i % 9 === 0 }; });
-  const options = { policy, weights: { hpwl: 1, overlap: 300, bounds: 200, congestion: 0.7 }, coarse: { gridWidth: 30, gridHeight: 20, capacity: 1.7 }, priorityScale: 40, minNetWeight: 0.15, topLockedBoost: 2.5 };
+  const options = { policy, weights: { hpwl: 1, overlap: 300, bounds: 200, congestion: 0.7, backside: 0.8 }, coarse: { gridWidth: 30, gridHeight: 20, capacity: 1.7 }, priorityScale: 40, minNetWeight: 0.15, topLockedBoost: 2.5 };
   const cpu = new PriorityCpuBatchScorer(problem, options);
   const gpu = new PriorityGpuBatchScorer(device, problem, options);
   const layouts = randomLayouts(problem, 5, 24);

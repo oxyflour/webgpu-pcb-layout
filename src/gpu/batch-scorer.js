@@ -11,7 +11,7 @@ const COMMON = /* wgsl */`
 // side: 0 = top, 1 = bottom (pins mirrored in local x).
 struct Placement { pos: vec2<f32>, rot: u32, side: u32 };
 // counts: candidates, components, nets, smallNets
-// counts2: largeNets, gridWidth, gridHeight, -
+// counts2: largeNets, gridWidth, gridHeight, bitcast(backside cost / bounds weight)
 // f0: canvasW, canvasH, wHpwl, wOverlap
 // f1: wBounds, wCongestion, capacity, 1/demandScale
 struct Params { counts: vec4<u32>, counts2: vec4<u32>, f0: vec4<f32>, f1: vec4<f32> };
@@ -124,7 +124,8 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
     let ah = 0.5 * rotatedSize(ai.xy, a.rot);
     let lo = max(vec2<f32>(0.0), ah - a.pos);
     let hi = max(vec2<f32>(0.0), a.pos + ah - canvas);
-    bounds += dot(lo, lo) + dot(hi, hi);${hasMask ? `
+    bounds += dot(lo, lo) + dot(hi, hi);
+    if (a.side == 1u && ai.z == 0.0) { bounds += bitcast<f32>(params.counts2.w) * ai.x * ai.y; }${hasMask ? `
     bounds += blockedArea(a.pos, ah, bitcast<u32>(ai.w), a.side, ai.z != 0.0);` : ''}
     let amin = a.pos - ah;
     let amax = a.pos + ah;
@@ -475,7 +476,7 @@ export class GpuBatchScorer {
     device.queue.writeBuffer(d.placements, 0, this.hostPlacements, 0, count * n * 16);
     const params = new ArrayBuffer(64), u = new Uint32Array(params), f = new Float32Array(params);
     u[0] = count; u[1] = n; u[2] = this.problem.nets.length; u[3] = st.smallCount;
-    u[4] = st.largeCount; u[5] = this.coarse.gridWidth; u[6] = this.coarse.gridHeight;
+    u[4] = st.largeCount; u[5] = this.coarse.gridWidth; u[6] = this.coarse.gridHeight; f[7] = (this.weights.backside ?? 0) / this.weights.bounds;
     f[8] = this.problem.canvas.width; f[9] = this.problem.canvas.height; f[10] = this.weights.hpwl; f[11] = this.weights.overlap;
     f[12] = this.weights.bounds; f[13] = this.weights.congestion; f[14] = this.coarse.capacity; f[15] = 1 / st.demandScale;
     device.queue.writeBuffer(this.buffers.params, 0, params);

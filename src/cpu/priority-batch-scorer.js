@@ -76,6 +76,8 @@ export class PriorityCpuBatchScorer {
       const left=Math.max(0,aw/2-pa.x),right=Math.max(0,pa.x+aw/2-p.canvas.width),top=Math.max(0,ah/2-pa.y),bottom=Math.max(0,pa.y+ah/2-p.canvas.height);
       // Outside the canvas (quadratic) plus area on masked cells (outline, holes, keepouts).
       bounds+=left*left+right*right+top*top+bottom*bottom+blockedArea(masks,p,i,pa);
+      // Bottom-side cost (assembly), folded into bounds: total gains weights.backside * area.
+      if(w.backside&&pa.side&&!a.twoSided)bounds+=w.backside/w.bounds*a.width*a.height;
       for(let j=i+1;j<p.components.length;j++){
         if(!sharesSide(p,i,pa,j,layout[j]))continue;
         const b=p.components[j],pb=layout[j],[bw,bh]=rotatedSize(b,pb.rotation);

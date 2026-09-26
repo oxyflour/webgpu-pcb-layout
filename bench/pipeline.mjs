@@ -10,7 +10,7 @@ import { FastDeltaLnsOptimizer } from '../src/optimizer/fast-delta-lns.js';
 import { GpuLnsOptimizer } from '../src/optimizer/lns.js';
 import { GpuAnalyticalGlobalPlacer } from '../src/gpu/global-placer.js';
 import { legalizeLayout } from '../src/optimizer/legalizer.js';
-import { moduleProblem, expandModules, withModuleNets, isModuleNet, MODULE_NET_PREFIX } from '../src/optimizer/modules.js';
+import { moduleProblem, expandModules, withModuleNets, isModuleNet, splitModuleSides, MODULE_NET_PREFIX } from '../src/optimizer/modules.js';
 import { withPowerEdges, isPowerEdge } from './power-edges.mjs';
 import { routeBoard } from './pcb-router.mjs';
 
@@ -40,25 +40,42 @@ export function parseOptions(argv, defaults = {}) {
     modules: arg('modules', null),
     cohesion: Number(arg('cohesion', 0.4)),
     moduleResolution: Number(arg('module-resolution', 1)),
+    // Split modules across both sides (small parts under the ICs); --no-split disables.
+    split: !has('no-split'),
+    // Bottom-side cost, HPWL-mm per mm² of part area: a number or 'auto' (see backsideCost).
+    backside: arg('backside', 'auto'),
     // Global iterations scale with the part count unless given; parts moved per LNS candidate.
     globalScale: arg('global-scale', null) === null ? null : Number(arg('global-scale')),
     lnsMoves: arg('lns-moves', null) === null ? null : Number(arg('lns-moves')),
   };
   o.mode = [o.preplace && 'preplace', o.power && 'power', o.sides !== 'single' && `sides-${o.sides}`, o.density > 0 && `density${o.density}`,
-    o.noLns && 'nolns', o.congestion !== 0.5 && `cong${o.congestion}`, o.modules && `modules-${o.modules === 'auto' ? 'auto' : 'file'}`, o.legalize && 'legal'].filter(Boolean).join('+') || 'plain';
+    o.noLns && 'nolns', o.congestion !== 0.5 && `cong${o.congestion}`, o.modules && `modules-${o.modules === 'auto' ? 'auto' : 'file'}`,
+    o.modules && !o.split && 'nosplit', o.backside !== 'auto' && `backside${o.backside}`, o.legalize && 'legal'].filter(Boolean).join('+') || 'plain';
   return o;
 }
 
 function rng32(seed) { let x = seed >>> 0 || 1; return () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return (x >>> 0) / 4294967296; }; }
 
-export function randomLayout(problem, seed) {
+/**
+ * Bottom-side cost for a board: explicit option, IR rules.backsideCost, or 'auto' =
+ * single-sided (20) when the input placement has fewer than 10% of parts on the bottom.
+ */
+export function backsideCost(adapted, o) {
+  if (o.backside !== 'auto' && o.backside !== undefined) return Number(o.backside);
+  if (adapted.ir?.rules?.backsideCost !== undefined) return adapted.ir.rules.backsideCost;
+  const bottom = adapted.sides.filter((s) => s < 0).length / Math.max(1, adapted.sides.length);
+  return bottom < 0.1 ? 20 : 0;
+}
+const SINGLE_SIDED = 2; // backside costs at or above this keep free parts on top
+
+export function randomLayout(problem, seed, backside = 0) {
   const rnd = rng32(seed);
   return problem.components.map((c) => {
     if (c.fixed) return { ...c.fixed };
     const [w, h] = rotatedSize(c, 0);
     const p = { x: w / 2 + rnd() * Math.max(0, problem.canvas.width - w), y: h / 2 + rnd() * Math.max(0, problem.canvas.height - h), rotation: 0 };
     // Free parts: ICs start on top, small parts on a random side.
-    if (c.sides === 'any') p.side = c.pins.length >= 8 ? 0 : rnd() < 0.5 ? 1 : 0;
+    if (c.sides === 'any') p.side = c.pins.length >= 8 || backside >= SINGLE_SIDED ? 0 : rnd() < 0.5 ? 1 : 0;
     else if (c.sides === 'bottom') p.side = 1;
     return p;
   });
@@ -130,13 +147,14 @@ const POWER_EDGE_WEIGHT = 0.25;
  * side is full: modules without through-hole or large ICs then move to the bottom,
  * largest first, until the top load fits its capacity.
  */
-export function assignModuleSides(problem, modules, o) {
+export function assignModuleSides(problem, modules, o, backside = 0) {
   const target = o.densityTarget, W = problem.canvas.width, H = problem.canvas.height;
   if (o.sides !== 'free') return modules.map((m) => ({ ...m, side: m.side === 'bottom' || (o.sides === 'original' && problem.components[m.members[0]].sides === 'bottom') ? 1 : 0 }));
   const areaOf = (i) => { const c = problem.components[i]; return c.width * c.height + o.pinArea * c.pins.length; };
   const fixedTop = problem.components.reduce((s, c, i) => s + (c.fixed && (!c.fixed.side || c.twoSided) ? areaOf(i) : 0), 0);
   let topLoad = fixedTop + modules.reduce((s, m) => s + m.members.reduce((t, i) => t + areaOf(i), 0), 0);
-  const capacity = target * W * H;
+  // A costly bottom side is only used when a module asks for it explicitly.
+  const capacity = backside >= SINGLE_SIDED ? Infinity : target * W * H;
   const out = modules.map((m) => ({ ...m, side: m.side === 'bottom' ? 1 : 0 }));
   for (const m of out) if (m.side === 1) topLoad -= m.members.reduce((t, i) => t + areaOf(i), 0);
   const movable = out.map((m, k) => k).filter((k) => {
@@ -190,7 +208,9 @@ export async function placeBoard(adapted, o, { device = null, seed = 1, plan = n
   // Board IR rules.componentClearance drives the placer and legalizer spacing.
   const clearance = adapted.ir?.rules?.componentClearance;
   if (clearance !== undefined) g.global.placer.clearance = clearance;
-  const init = randomLayout(problem, seed);
+  const backside = backsideCost(adapted, o);
+  cfg.scorerOptions.weights.backside = backside; g.approximate.weights = { ...g.approximate.weights, backside };
+  const init = randomLayout(problem, seed, backside);
   const timing = {};
   const t0 = performance.now();
 
@@ -202,7 +222,12 @@ export async function placeBoard(adapted, o, { device = null, seed = 1, plan = n
       for (const m of plan.modules) if (m.side === 'top' || m.side === 'bottom') for (const i of m.members) if (input.components[i].sides === 'any') input.components[i].sides = m.side;
       problem = normalizeProblem(input);
     }
-    modules = assignModuleSides(problem, plan.modules, o);
+    modules = assignModuleSides(problem, plan.modules, o, backside);
+    // Small parts under the ICs on the opposite side, unless the bottom side is costly or
+    // the module's side was set explicitly.
+    if (o.split && o.sides === 'free' && backside < SINGLE_SIDED) {
+      modules = modules.map((m, k) => plan.modules[k].side === 'top' || plan.modules[k].side === 'bottom' ? m : { ...m, memberSide: splitModuleSides(problem, m) });
+    }
     const placed = await placeModules(problem, modules, o, cfg, device, seed, 8);
     initials = placed.initials; moduleInfo = { sides: modules.map((m) => m.side), layout: placed.moduleLayout, ms: placed.ms };
     input = withModuleNets(input, modules);
@@ -250,7 +275,7 @@ export async function placeBoard(adapted, o, { device = null, seed = 1, plan = n
   let legal = null;
   if (o.legalize) { const tl = performance.now(); legal = legalizeLayout(problem, layout, { clearance: clearance ?? 0.1, regions }); layout = legal.layout; timing.legalizeMs = performance.now() - tl; }
   timing.totalMs = performance.now() - t0;
-  return { layout, init, cfg, timing, global, fast, legal, modules: moduleInfo };
+  return { layout, init, cfg, timing, global, fast, legal, modules: moduleInfo, backside };
 }
 
 export function routeStats(adapted, layout, cell = 0.4, layers = 'board') {

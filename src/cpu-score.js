@@ -59,6 +59,7 @@ export function scoreLayoutCpu(problem, layout, weights = {}, coarse = {}) {
     const bottom = Math.max(0, p.y + ch / 2 - problem.canvas.height);
     // Outside the canvas (quadratic) plus area on masked cells (outline, holes, keepouts).
     bounds += left * left + right * right + top * top + bottom * bottom + blockedArea(placementMasks(problem), problem, i, p);
+    if (w.backside && p.side && !c.twoSided) bounds += w.backside / w.bounds * c.width * c.height;
   }
   const congestion=coarseCongestionCpu(problem,layout,coarse);
   return { total: w.hpwl * hpwl + w.overlap * overlap + w.bounds * bounds + w.congestion*congestion, hpwl, overlap, bounds, congestion };

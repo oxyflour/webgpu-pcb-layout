@@ -105,6 +105,7 @@ export class CompiledPlacementModel {
       const left=Math.max(0,aw/2-xi),right=Math.max(0,xi+aw/2-p.canvas.width),top=Math.max(0,ah/2-yi),bottom=Math.max(0,yi+ah/2-p.canvas.height);
       bounds+=left*left+right*right+top*top+bottom*bottom;
       if(this.masks)bounds+=blockedArea(this.masks,p,i,{x:xi,y:yi,rotation:ri,side:(r[off+i]>>2)&1});
+      if(w.backside&&(r[off+i]&4)&&!this.twoSided[i])bounds+=w.backside/w.bounds*this.compW[i]*this.compH[i];
       for(let j=i+1;j<this.n;j++){
         if(((r[off+i]^r[off+j])&4) && !this.twoSided[i] && !this.twoSided[j])continue;
         const rj=r[off+j]&3,bw=(rj&1)?this.compH[j]:this.compW[j],bh=(rj&1)?this.compW[j]:this.compH[j];
