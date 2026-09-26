@@ -124,3 +124,17 @@ test('evaluation router uses inner layers when the board has them', async () => 
   assert.ok(two.clean <= 2, `${two.clean} clean nets through two one-cell gaps`);
   assert.equal(four.clean, n, `${four.clean} clean nets with open inner layers`);
 });
+
+test('router outline mask uses the router grid even when ceil() rounding differs', async () => {
+  const { routeBoard } = await import('../bench/pcb-router.mjs');
+  // 18.80000000000001 / 0.4 rounds up to 48 columns; the mask must not drift across rows.
+  const W = 18.80000000000001, H = 51.81;
+  const outline = [{ outer: [[0, H], [0, 0], [W, 0], [W, H], [0, H]] }];
+  const pads = [], layout = [], sides = [];
+  for (let k = 0; k < 10; k++) {
+    layout.push({ x: 2, y: 3 + 4.5 * k, rotation: 0 }, { x: 16.5, y: 48 - 4.5 * k, rotation: 0 }); sides.push(1, 1);
+    pads.push({ comp: 2 * k, lx: 0, ly: 0, w: 0.5, h: 0.5, rot: 0, tht: false, hole: false, net: k }, { comp: 2 * k + 1, lx: 0, ly: 0, w: 0.5, h: 0.5, rot: 0, tht: false, hole: false, net: k });
+  }
+  const r = routeBoard({ canvas: { width: W, height: H }, pads, netCount: 10, outline }, layout, sides, { cell: 0.4 });
+  assert.equal(r.clean, 10);
+});

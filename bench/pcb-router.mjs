@@ -50,7 +50,8 @@ export function routeBoard(board, layout, sides, options = {}) {
   const owner = new Int32Array(N).fill(-1), ownerPad = new Int32Array(N).fill(-1), ownerDist = new Float32Array(N).fill(Infinity);
   // Outside the outline, board holes and routing keepouts are closed to every net.
   if (board.outline || board.blocked?.length) {
-    const m = buildPlacementMasks({ canvas: { width: W * cell, height: H * cell, outline: board.outline, blocked: board.blocked ?? [] }, components: [] }, { resolution: cell });
+    // Same grid as the router (sizes forced: ceil() of the canvas could differ by a column).
+    const m = buildPlacementMasks({ canvas: { width: W * cell, height: H * cell, outline: board.outline, blocked: board.blocked ?? [] }, components: [] }, { resolution: cell, gw: W, gh: H });
     // Mask side 0 -> top layer, side 1 -> bottom layer; cells blocked on both sides
     // (outline, holes, two-sided keepouts) are blocked on the inner layers too.
     const top = m.grids[m.layers.findIndex((l) => l.side === 0 && l.maxHeight === null)], bot = m.grids[m.layers.findIndex((l) => l.side === 1 && l.maxHeight === null)];

@@ -34,11 +34,12 @@ export function buildPlacementMasks(problem, options = {}) {
   // Rasterized layers depend only on the canvas geometry: share them between problems.
   const key = outline ?? blocked;
   const cached = canvasCache.get(key);
-  if (cached && cached.W === W && cached.H === H && cached.edge === (canvas.edgeClearance ?? 0) && cached.blocked === blocked && (options.resolution === undefined || options.resolution === cached.masks.res)) {
+  if (cached && cached.W === W && cached.H === H && cached.edge === (canvas.edgeClearance ?? 0) && cached.blocked === blocked && (options.resolution === undefined || options.resolution === cached.masks.res) && (options.gw === undefined || (options.gw === cached.masks.gw && options.gh === cached.masks.gh))) {
     return { ...cached.masks, componentLayers: componentLayersOf(problem, cached.masks.layers) };
   }
   const res = options.resolution ?? Math.max(0.1, Math.min(0.5, Math.max(W, H) / 1024));
-  const gw = Math.ceil(W / res), gh = Math.ceil(H / res), cells = gw * gh;
+  // options.gw/gh force the grid size (callers indexing the grids with their own layout).
+  const gw = options.gw ?? Math.ceil(W / res), gh = options.gh ?? Math.ceil(H / res), cells = gw * gh;
 
   // Layer 0/1: outline + holes + height-independent keepouts, for the top/bottom side.
   const layers = [{ side: 0, maxHeight: null }, { side: 1, maxHeight: null }];
