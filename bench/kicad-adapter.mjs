@@ -21,12 +21,16 @@ export async function loadKicadParser(placerRoot) {
   const mod = await import(pathToFileURL(path.join(placerRoot, 'src', 'kicad.js')).href);
   return (text, name) => {
     const design = mod.parseKicadPCB(text, name);
+    const copper = copperSideNames(text);
     // Same block order as the parser: footprints, then legacy modules; pads in order.
     const blocks = [...mod.extractBlocks(text, 'footprint'), ...mod.extractBlocks(text, 'module')];
-    design.raw = blocks.map((b) => {
+    design.raw = blocks.map((b, fi) => {
       const [x, y, deg] = parseAt(b);
+      // The parser only recognises "B.Cu"; boards with custom copper names need the layer table.
+      const layer = (b.match(/\(layer\s+"?([^")\s]+)"?\)/) ?? [])[1];
+      if (layer) design.footprints[fi].side = layer === copper.back ? -1 : 1;
       return {
-        x, y, deg,
+        x, y, deg, layer,
         lib: (b.match(/^\((?:footprint|module)\s+"?([^"\s)]+)/) ?? [])[1] ?? '',
         pads: mod.extractBlocks(b, 'pad').map((pb) => {
           const [px, py, pang] = parseAt(pb), m = pb.match(SIZE);
@@ -36,6 +40,20 @@ export async function loadKicadParser(placerRoot) {
     });
     return design;
   };
+}
+
+/**
+ * Names of the front and back copper layers from the (layers ...) table. KiCad <= 4
+ * numbers them 15 (front) and 0 (back); later versions 0 (front) and 31 (back).
+ */
+export function copperSideNames(text) {
+  const start = text.indexOf('(layers');
+  // The table is short; entries after it (net classes etc.) never match the copper pattern.
+  const table = start < 0 ? '' : text.slice(start, start + 4000).split(/\n\s*\)\s*\n/)[0];
+  const byNumber = new Map();
+  for (const m of table.matchAll(/\((\d+)\s+"?([^"\s)]+)"?\s+(signal|power|mixed|jumper)/g)) byNumber.set(+m[1], m[2]);
+  const modern = byNumber.has(31) || !byNumber.has(15);
+  return { front: byNumber.get(modern ? 0 : 15) ?? 'F.Cu', back: byNumber.get(modern ? 31 : 0) ?? 'B.Cu' };
 }
 
 function parseAt(block) {
@@ -50,7 +68,9 @@ export function parseTracks(text, origin) {
   const via = new RegExp(String.raw`\(via\s+(?:\w+\s+)*\(at\s+${num}\s+${num}\)\s*\(size\s+${num}\)`, 'g');
   const segments = [], vias = [];
   let m;
-  while ((m = seg.exec(text))) segments.push({ x1: +m[1] - origin.x, y1: +m[2] - origin.y, x2: +m[3] - origin.x, y2: +m[4] - origin.y, width: +m[5], layer: m[6] });
+  const copper = copperSideNames(text);
+  const layerName = (l) => l === copper.front ? 'F.Cu' : l === copper.back ? 'B.Cu' : l;
+  while ((m = seg.exec(text))) segments.push({ x1: +m[1] - origin.x, y1: +m[2] - origin.y, x2: +m[3] - origin.x, y2: +m[4] - origin.y, width: +m[5], layer: layerName(m[6]) });
   while ((m = via.exec(text))) vias.push({ x: +m[1] - origin.x, y: +m[2] - origin.y, size: +m[3] });
   return { segments, vias };
 }
