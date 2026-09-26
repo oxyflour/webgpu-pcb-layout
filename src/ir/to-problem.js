@@ -15,6 +15,12 @@ const quarterOf = (deg) => ((Math.round(-deg / 90) % 4) + 4) % 4;
 const isQuarter = (deg) => Math.abs(deg / 90 - Math.round(deg / 90)) < 1e-6;
 const sideIndex = (side) => side === 'bottom' ? 1 : 0;
 
+/** Whether a ring is exactly the axis-aligned box [x0, x1] x [y0, y1]. */
+function isAxisBox(ring, x0, y0, x1, y1) {
+  if (ring.length !== 4) return false;
+  return ring.every(([x, y]) => (Math.abs(x - x0) < 1e-9 || Math.abs(x - x1) < 1e-9) && (Math.abs(y - y0) < 1e-9 || Math.abs(y - y1) < 1e-9));
+}
+
 function shapeBox(shape) {
   if (shape.type === 'rect') return [shape.x, shape.y, shape.x + shape.width, shape.y + shape.height];
   if (shape.type === 'circle') return [shape.center[0] - shape.radius, shape.center[1] - shape.radius, shape.center[0] + shape.radius, shape.center[1] + shape.radius];
@@ -150,6 +156,24 @@ export function irToProblem(irIn, options = {}) {
     return c;
   });
 
+  // Placement masks in canvas coordinates: outline + holes, edge clearance, keepouts.
+  const shift = (s) => s.type === 'rect' ? { ...s, x: s.x - origin.x, y: s.y - origin.y }
+    : s.type === 'circle' ? { ...s, center: [s.center[0] - origin.x, s.center[1] - origin.y] }
+    : { ...s, points: s.points.map(([x, y]) => [x - origin.x, y - origin.y]), ...(s.holes ? { holes: s.holes.map((h) => h.map(([x, y]) => [x - origin.x, y - origin.y])) } : {}) };
+  const ring = (r) => r.map(([x, y]) => [x - origin.x, y - origin.y]);
+  const sideIdx = (sides) => (sides ?? ['top', 'bottom']).map(sideIndex);
+  const outline = ir.board.outline.map((o) => ({ outer: ring(o.outer), ...(o.holes?.length ? { holes: o.holes.map(ring) } : {}) }));
+  const keepouts = ir.keepouts ?? [];
+  const placementBlocked = keepouts.filter((k) => k.rules?.placement !== false).map((k) => ({ shape: shift(k.shape), sides: sideIdx(k.sides), ...(k.maxHeight != null ? { maxHeight: k.maxHeight } : {}) }));
+  const routingBlocked = keepouts.filter((k) => k.rules?.routing !== false && k.maxHeight == null).map((k) => ({ shape: shift(k.shape), sides: sideIdx(k.sides) }));
+  // Only rectangular single-piece outlines without holes need no mask.
+  const trivial = ir.board.outline.length === 1 && !ir.board.outline[0].holes?.length && isAxisBox(ir.board.outline[0].outer, bx0, by0, bx1, by1);
+  canvas.outline = trivial && !ir.rules?.edgeClearance ? undefined : outline;
+  if (ir.rules?.edgeClearance) canvas.edgeClearance = ir.rules.edgeClearance;
+  if (placementBlocked.length) canvas.blocked = placementBlocked;
+  if (!canvas.outline) delete canvas.outline;
+  components.forEach((c, i) => { const h = ir.footprints[i].height; if (h !== undefined) c.bodyHeight = h; });
+
   const nets = signalNets.map(({ net, refs }) => ({ id: net.name, pins: refs.map((r) => ({ componentId: ir.footprints[r.fi].id, pinId: `p${r.index}` })) }));
   const policy = Object.fromEntries(signalNets.filter(({ net }) => net.priority !== undefined).map(({ net }) => [net.name, { priority: net.priority }]));
 
@@ -182,7 +206,7 @@ export function irToProblem(irIn, options = {}) {
     input: { canvas, components, nets },
     originalLayout, placed, origin, sides, policy, plan, power, mechanical,
     contours: ir.board.outline.flatMap((o) => [o.outer, ...(o.holes ?? [])]).map((c) => c.map(([x, y]) => [x - origin.x, y - origin.y])),
-    routing: { canvas, pads: routingPads, netCount: nets.length },
+    routing: { canvas, pads: routingPads, netCount: nets.length, outline, blocked: routingBlocked },
     // The IR exactly as given (its yAxis and coordinates are used for results).
     bodyFrame, ir: irIn,
     stats: {

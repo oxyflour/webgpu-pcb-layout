@@ -50,7 +50,13 @@ export function normalizeProblem(problem) {
   }
 
   return {
-    canvas: { width: Number(problem.canvas.width), height: Number(problem.canvas.height) },
+    canvas: {
+      width: Number(problem.canvas.width), height: Number(problem.canvas.height),
+      // Optional placement masks (see src/geometry/mask.js); passed through by reference.
+      ...(problem.canvas.outline ? { outline: problem.canvas.outline } : {}),
+      ...(problem.canvas.blocked?.length ? { blocked: problem.canvas.blocked } : {}),
+      ...(problem.canvas.edgeClearance ? { edgeClearance: Number(problem.canvas.edgeClearance) } : {}),
+    },
     components: components.map((c, i) => ({
       id: c.id,
       index: i,
@@ -60,6 +66,8 @@ export function normalizeProblem(problem) {
       // Board sides this part may be placed on; `twoSided` parts (through-hole) block both.
       sides: normalizeSides(c.sides, c.id),
       twoSided: !!c.twoSided,
+      // Physical height (mm) for height-limited keepouts; 0 when unknown.
+      bodyHeight: Number(c.bodyHeight ?? 0),
       fixed: c.fixed ? { x: Number(c.fixed.x), y: Number(c.fixed.y), rotation: (c.fixed.rotation ?? 0) & 3, side: c.fixed.side ? 1 : 0 } : null,
       pins: (c.pins ?? []).map((p) => pinIndexByKey.get(`${c.id}\u0000${p.id}`))
     })),

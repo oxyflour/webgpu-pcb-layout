@@ -1,4 +1,5 @@
 import { rotatedSize } from '../problem.js';
+import { placementMasks, blockedArea } from '../geometry/mask.js';
 
 function netPriorityWeight(policy, netId, options){
   const priority = Number(policy?.[netId]?.priority ?? options.defaultPriority);
@@ -62,6 +63,7 @@ export class CompiledPlacementModel {
       for(const pi of net.pins)this.netPins[q++]=pi;
     }
     this.demand = new Float64Array(this.options.gridWidth*this.options.gridHeight);
+    this.masks = placementMasks(problem);
   }
 
   layoutToFlat(layout){
@@ -102,6 +104,7 @@ export class CompiledPlacementModel {
       const xi=x[off+i], yi=y[off+i];
       const left=Math.max(0,aw/2-xi),right=Math.max(0,xi+aw/2-p.canvas.width),top=Math.max(0,ah/2-yi),bottom=Math.max(0,yi+ah/2-p.canvas.height);
       bounds+=left*left+right*right+top*top+bottom*bottom;
+      if(this.masks)bounds+=blockedArea(this.masks,p,i,{x:xi,y:yi,rotation:ri,side:(r[off+i]>>2)&1});
       for(let j=i+1;j<this.n;j++){
         if(((r[off+i]^r[off+j])&4) && !this.twoSided[i] && !this.twoSided[j])continue;
         const rj=r[off+j]&3,bw=(rj&1)?this.compH[j]:this.compW[j],bh=(rj&1)?this.compW[j]:this.compH[j];

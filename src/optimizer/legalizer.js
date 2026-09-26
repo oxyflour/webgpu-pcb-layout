@@ -1,4 +1,5 @@
 import { rotatedSize } from '../problem.js';
+import { placementMasks, maskCellRect, blockedCells } from '../geometry/mask.js';
 
 /**
  * Greedy overlap legalizer for mixed-size, double-sided placements.
@@ -7,7 +8,8 @@ import { rotatedSize } from '../problem.js';
  * then movable parts in decreasing area order take the free position closest to
  * where the global/detailed placer left them (rings of increasing Chebyshev radius,
  * nearest Euclidean candidate first within a ring). Through-hole (`twoSided`) parts
- * need both sides free. Rotation and side are kept.
+ * need both sides free. Rotation and side are kept. Masked cells (outline, holes,
+ * keepouts, height limits that apply to the part) are never used.
  *
  * @returns {layout, moved, failed, maxDisplacement, meanDisplacement}
  */
@@ -37,6 +39,10 @@ export function legalizeLayout(problem, layout, options = {}) {
     if (!r) return null;
     return [Math.ceil(r.x / cell), Math.ceil(r.y / cell), Math.floor((r.x + r.width) / cell) - 1, Math.floor((r.y + r.height) / cell) - 1];
   };
+  const masks = placementMasks(problem);
+  // Occupancy rectangle (cells) -> no masked cell of a layer applying to part i under it.
+  const unmasked = (i, [x0, y0, x1, y1], sides) => !masks || blockedCells(masks, masks.componentLayers[i], sides[0], sides.length > 1,
+    maskCellRect(masks, x0 * cell, y0 * cell, (x1 + 1) * cell, (y1 + 1) * cell)) === 0;
   const within = (rect, rc) => !rc || (rect[0] >= rc[0] && rect[1] >= rc[1] && rect[2] <= rc[2] && rect[3] <= rc[3]);
   const free = ([x0, y0, x1, y1], sides) => {
     for (const s of sides) {
@@ -79,13 +85,13 @@ export function legalizeLayout(problem, layout, options = {}) {
       ring.sort((a, b) => (a[0] - cx) ** 2 + (a[1] - cy) ** 2 - ((b[0] - cx) ** 2 + (b[1] - cy) ** 2));
       for (const [x, y] of ring) {
         const rect = rectAt(sw, sh, x, y);
-        if (inside(rect) && within(rect, rc) && free(rect, sides)) { best = rect; break; }
+        if (inside(rect) && within(rect, rc) && free(rect, sides) && unmasked(i, rect, sides)) { best = rect; break; }
       }
     }
     // A full region falls back to the nearest free spot anywhere.
     if (!best && rc) {
       outsideRegion++;
-      for (let r = 0; r <= maxRadius && !best; r++) for (let k = -r; k <= r && !best; k++) for (const [x, y] of [[cx + k, cy - r], [cx + k, cy + r], [cx - r, cy + k], [cx + r, cy + k]]) { const rect = rectAt(sw, sh, x, y); if (inside(rect) && free(rect, sides)) { best = rect; break; } }
+      for (let r = 0; r <= maxRadius && !best; r++) for (let k = -r; k <= r && !best; k++) for (const [x, y] of [[cx + k, cy - r], [cx + k, cy + r], [cx - r, cy + k], [cx + r, cy + k]]) { const rect = rectAt(sw, sh, x, y); if (inside(rect) && free(rect, sides) && unmasked(i, rect, sides)) { best = rect; break; } }
     }
     if (!best) { failed++; continue; }
     stamp(best, sides);

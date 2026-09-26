@@ -7,6 +7,7 @@
 // trees with A* (multi-source from the tree) and negotiated with present/history
 // congestion costs until no cell is shared or `maxRounds` is reached.
 import { rotateQuarter, localPin } from '../src/problem.js';
+import { buildPlacementMasks } from '../src/geometry/mask.js';
 
 class MinHeap {
   constructor(cap = 1024) { this.k = new Float64Array(cap); this.v = new Int32Array(cap); this.n = 0; }
@@ -44,6 +45,11 @@ export function routeBoard(board, layout, sides, options = {}) {
   const margin = options.windowMargin ?? 12;
   const W = Math.ceil(board.canvas.width / cell), H = Math.ceil(board.canvas.height / cell), P = W * H, N = 2 * P;
   const owner = new Int32Array(N).fill(-1), ownerPad = new Int32Array(N).fill(-1), ownerDist = new Float32Array(N).fill(Infinity);
+  // Outside the outline, board holes and routing keepouts are closed to every net.
+  if (board.outline || board.blocked?.length) {
+    const m = buildPlacementMasks({ canvas: { width: W * cell, height: H * cell, outline: board.outline, blocked: board.blocked ?? [] }, components: [] }, { resolution: cell });
+    m.layers.forEach((l, k) => { const g = m.grids[k]; for (let c = 0; c < P; c++) if (g[c]) owner[l.side * P + c] = -2; });
+  }
 
   // Rasterize pads (nearest-centre wins shared cells).
   const padCenter = board.pads.map((pad) => {

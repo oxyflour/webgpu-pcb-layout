@@ -163,13 +163,15 @@ function blurXWgsl(g, target) {
     var acc = 0.0;
     for (var k = -${k.radius}; k <= ${k.radius}; k++) {
       let xx = x + k;
-      if (xx >= 0 && xx < ${g.gw}) { acc += K${s}[k + ${k.radius}] * (f32(density[row + u32(xx)]) / ${DENSITY_FIXED_POINT}.0 - ${lit(target)}); }
+      if (xx >= 0 && xx < ${g.gw}) { acc += K${s}[k + ${k.radius}] * (f32(density[row + u32(xx)]) / ${DENSITY_FIXED_POINT}.0${g.blocked ? ' + blocked[blockedRow + u32(xx)]' : ''} - ${lit(target)}); }
     }
     tmp[(g * ${S}u + ${s}u) * ${B}u + y * ${g.gw}u + u32(x)] = acc;
   }`).join('\n');
   return /* wgsl */`
 @group(0) @binding(0) var<storage, read> density: array<u32>;
-@group(0) @binding(1) var<storage, read_write> tmp: array<f32>;
+@group(0) @binding(1) var<storage, read_write> tmp: array<f32>;${g.blocked ? `
+// Masked coverage per board side (same for every start).
+@group(0) @binding(2) var<storage, read> blocked: array<f32>;` : ''}
 ${kernelConst(g)}
 @compute @workgroup_size(${GRID_WG}, ${GRID_WG})
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -178,6 +180,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let g = gid.z;
   if (x >= ${g.gw} || y >= ${g.gh}u) { return; }
   let row = g * ${B}u + y * ${g.gw}u;
+  let blockedRow = (g & 1u) * ${B}u + y * ${g.gw}u;
 ${scales}
 }
 `;
@@ -424,6 +427,7 @@ export class GpuAnalyticalGlobalPlacer {
       this.scatterPipeline = pipeline(scatterWgsl(t, this.options, problem.canvas, this.grid));
       this.blurXPipeline = pipeline(blurXWgsl(this.grid, this.options.gridDensity.target));
       this.blurYPipeline = pipeline(blurYWgsl(this.grid));
+      if (this.grid.blocked) { const b = new Float32Array(2 * this.grid.gw * this.grid.gh); b.set(this.grid.blocked[0]); b.set(this.grid.blocked[1], this.grid.gw * this.grid.gh); this.blockedBuf = createBuffer(device, b.byteLength, U.STORAGE, b); }
     }
   }
 
@@ -470,7 +474,7 @@ export class GpuAnalyticalGlobalPlacer {
     const forceGroups = pos.map((p, k) => device.createBindGroup({ layout: this.forcePipeline.getBindGroupLayout(0), entries: entries([p, ...shared, centroid, pos[1 - k], vel, phi]) }));
     const gridGroups = g && {
       scatter: pos.map((p) => device.createBindGroup({ layout: this.scatterPipeline.getBindGroupLayout(0), entries: entries([p, this.topo, this.stat, null, density]) })),
-      blurX: device.createBindGroup({ layout: this.blurXPipeline.getBindGroupLayout(0), entries: entries([density, tmp]) }),
+      blurX: device.createBindGroup({ layout: this.blurXPipeline.getBindGroupLayout(0), entries: entries([density, tmp, this.blockedBuf]) }),
       blurY: device.createBindGroup({ layout: this.blurYPipeline.getBindGroupLayout(0), entries: entries([tmp, phi, density]) }),
     };
     const netGroups = Math.ceil(t.nets / NET_WG), compGroups = Math.ceil(t.movable.length / WG);
@@ -519,5 +523,5 @@ export class GpuAnalyticalGlobalPlacer {
     }));
   }
 
-  destroy() { this.topo.destroy(); this.stat.destroy(); this.iterUniform.destroy(); }
+  destroy() { this.topo.destroy(); this.stat.destroy(); this.iterUniform.destroy(); this.blockedBuf?.destroy(); }
 }

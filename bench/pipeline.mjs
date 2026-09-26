@@ -38,6 +38,9 @@ export function parseOptions(argv, defaults = {}) {
     modules: arg('modules', null),
     cohesion: Number(arg('cohesion', 0.4)),
     moduleResolution: Number(arg('module-resolution', 1)),
+    // Diagnostics: scale global iterations; parts moved per LNS candidate.
+    globalScale: Number(arg('global-scale', 1)),
+    lnsMoves: arg('lns-moves', null) === null ? null : Number(arg('lns-moves')),
   };
   o.mode = [o.preplace && 'preplace', o.power && 'power', o.sides !== 'single' && `sides-${o.sides}`, o.density > 0 && `density${o.density}`,
     o.noLns && 'nolns', o.congestion !== 0.5 && `cong${o.congestion}`, o.modules && `modules-${o.modules === 'auto' ? 'auto' : 'file'}`, o.legalize && 'legal'].filter(Boolean).join('+') || 'plain';
@@ -100,8 +103,8 @@ export function configFor(problem, seed, o) {
     scorerOptions, L,
     optimizer: {
       seed, approximate,
-      global: { starts: 32, coarseIterations: 150, finalists: 4, fineIterations: 220, placer },
-      fastLns: { iterations: 400 * lnsScale, population: 1024, movesPerCandidate: 2, translationScale: 0.015 * L, rotationProbability: 0.1, temperature: .025, cooling: .992 },
+      global: { starts: 32, coarseIterations: Math.round(150 * o.globalScale), finalists: 4, fineIterations: Math.round(220 * o.globalScale), placer },
+      fastLns: { iterations: 400 * lnsScale, population: 1024, movesPerCandidate: o.lnsMoves ?? 2, translationScale: 0.015 * L, rotationProbability: 0.1, temperature: .025, cooling: .992 },
       polish: { iterations: 200 * lnsScale, population: 1024, movesPerCandidate: 1, translationScale: 0.008 * L, rotationProbability: 0.05, temperature: .012, cooling: .985 },
     },
   };

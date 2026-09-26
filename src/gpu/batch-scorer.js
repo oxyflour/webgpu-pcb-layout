@@ -1,5 +1,6 @@
 import { createBuffer } from './device.js';
 import { resolvePriorityOptions, priorityNetWeights } from '../cpu/priority-batch-scorer.js';
+import { placementMasks } from '../geometry/mask.js';
 
 const WG = 256;
 // Nets up to this many pins are handled by one lane each (exact L-star dedupe in
@@ -72,10 +73,31 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
 }
 `;
 
-/** Pairwise overlap area and quadratic canvas violation; lane i scans pairs (i, j>i). */
-const GEOMETRY_WGSL = COMMON + /* wgsl */`
+/** Masked (outline / hole / keepout) area under a body, from summed-area tables. */
+const maskWgsl = (m) => m ? /* wgsl */`
+@group(0) @binding(4) var<storage, read> sat: array<u32>;
+const MASK_SIDE = array<u32, ${m.layers.length}>(${m.layers.map((l) => `${l.side}u`).join(', ')});
+fn satSum(k: u32, c: vec4<u32>) -> u32 {
+  let b = k * ${(m.gw + 1) * (m.gh + 1)}u;
+  let w = ${m.gw + 1}u;
+  return (sat[b + c.w * w + c.z] + sat[b + c.y * w + c.x]) - (sat[b + c.y * w + c.z] + sat[b + c.w * w + c.x]);
+}
+fn blockedArea(pos: vec2<f32>, half: vec2<f32>, bits: u32, side: u32, twoSided: bool) -> f32 {
+  let g = vec2<f32>(${m.gw}.0, ${m.gh}.0);
+  let lo = clamp(ceil((pos - half) / ${m.res.toExponential(9)} - vec2<f32>(0.5)), vec2<f32>(0.0), g);
+  let hi = max(lo, clamp(ceil((pos + half) / ${m.res.toExponential(9)} - vec2<f32>(0.5)), vec2<f32>(0.0), g));
+  let c = vec4<u32>(vec2<u32>(lo), vec2<u32>(hi));
+  var count = 0u;
+  for (var k = 0u; k < ${m.layers.length}u; k++) {
+    if ((bits & (1u << k)) != 0u && (twoSided || MASK_SIDE[k] == side)) { count += satSum(k, c); }
+  }
+  return f32(count) * ${(m.res * m.res).toExponential(9)};
+}` : '';
+
+/** Pairwise overlap area and canvas/mask violation; lane i scans pairs (i, j>i). */
+const geometryWgsl = (masks) => COMMON + maskWgsl(masks) + /* wgsl */`
 @group(0) @binding(0) var<storage, read> placements: array<Placement>;
-// (width, height, twoSided, 0)
+// (width, height, twoSided, bitcast(mask layer bits))
 @group(0) @binding(1) var<storage, read> componentSize: array<vec4<f32>>;
 @group(0) @binding(2) var<storage, read_write> outGeometry: array<vec2<f32>>;
 @group(0) @binding(3) var<uniform> params: Params;
@@ -97,7 +119,8 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
     let ah = 0.5 * rotatedSize(ai.xy, a.rot);
     let lo = max(vec2<f32>(0.0), ah - a.pos);
     let hi = max(vec2<f32>(0.0), a.pos + ah - canvas);
-    bounds += dot(lo, lo) + dot(hi, hi);
+    bounds += dot(lo, lo) + dot(hi, hi);${masks ? `
+    bounds += blockedArea(a.pos, ah, bitcast<u32>(ai.w), a.side, ai.z != 0.0);` : ''}
     let amin = a.pos - ah;
     let amax = a.pos + ah;
     for (var j = i + 1u; j < n; j++) {
@@ -259,7 +282,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
 function staticData(problem, netWeights) {
   const componentSize = new Float32Array(problem.components.length * 4);
-  problem.components.forEach((c, i) => { componentSize.set([c.width, c.height, c.twoSided ? 1 : 0, 0], 4 * i); });
+  const masks = placementMasks(problem), sizeBits = new Uint32Array(componentSize.buffer);
+  problem.components.forEach((c, i) => { componentSize.set([c.width, c.height, c.twoSided ? 1 : 0], 4 * i); sizeBits[4 * i + 3] = masks ? masks.componentLayers[i] : 0; });
   const pins = new Float32Array(problem.pins.length * 4), pinBits = new Uint32Array(pins.buffer);
   problem.pins.forEach((p, i) => { pins[4 * i] = p.x; pins[4 * i + 1] = p.y; pinBits[4 * i + 2] = p.componentIndex; });
   let totalPins = 0; for (const n of problem.nets) totalPins += n.pins.length;
@@ -275,10 +299,17 @@ function staticData(problem, netWeights) {
   const small = [], large = [];
   problem.nets.forEach((n, i) => { if (n.pins.length >= 2) (n.pins.length <= SMALL_NET ? small : large).push(i); });
   return {
-    componentSize, pins, netOffsets, netPins,
+    componentSize, pins, netOffsets, netPins, masks,
+    sat: masks ? concatU32(masks.sats) : null,
     netWeight: Float32Array.from(netWeights), netWeightQ, demandScale,
     netOrder: Uint32Array.from([...small, ...large]), smallCount: small.length, largeCount: large.length,
   };
+}
+
+function concatU32(arrays) {
+  const out = new Uint32Array(arrays.reduce((s, a) => s + a.length, 0));
+  let o = 0; for (const a of arrays) { out.set(a, o); o += a.length; }
+  return out;
 }
 
 function nextPow2(v) { let n = 1; while (n < v) n <<= 1; return n; }
@@ -319,11 +350,12 @@ export class GpuBatchScorer {
       componentSize: buf(d.componentSize), pins: buf(d.pins),
       netOffsets: buf(d.netOffsets), netPins: buf(d.netPins), netWeight: buf(d.netWeight), netWeightQ: buf(d.netWeightQ),
       netOrder: buf(d.netOrder),
+      sat: d.sat ? buf(d.sat) : null,
       params: createBuffer(device, 64, U.UNIFORM | U.COPY_DST),
     };
     const pipeline = (code) => device.createComputePipeline({ layout: 'auto', compute: { module: device.createShaderModule({ code }), entryPoint: 'main' } });
     this.pipelines = {
-      hpwl: pipeline(HPWL_WGSL), geometry: pipeline(GEOMETRY_WGSL),
+      hpwl: pipeline(HPWL_WGSL), geometry: pipeline(geometryWgsl(d.masks)),
       congestion: pipeline(congestionWgsl(cells, this.globalGrid)), reduce: pipeline(REDUCE_WGSL),
     };
 
@@ -357,7 +389,7 @@ export class GpuBatchScorer {
     const group = (pl, list) => device.createBindGroup({ layout: pl.getBindGroupLayout(0), entries: list.flatMap((buffer, binding) => buffer ? [{ binding, resource: { buffer } }] : []) });
     this.bindGroups = {
       hpwl: group(p.hpwl, [d.placements, s.pins, s.netOffsets, s.netPins, s.netWeight, d.hpwl, s.params]),
-      geometry: group(p.geometry, [d.placements, s.componentSize, d.geometry, s.params]),
+      geometry: group(p.geometry, [d.placements, s.componentSize, d.geometry, s.params, s.sat]),
       congestion: group(p.congestion, [d.placements, s.pins, s.netOffsets, s.netPins, s.netWeightQ, s.netOrder, d.congestion, d.scratch ?? null, s.params]),
       reduce: group(p.reduce, [d.hpwl, d.geometry, d.congestion, d.scores, s.params]),
     };
@@ -438,7 +470,7 @@ export class GpuBatchScorer {
   }
 
   destroy() {
-    for (const b of Object.values(this.buffers)) b.destroy();
+    for (const b of Object.values(this.buffers)) b?.destroy();
     if (this.dynamic) for (const b of Object.values(this.dynamic)) b.destroy();
     this.dynamic = null; this.capacity = 0; this.bindGroups = null;
   }

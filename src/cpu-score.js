@@ -1,4 +1,5 @@
 import { worldPin, rotatedSize, sharesSide } from './problem.js';
+import { placementMasks, blockedArea } from './geometry/mask.js';
 
 export function coarseCongestionCpu(problem, layout, options={}) {
   const gridW=options.gridWidth ?? 32,gridH=options.gridHeight ?? 32,capacity=options.capacity ?? 1;
@@ -56,7 +57,8 @@ export function scoreLayoutCpu(problem, layout, weights = {}, coarse = {}) {
     const right = Math.max(0, p.x + cw / 2 - problem.canvas.width);
     const top = Math.max(0, ch / 2 - p.y);
     const bottom = Math.max(0, p.y + ch / 2 - problem.canvas.height);
-    bounds += left * left + right * right + top * top + bottom * bottom;
+    // Outside the canvas (quadratic) plus area on masked cells (outline, holes, keepouts).
+    bounds += left * left + right * right + top * top + bottom * bottom + blockedArea(placementMasks(problem), problem, i, p);
   }
   const congestion=coarseCongestionCpu(problem,layout,coarse);
   return { total: w.hpwl * hpwl + w.overlap * overlap + w.bounds * bounds + w.congestion*congestion, hpwl, overlap, bounds, congestion };

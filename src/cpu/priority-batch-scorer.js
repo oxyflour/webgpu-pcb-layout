@@ -1,4 +1,5 @@
 import { worldPin, rotatedSize, sharesSide } from '../problem.js';
+import { placementMasks, blockedArea } from '../geometry/mask.js';
 
 function priorityWeight(policy, netId, options){
   const p=Number(policy?.[netId]?.priority ?? options.defaultPriority);
@@ -69,11 +70,12 @@ export class PriorityCpuBatchScorer {
       for(const pi of net.pins){const [x,y]=worldPin(p,layout,pi);minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);}
       const hp=(maxX-minX)+(maxY-minY);rawHpwl+=hp;weightedHpwl+=priorityWeight(this.policy,net.id,o)*hp;
     }
-    let overlap=0,bounds=0;
+    let overlap=0,bounds=0;const masks=placementMasks(p);
     for(let i=0;i<p.components.length;i++){
       const a=p.components[i],pa=layout[i],[aw,ah]=rotatedSize(a,pa.rotation);
       const left=Math.max(0,aw/2-pa.x),right=Math.max(0,pa.x+aw/2-p.canvas.width),top=Math.max(0,ah/2-pa.y),bottom=Math.max(0,pa.y+ah/2-p.canvas.height);
-      bounds+=left*left+right*right+top*top+bottom*bottom;
+      // Outside the canvas (quadratic) plus area on masked cells (outline, holes, keepouts).
+      bounds+=left*left+right*right+top*top+bottom*bottom+blockedArea(masks,p,i,pa);
       for(let j=i+1;j<p.components.length;j++){
         if(!sharesSide(p,i,pa,j,layout[j]))continue;
         const b=p.components[j],pb=layout[j],[bw,bh]=rotatedSize(b,pb.rotation);

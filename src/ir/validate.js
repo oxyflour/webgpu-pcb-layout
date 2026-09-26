@@ -37,7 +37,7 @@ export function validateBoardIR(ir) {
     if (!Array.isArray(board.outline) || !board.outline.length) err('board.outline must contain at least one polygon');
     else board.outline.forEach((o, k) => {
       if (!Array.isArray(o.outer) || o.outer.length < 3 || !o.outer.every(point)) err(`board.outline[${k}].outer needs at least 3 finite points`);
-      if (o.holes?.length) { warn(`board.outline[${k}].holes: outline holes are not used by the engine yet (placement uses the outline bounding box)`); o.holes.forEach((h, j) => { if (!Array.isArray(h) || h.length < 3 || !h.every(point)) err(`board.outline[${k}].holes[${j}] needs at least 3 finite points`); }); }
+      (o.holes ?? []).forEach((h, j) => { if (!Array.isArray(h) || h.length < 3 || !h.every(point)) err(`board.outline[${k}].holes[${j}] needs at least 3 finite points`); });
     });
     if (board.sides !== undefined) {
       if (!Array.isArray(board.sides) || !board.sides.length || !board.sides.every((s) => SIDES.includes(s))) err('board.sides must be a non-empty subset of ["top", "bottom"]');
@@ -67,7 +67,9 @@ export function validateBoardIR(ir) {
   }
   for (const [k, ko] of (ir.keepouts ?? []).entries()) {
     shape(ko?.shape, `keepouts[${k}]`);
-    warn(`keepouts[${k}]${ko?.id ? ` ("${ko.id}")` : ''}: keepouts are not used by the engine yet`);
+    if (ko?.sides !== undefined && (!Array.isArray(ko.sides) || !ko.sides.every((x) => SIDES.includes(x)))) err(`keepouts[${k}]: sides must be a subset of ["top", "bottom"]`);
+    if (ko?.maxHeight != null && !(finite(ko.maxHeight) && ko.maxHeight >= 0)) err(`keepouts[${k}]: maxHeight must be a number >= 0 or null`);
+    if (ko?.rules?.vias) warn(`keepouts[${k}]: rules.vias is not used by the engine yet`);
   }
 
   // Footprints
@@ -93,7 +95,7 @@ export function validateBoardIR(ir) {
       if (p?.net != null) { if (!nets.has(p.net)) err(`${pw}: unknown net "${p.net}"`); usedNets.add(p.net); }
     }
     if (f.courtyard) shape(f.courtyard, `${at} courtyard`);
-    if (f.height !== undefined) warn(`${at}: height is not used by the engine yet`);
+    if (f.height !== undefined && !(finite(f.height) && f.height >= 0)) err(`${at}: height must be a number >= 0`);
     if (f.region != null) { if (!regions.has(f.region)) err(`${at}: unknown region "${f.region}"`); else warn(`${at}: footprint regions are not used by the engine yet (use a module region)`); }
     const pl = f.placement;
     if (pl) {
@@ -137,7 +139,8 @@ export function validateBoardIR(ir) {
   // Rules
   const rules = ir.rules ?? {};
   if (rules.componentClearance !== undefined && !(finite(rules.componentClearance) && rules.componentClearance >= 0)) err('rules.componentClearance must be a number >= 0');
-  for (const k of ['edgeClearance', 'track', 'via']) if (rules[k] !== undefined) warn(`rules.${k} is not used by the engine yet`);
+  if (rules.edgeClearance !== undefined && !(finite(rules.edgeClearance) && rules.edgeClearance >= 0)) err('rules.edgeClearance must be a number >= 0');
+  for (const k of ['track', 'via']) if (rules[k] !== undefined) warn(`rules.${k} is not used by the engine yet`);
 
   for (const name of nets.keys()) if (!usedNets.has(name)) warn(`net "${name}" is declared but no pad uses it`);
   return { errors, warnings };

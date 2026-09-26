@@ -30,11 +30,11 @@ function tinyBoard(yAxis, placement, extra = {}) {
   };
 }
 
-test('the minimal example is valid and warns about reserved fields only', () => {
+test('the minimal example is valid and only warns about reserved fields', () => {
   const { errors, warnings } = validateBoardIR(minimal);
   assert.deepEqual(errors, []);
-  assert.ok(warnings.some((w) => /holes/.test(w)));
-  assert.ok(warnings.some((w) => /keepouts/.test(w)));
+  assert.ok(!warnings.some((w) => /holes|keepouts are not used/.test(w)));
+  assert.ok(warnings.some((w) => /rules\.vias/.test(w)));
   assert.ok(warnings.some((w) => /R1.*no placement/.test(w)));
 });
 

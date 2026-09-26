@@ -1,4 +1,5 @@
 import { worldPin, rotatedSize, sharesSide } from '../problem.js';
+import { placementMasks } from '../geometry/mask.js';
 
 function cloneLayout(layout){ return layout.map(p=>({...p})); }
 
@@ -47,7 +48,8 @@ export function resolveGlobalPlacerOptions(options={}){
     netWeight: options.netWeight ?? null,
     // Long-range bin density (off when strength is 0); see densityGridSpec().
     gridDensity: {
-      strength: 0, bins: 64, target: 0.7, pinArea: 0, scales: [1, 2, 4, 8, 16],
+      // blockedWeight: coverage given to masked bins (outline, holes, keepouts), > 1 acts as a wall.
+      strength: 0, bins: 64, target: 0.7, pinArea: 0, scales: [1, 2, 4, 8, 16], blockedWeight: 1.5,
       ...options.gridDensity,
     },
   };
@@ -73,7 +75,23 @@ export function densityGridSpec(problem, gd) {
     const sum = w.reduce((a, b) => a + b, 0);
     return { sigma, radius: r, weights: w.map((v) => v / sum) };
   });
-  return { gw, gh, binW: W / gw, binH: H / gh, inflate, kernels };
+  // Fraction of every bin covered by height-independent masks, per side, times blockedWeight.
+  const masks = placementMasks(problem);
+  let blocked = null;
+  if (masks) {
+    blocked = [new Float64Array(gw * gh), new Float64Array(gw * gh)];
+    const cellArea = masks.res * masks.res / ((W / gw) * (H / gh)) * (gd.blockedWeight ?? 1.5);
+    masks.layers.forEach((l, k) => {
+      if (l.maxHeight !== null) return;
+      const g = masks.grids[k];
+      for (let y = 0; y < masks.gh; y++) for (let x = 0; x < masks.gw; x++) {
+        if (!g[y * masks.gw + x]) continue;
+        const bx = Math.min(gw - 1, Math.floor((x + .5) * masks.res / (W / gw))), by = Math.min(gh - 1, Math.floor((y + .5) * masks.res / (H / gh)));
+        blocked[l.side][by * gw + bx] += cellArea;
+      }
+    });
+  }
+  return { gw, gh, binW: W / gw, binH: H / gh, inflate, kernels, blocked };
 }
 
 /** CPU reference of the density potential; returns phi[side][gy*gw+gx]. */
@@ -93,6 +111,7 @@ export function densityPotential(problem, layout, gd, spec) {
       for (const s of sides) cover[s][by * gw + bx] += q;
     }
   });
+  if (spec.blocked) for (const s of [0, 1]) for (let c = 0; c < B; c++) cover[s][c] += spec.blocked[s][c];
   return cover.map((cv) => {
     const phi = new Float64Array(B);
     for (const { radius: r, weights } of kernels) {
