@@ -1,3 +1,5 @@
+import { clampToRegion } from '../problem.js';
+
 function rng32(seed) { let x=seed>>>0||1; return ()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967296;}; }
 function normal(rnd){const u=Math.max(1e-12,rnd()),v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
 function cloneLayout(l){return l.map(p=>({...p}));}
@@ -17,6 +19,8 @@ export class GpuLnsOptimizer {
       seed:options.seed ?? 1
     };
     this.movable=problem.components.filter(c=>!c.fixed);
+    // Optional per-component {x,y,width,height} the part must stay inside (module regions).
+    this.regions=options.regions??null;
   }
 
   #mutate(base,rnd,scale) {
@@ -27,6 +31,8 @@ export class GpuLnsOptimizer {
       p.x += normal(rnd)*scale; p.y += normal(rnd)*scale;
       if(c.rotatable && rnd()<this.options.rotationProbability)p.rotation=(p.rotation+(rnd()<.5?1:3))&3;
       if(c.sides==='any' && rnd()<this.options.flipProbability)p.side=p.side?0:1;
+      const region=this.regions?.[c.index];
+      if(region)[p.x,p.y]=clampToRegion(c,p,region);
     }
     return out;
   }
@@ -45,6 +51,8 @@ export class GpuLnsOptimizer {
         x[q]+=normal(rnd)*scale; y[q]+=normal(rnd)*scale;
         if(c.rotatable && rnd()<this.options.rotationProbability)r[q]=(r[q]&4)|((r[q]+(rnd()<.5?1:3))&3);
         if(c.sides==='any' && rnd()<this.options.flipProbability)r[q]^=4;
+        const region=this.regions?.[c.index];
+        if(region)[x[q],y[q]]=clampToRegion(c,{x:x[q],y:y[q],rotation:r[q]&3},region);
       }
     }
     const scores=await this.scorer.scoreSlabs(x,y,r,pop);

@@ -19,7 +19,9 @@ export class MultiStartGlobalPlacer {
   constructor(problem, exactScorer, options={}){
     this.problem=problem;this.exactScorer=exactScorer;
     this.options={starts:options.starts??12,coarseIterations:options.coarseIterations??180,finalists:options.finalists??3,
-      fineIterations:options.fineIterations??260,seed:options.seed??1,placer:options.placer??{},device:options.device??null};
+      fineIterations:options.fineIterations??260,seed:options.seed??1,placer:options.placer??{},device:options.device??null,
+      // Explicit starting layouts (e.g. expanded module placements) replace the random starts.
+      initials:options.initials??null};
   }
   async #run(layouts,iterations){
     const o=this.options;
@@ -36,7 +38,8 @@ export class MultiStartGlobalPlacer {
   }
   async optimize(primaryInitial=null){
     const o=this.options,rnd=rng32(o.seed),initials=[];
-    for(let s=0;s<o.starts;s++)initials.push(s===0&&primaryInitial?primaryInitial:randomLayout(this.problem,rnd));
+    if(o.initials?.length)initials.push(...o.initials);
+    else for(let s=0;s<o.starts;s++)initials.push(s===0&&primaryInitial?primaryInitial:randomLayout(this.problem,rnd));
     const runs=await this.#run(initials,o.coarseIterations);
     const scores=await this.exactScorer.scoreLayouts(runs);const ord=scores.map((_,i)=>i).sort((a,b)=>scores[a].total-scores[b].total).slice(0,o.finalists);
     const fine=await this.#run(ord.map(i=>runs[i]),o.fineIterations);

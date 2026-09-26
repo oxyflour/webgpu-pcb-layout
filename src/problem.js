@@ -108,6 +108,16 @@ export function worldPin(problem, layout, pinIndex) {
   return [pl.x + rx, pl.y + ry];
 }
 
+/**
+ * Centre of `placement` moved the least so that the rotated body lies inside `region`
+ * ({x, y, width, height}); a region smaller than the part centres it.
+ */
+export function clampToRegion(component, placement, region) {
+  const [w, h] = rotatedSize(component, placement.rotation);
+  const fit = (v, lo, size, extent) => lo + extent / 2 > lo + size - extent / 2 ? lo + size / 2 : Math.max(lo + extent / 2, Math.min(lo + size - extent / 2, v));
+  return [fit(placement.x, region.x, region.width, w), fit(placement.y, region.y, region.height, h)];
+}
+
 export function rotatedSize(component, rotation) {
   return (rotation & 1) ? [component.height, component.width] : [component.width, component.height];
 }

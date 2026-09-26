@@ -142,6 +142,21 @@ scorer.destroy();
 
 No Node/Dawn import is used in the browser entry point.
 
+## Board IR (file format for boards)
+
+Boards from any EDA format enter the engine as **Board IR** (`webgpu-pin-layout/board@1`), a JSON description of the outline, nets (signal / power / ground), footprints with pads, placement constraints, regions and modules. Results come back as `webgpu-pin-layout/placement@1` (footprint anchors in the input's coordinates) for the format's adapter to write back.
+
+- Specification (Chinese): [`docs/board-ir.md`](docs/board-ir.md)
+- JSON Schema: [`schema/board-ir.schema.json`](schema/board-ir.schema.json), TypeScript types: [`src/ir/board-ir.d.ts`](src/ir/board-ir.d.ts)
+- Example: [`examples/board-ir/minimal.board.json`](examples/board-ir/minimal.board.json); a real board: `node bench/kicad-to-ir.mjs board.kicad_pcb`
+- API: `validateBoardIR(ir)`, `irToProblem(ir, options)`, `placementResult(adapted, layout)`
+
+```bash
+node bench/place-board.mjs my.board.json --placement my.placement.json --render my.html
+```
+
+The KiCad adapter itself goes through the IR (`kicadToIR` then `irToProblem`).
+
 ## Problem model
 
 Pin coordinates are local to the **component center**. Component rotation is a quarter-turn integer:
@@ -190,6 +205,15 @@ A placement is `{ x, y, rotation, side }` with `side` 0 (top, default) or 1 (bot
 `AnalyticalGlobalPlacer` / `GpuAnalyticalGlobalPlacer` accept `gridDensity: { strength, bins, target, pinArea, scales }`. With `strength > 0` every part is spread into a per-side bin grid (its area grows by `pinArea` mm² per pin to reserve routing space), the potential is the sum of Gaussian blurs of (coverage − target) over `scales` bins, and parts move down its gradient. This long-range term stops the short-range pair repulsion from packing everything into one clump.
 
 `legalizeLayout(problem, layout, { cell, clearance })` removes the remaining overlaps: fixed parts first, then movable parts by decreasing area take the nearest free spot on an occupancy grid per side.
+
+### Modules
+
+`autoModules(problem, { resolution, maxAreaFraction })` groups movable parts into modules: Louvain communities of the signal netlist (clique model, nets wider than 24 parts ignored), recursively split while a module exceeds `maxAreaFraction` of the board (default 0.18), with one-part communities merged into their most connected neighbour. Parts with no signal connection (typically decoupling capacitors) stay unassigned and are placed individually (the KiCad pipeline pulls them to their IC through the supply-net edges).
+
+Placement with modules runs in two levels:
+
+1. `moduleProblem()` turns every module into a square soft macro (member area plus routing area, divided by the target density) and places it with the multi-start global placer; each module gets one board side (explicit, or `auto`: top unless the top side is over capacity).
+2. `expandModules()` spreads each module's members inside its square to form component-level starting layouts, and `withModuleNets()` adds one cohesion net per module (`moduleNetWeight`: every member is pulled toward the module centroid with strength `cohesion`) for the rest of the pipeline.
 
 ## Topology model
 
@@ -331,6 +355,17 @@ Placement quality options (`--quality` enables all of them):
 | `--sides original\|free` | double-sided placement; `free` lets SMD parts choose a side |
 | `--density 3 --congestion 3` | global bin-density force and a stronger coarse-congestion term |
 | `--legalize` | overlap legalization after LNS |
+
+#### One board with an editable module plan
+
+```bash
+# automatic modules, export the plan and an HTML report (module maps included)
+node bench/place-board.mjs path/to/board.kicad_pcb --modules auto --export-modules board.modules.json --render board.html
+# edit board.modules.json, then place again with the edited plan
+node bench/place-board.mjs path/to/board.kicad_pcb --modules board.modules.json --render board.html
+```
+
+In `board.modules.json` each module lists KiCad references in `components`; move references between modules, delete a module (its parts are then placed individually), set `side` (`auto`, `top`, `bottom`), pin a module with `region` (`x`, `y`, `width`, `height` in mm, KiCad board coordinates) or change `cohesion`. `info`, `links` and `unassigned` are read-only statistics. Import errors (unknown or duplicated references, invalid sides, regions outside the board) are reported all at once. `place-board.mjs` defaults to `--quality` on the GPU backend with the large budget; `--plain` switches the quality options off.
 
 `--route` evaluates both the original and the optimized placement with `bench/pcb-router.mjs`, a two-layer PathFinder router on the real pads (0.4 mm grid, vias, SMD pads on their side), and reports nets routed without sharing cells. `bench/render-kicad.mjs --in <results with --save-layouts>` draws the original copper and both routed placements side by side.
 

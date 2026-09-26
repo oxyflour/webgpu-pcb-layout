@@ -1,4 +1,5 @@
 import { CompiledPlacementModel, packOrientation } from './compiled-placement-model.js';
+import { clampToRegion } from '../problem.js';
 
 function rng32(seed){let x=seed>>>0||1;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296;};}
 function normal(rnd){const u=Math.max(1e-12,rnd()),v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
@@ -30,6 +31,8 @@ export class FastDeltaLnsOptimizer {
     };
     this.model=options.model??new CompiledPlacementModel(problem,options.approximate??{});
     this.movable=[];for(let i=0;i<problem.components.length;i++)if(!problem.components[i].fixed)this.movable.push(i);
+    // Optional per-component {x,y,width,height} the part must stay inside (module regions).
+    this.regions=options.regions??null;
   }
 
   async optimize(initial,onIteration=null){
@@ -54,6 +57,8 @@ export class FastDeltaLnsOptimizer {
           slabY[off+ci]=Math.max(h/2,Math.min(this.problem.canvas.height-h/2,slabY[off+ci]));
           if(c.rotatable&&rnd()<o.rotationProbability)slabR[off+ci]=(slabR[off+ci]&4)|((rr+(rnd()<.5?1:3))&3);
           if(c.sides==='any'&&rnd()<o.flipProbability)slabR[off+ci]^=4;
+          const region=this.regions?.[ci];
+          if(region)[slabX[off+ci],slabY[off+ci]]=clampToRegion(c,{x:slabX[off+ci],y:slabY[off+ci],rotation:slabR[off+ci]&3},region);
         }
       }
       let cand,candScore,exact;

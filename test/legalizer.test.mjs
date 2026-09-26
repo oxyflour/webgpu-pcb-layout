@@ -33,3 +33,32 @@ test('legalizer removes overlaps on both sides and keeps fixed parts', () => {
   // Bottom-side parts may sit under the fixed top-side part.
   assert.ok(out.layout.some((p, i) => i > 0 && p.side === 1 && !problem.components[i].twoSided && Math.abs(p.x - 20) < 5 && Math.abs(p.y - 20) < 5));
 });
+
+test('regions keep parts inside during LNS and legalization', async () => {
+  const { FastDeltaLnsOptimizer, GpuLnsOptimizer, PriorityCpuBatchScorer } = await import('../src/index.js');
+  const components = [{ id: 'J', width: 2, height: 2, fixed: { x: 2, y: 2, rotation: 0 }, pins: [{ id: 'a', x: 0, y: 0 }] }];
+  for (let i = 0; i < 6; i++) components.push({ id: `P${i}`, width: 1.5, height: 1, pins: [{ id: 'a', x: 0, y: 0 }] });
+  const nets = components.slice(1).map((c) => ({ id: `N${c.id}`, pins: [{ componentId: 'J', pinId: 'a' }, { componentId: c.id, pinId: 'a' }] }));
+  // One pin per net on J is not allowed; give J one pin per net instead.
+  components[0].pins = nets.map((n, k) => ({ id: `a${k}`, x: 0, y: 0 }));
+  nets.forEach((n, k) => { n.pins[0].pinId = `a${k}`; });
+  const problem = normalizeProblem({ canvas: { width: 40, height: 40 }, components, nets });
+  const region = { x: 25, y: 25, width: 8, height: 8 };
+  const regions = problem.components.map((c) => c.fixed ? null : region);
+  const start = problem.components.map((c, i) => c.fixed ? { ...c.fixed } : { x: 29, y: 29, rotation: 0 });
+  const scorer = new PriorityCpuBatchScorer(problem, { weights: { congestion: 0 } });
+  const inRegion = (layout) => layout.every((p, i) => {
+    if (!regions[i]) return true;
+    const [w, h] = rotatedSize(problem.components[i], p.rotation);
+    return p.x - w / 2 >= region.x - 1e-9 && p.x + w / 2 <= region.x + region.width + 1e-9 && p.y - h / 2 >= region.y - 1e-9 && p.y + h / 2 <= region.y + region.height + 1e-9;
+  });
+  const fast = await new FastDeltaLnsOptimizer(problem, scorer, { iterations: 40, population: 64, translationScale: 6, regions, seed: 2 }).optimize(start);
+  assert.ok(inRegion(fast.layout), 'FastDeltaLns left the region');
+  const polish = await new GpuLnsOptimizer(problem, scorer, { iterations: 30, population: 64, translationScale: 6, regions, seed: 3 }).optimize(fast.layout);
+  assert.ok(inRegion(polish.layout), 'GpuLns left the region');
+  const legal = legalizeLayout(problem, polish.layout, { regions });
+  assert.equal(legal.failed, 0);
+  assert.equal(legal.outsideRegion, 0);
+  assert.ok(inRegion(legal.layout), 'legalizer left the region');
+  assert.equal(overlaps(problem, legal.layout), 0);
+});

@@ -1,0 +1,119 @@
+{
+  "format": "webgpu-pin-layout/board@1",
+  "yAxis": "down",
+  "name": "minimal",
+  "source": { "tool": "hand-written" },
+  "board": {
+    "outline": [
+      {
+        "outer": [[0, 0], [40, 0], [40, 30], [0, 30]],
+        "holes": [[[30, 20], [36, 20], [36, 26], [30, 26]]]
+      }
+    ],
+    "thickness": 1.6,
+    "sides": ["top", "bottom"],
+    "copperLayers": [
+      { "name": "F.Cu", "side": "top", "type": "signal" },
+      { "name": "B.Cu", "side": "bottom", "type": "signal" }
+    ]
+  },
+  "nets": [
+    { "name": "SDA", "class": "signal" },
+    { "name": "SCL", "class": "signal" },
+    { "name": "CLK", "class": "signal", "priority": 90 },
+    { "name": "+3V3", "class": "power" },
+    { "name": "GND", "class": "ground" }
+  ],
+  "footprints": [
+    {
+      "id": "J1",
+      "value": "Conn_01x04",
+      "library": "Connector_PinHeader_2.54mm:PinHeader_1x04",
+      "pads": [
+        { "id": "1", "at": [0, 0], "shape": "rect", "size": [1.7, 1.7], "type": "through", "drill": 1.0, "net": "+3V3" },
+        { "id": "2", "at": [0, 2.54], "shape": "oval", "size": [1.7, 1.7], "type": "through", "drill": 1.0, "net": "SDA" },
+        { "id": "3", "at": [0, 5.08], "shape": "oval", "size": [1.7, 1.7], "type": "through", "drill": 1.0, "net": "SCL" },
+        { "id": "4", "at": [0, 7.62], "shape": "oval", "size": [1.7, 1.7], "type": "through", "drill": 1.0, "net": "GND" }
+      ],
+      "placement": { "x": 3, "y": 10, "rotation": 0, "side": "top" },
+      "fixed": true,
+      "allowedSides": ["top"]
+    },
+    {
+      "id": "U1",
+      "value": "SENSOR",
+      "library": "Package_DFN_QFN:QFN-8",
+      "pads": [
+        { "id": "1", "at": [-1.45, -0.75], "shape": "rect", "size": [0.8, 0.3], "type": "smd", "net": "SDA" },
+        { "id": "2", "at": [-1.45, -0.25], "shape": "rect", "size": [0.8, 0.3], "type": "smd", "net": "SCL" },
+        { "id": "3", "at": [-1.45, 0.25], "shape": "rect", "size": [0.8, 0.3], "type": "smd", "net": "CLK" },
+        { "id": "4", "at": [-1.45, 0.75], "shape": "rect", "size": [0.8, 0.3], "type": "smd", "net": null },
+        { "id": "5", "at": [1.45, 0.75], "shape": "rect", "size": [0.8, 0.3], "type": "smd", "net": null },
+        { "id": "6", "at": [1.45, 0.25], "shape": "rect", "size": [0.8, 0.3], "type": "smd", "net": null },
+        { "id": "7", "at": [1.45, -0.25], "shape": "rect", "size": [0.8, 0.3], "type": "smd", "net": "GND" },
+        { "id": "8", "at": [1.45, -0.75], "shape": "rect", "size": [0.8, 0.3], "type": "smd", "net": "+3V3" }
+      ],
+      "courtyard": { "type": "rect", "x": -2.1, "y": -1.6, "width": 4.2, "height": 3.2 },
+      "placement": { "x": 20, "y": 12, "rotation": 90, "side": "top" },
+      "allowedSides": ["top"],
+      "allowedRotations": [0, 90, 180, 270]
+    },
+    {
+      "id": "Y1",
+      "value": "32MHz",
+      "pads": [
+        { "id": "1", "at": [-0.9, 0], "shape": "rect", "size": [0.8, 1.2], "type": "smd", "net": "CLK" },
+        { "id": "2", "at": [0.9, 0], "shape": "rect", "size": [0.8, 1.2], "type": "smd", "net": "GND" }
+      ],
+      "placement": { "x": 24, "y": 8, "rotation": 0, "side": "top" },
+      "allowedSides": ["top", "bottom"]
+    },
+    {
+      "id": "C1",
+      "value": "100n",
+      "pads": [
+        { "id": "1", "at": [-0.5, 0], "shape": "rect", "size": [0.6, 0.5], "type": "smd", "net": "+3V3" },
+        { "id": "2", "at": [0.5, 0], "shape": "rect", "size": [0.6, 0.5], "type": "smd", "net": "GND" }
+      ],
+      "placement": { "x": 20, "y": 16, "rotation": 0, "side": "bottom" },
+      "allowedSides": ["top", "bottom"]
+    },
+    {
+      "id": "R1",
+      "value": "4k7",
+      "pads": [
+        { "id": "1", "at": [-0.5, 0], "shape": "rect", "size": [0.6, 0.5], "type": "smd", "net": "SDA" },
+        { "id": "2", "at": [0.5, 0], "shape": "rect", "size": [0.6, 0.5], "type": "smd", "net": "+3V3" }
+      ],
+      "allowedSides": ["top", "bottom"]
+    },
+    {
+      "id": "H1",
+      "value": "MountingHole_3.2mm",
+      "library": "MountingHole:MountingHole_3.2mm_M3",
+      "pads": [
+        { "id": "1", "at": [0, 0], "shape": "circle", "size": [3.2, 3.2], "type": "npth", "drill": 3.2 }
+      ],
+      "placement": { "x": 36, "y": 4, "rotation": 0, "side": "top" },
+      "fixed": true,
+      "mechanical": true,
+      "allowedSides": ["top"]
+    }
+  ],
+  "regions": [
+    { "id": "SENSOR_AREA", "shape": { "type": "rect", "x": 14, "y": 4, "width": 14, "height": 14 } }
+  ],
+  "keepouts": [
+    {
+      "id": "antenna",
+      "shape": { "type": "polygon", "points": [[0, 24], [12, 24], [12, 30], [0, 30]] },
+      "sides": ["top", "bottom"],
+      "rules": { "placement": true, "routing": true, "vias": true }
+    }
+  ],
+  "modules": [
+    { "id": "sensor", "name": "Sensor + clock", "footprints": ["U1", "Y1", "C1"], "side": "auto", "region": "SENSOR_AREA", "cohesion": 0.4 }
+  ],
+  "rules": { "componentClearance": 0.2 },
+  "extensions": { "hand-written": { "note": "extensions are preserved but ignored by the engine" } }
+}
