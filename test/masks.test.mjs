@@ -102,7 +102,7 @@ test('the minimal IR example routes around its hole and antenna keepout', async 
 });
 
 test('evaluation router uses inner layers when the board has them', async () => {
-  const { routeBoard } = await import('../bench/pcb-router.mjs');
+  const { routeBoard } = await import('../src/router/board-router.js');
   // 12 nets from the left edge to the right edge, SMD pads on the top.
   const pads = [], layout = [], sides = [], n = 12;
   for (let k = 0; k < n; k++) {
@@ -126,7 +126,7 @@ test('evaluation router uses inner layers when the board has them', async () => 
 });
 
 test('router outline mask uses the router grid even when ceil() rounding differs', async () => {
-  const { routeBoard } = await import('../bench/pcb-router.mjs');
+  const { routeBoard } = await import('../src/router/board-router.js');
   // 18.80000000000001 / 0.4 rounds up to 48 columns; the mask must not drift across rows.
   const W = 18.80000000000001, H = 51.81;
   const outline = [{ outer: [[0, H], [0, 0], [W, 0], [W, H], [0, H]] }];

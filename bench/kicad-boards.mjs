@@ -19,7 +19,7 @@
 //             place-board.mjs for editable module plans)
 // --quality   --preplace --power --sides free --density 3 --congestion 3 --legalize
 // --route     route original and optimized placements with the two-layer PathFinder
-//             router (pcb-router.mjs) and report clean nets
+//             router (src/router/board-router.js) and report clean nets
 // Every board starts from a uniform random placement (locked footprints stay put).
 // `--backend gpu` runs the global stages on GpuAnalyticalGlobalPlacer and scores LNS
 // candidates with PriorityGpuBatchScorer (Dawn); `--budget large` spends the GPU headroom

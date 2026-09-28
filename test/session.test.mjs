@@ -28,3 +28,28 @@ test('session keeps locked parts and only changes the re-placed members', async 
   assert.ok(r.after.hpwl < r.before.hpwl);
   device?.destroy();
 });
+
+test('assignModule moves joining parts next to the module and keeps locked ones', async () => {
+  const { problem, layout } = board();
+  const modules = [{ members: [0, 1, 2, 3] }, { members: [20, 21, 22, 23] }];
+  const s = await PlacementSession.create(problem, layout, { modules });
+  s.lock([21]);
+  const r = s.assignModule([20, 21], 0);
+  assert.equal(r.module, 0);
+  assert.deepEqual(r.moved, [20]);
+  assert.deepEqual(s.modules[0].members, [0, 1, 2, 3, 20, 21]);
+  assert.deepEqual(s.modules[1].members, [22, 23]);
+  assert.equal(s.moduleOf(20), 0);
+  assert.deepEqual(s.layout[21], layout[21]);
+  const cx = [0, 1, 2, 3].reduce((a, i) => a + layout[i].x, 0) / 4, cy = [0, 1, 2, 3].reduce((a, i) => a + layout[i].y, 0) / 4;
+  assert.ok(Math.hypot(s.layout[20].x - cx, s.layout[20].y - cy) < 1);
+  // A new module takes the parts as they are; -1 removes them from every module.
+  assert.equal(s.assignModule([22], 'new').module, 2);
+  assert.deepEqual(s.modules[2].members, [22]);
+  s.assignModule([22], -1);
+  assert.equal(s.moduleOf(22), -1);
+  assert.deepEqual(s.modules[2].members, []);
+  // The CPU path re-places the joined part inside the module region without overlaps.
+  const rr = await s.relayout({ around: 20, budgetMs: 200 });
+  assert.equal(rr.after.overlaps, 0);
+});

@@ -1,4 +1,5 @@
-// Multi-layer PathFinder router used to evaluate placements on real boards.
+// Multi-layer PathFinder router used to evaluate placements on real boards (benchmarks)
+// and to show routing in the editor (web/route-worker.js).
 //
 // Grid model: square cells of `cell` mm on L routing layers (board.layers, default 2):
 // layer 0 is the top copper, L-1 the bottom, the rest inner signal layers. Pads are the
@@ -8,8 +9,8 @@
 // `viaCost` cells. Nets are grown as
 // trees with A* (multi-source from the tree) and negotiated with present/history
 // congestion costs until no cell is shared or `maxRounds` is reached.
-import { rotateQuarter, localPin } from '../src/problem.js';
-import { buildPlacementMasks } from '../src/geometry/mask.js';
+import { rotateQuarter, localPin } from '../problem.js';
+import { buildPlacementMasks } from '../geometry/mask.js';
 
 class MinHeap {
   constructor(cap = 1024) { this.k = new Float64Array(cap); this.v = new Int32Array(cap); this.n = 0; }
@@ -41,6 +42,7 @@ class MinHeap {
  * @param board.netCount number of routed nets
  * @param layout [{x,y,rotation,side?}]; pads are mirrored for side 1. Without a
  *        `side`, `sides` (+1 top | -1 bottom) only chooses the SMD layer.
+ * @param options.cell grid cell (mm), options.maxRounds, options.onRound({round, maxRounds, overflow})
  */
 export function routeBoard(board, layout, sides, options = {}) {
   const cell = options.cell ?? 0.3, viaCost = options.viaCost ?? 6, maxRounds = options.maxRounds ?? 12;
@@ -175,6 +177,7 @@ export function routeBoard(board, layout, sides, options = {}) {
     }
     overflow = 0;
     for (let c = 0; c < N; c++) if (usage[c] > 1) { overflow++; history[c] += 0.4 * (usage[c] - 1); }
+    options.onRound?.({ round: rounds, maxRounds, overflow });
     if (!overflow) break;
     pres *= 1.6;
   }
@@ -192,12 +195,15 @@ export function routeBoard(board, layout, sides, options = {}) {
   }
   return {
     grid: { W, H, cell, layers: L }, rounds, overflow, nets: order.length, complete, clean, vias, length, status,
-    /** Polylines per net as [{layer, points:[[x,y],...]}] in mm. */
+    /**
+     * Polylines per net as [{layer, points:[[x,y],...], via?}] in mm; `via` marks a
+     * polyline that starts where the path changed layer.
+     */
     polylines: () => routes.map((r) => r ? r.paths.flatMap((path) => {
       const out = []; let cur = null;
       for (const c of path) {
         const l = (c / P) | 0, q = c - l * P, pt = [(q % W + .5) * cell, (((q / W) | 0) + .5) * cell];
-        if (!cur || cur.layer !== l) { if (cur && cur.points.length > 1) out.push(cur); cur = { layer: l, points: [pt] }; } else cur.points.push(pt);
+        if (!cur || cur.layer !== l) { if (cur && cur.points.length > 1) out.push(cur); cur = { layer: l, points: [pt], ...(cur ? { via: true } : {}) }; } else cur.points.push(pt);
       }
       if (cur && cur.points.length > 1) out.push(cur);
       return out;

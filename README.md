@@ -142,6 +142,22 @@ scorer.destroy();
 
 No Node/Dawn import is used in the browser entry point.
 
+## Interactive editor (browser)
+
+`web/editor.html` is an interactive placement editor running entirely in the browser (Chrome / Edge with WebGPU):
+
+```bash
+node bench/export-web-boards.mjs   # optional: sample boards for the page (web/boards/)
+node web/serve.mjs                 # http://localhost:8173/
+```
+
+- Load a `.kicad_pcb` or a Board IR `.board.json` (file picker or drag and drop). Keep the file's placement, or run the automatic pipeline (modules, module-level placement, global placement, LNS, legalization; seconds to tens of seconds by board size).
+- Drag parts (they are locked where dropped) and the nearby parts of their module are re-placed within the chosen budget (150 ms by default); rotate / flip / lock (`R` / `F` / `L`), move parts between modules, re-place a whole module, undo (`Ctrl+Z`), export `placement@1` JSON.
+- Routing: `web/route-worker.js` routes the placement with `src/router/board-router.js` (the benchmark router, on the board's signal layers) and the page draws tracks per layer, vias, nets sharing cells (red) and unrouted nets (red airwires). It re-routes automatically once an edit settles (boards under 1000 parts; larger boards take minutes, use the button); an edit cancels a run in progress.
+- All placement work runs in a Web Worker (`web/editor-worker.js`) that owns a `PlacementSession`; the page only draws (Canvas 2D) and handles input.
+
+`web/latency.html` runs the `bench/session-bench.mjs` drag / module-redo scenarios in the browser for latency comparisons with Node.
+
 ## Board IR (file format for boards)
 
 Boards from any EDA format enter the engine as **Board IR** (`webgpu-pin-layout/board@1`), a JSON description of the outline, nets (signal / power / ground), footprints with pads, placement constraints, regions and modules. Results come back as `webgpu-pin-layout/placement@1` (footprint anchors in the input's coordinates) for the format's adapter to write back.
@@ -367,7 +383,7 @@ node bench/place-board.mjs path/to/board.kicad_pcb --modules board.modules.json 
 
 In `board.modules.json` each module lists KiCad references in `components`; move references between modules, delete a module (its parts are then placed individually), set `side` (`auto`, `top`, `bottom`), pin a module with `region` (`x`, `y`, `width`, `height` in mm, KiCad board coordinates) or change `cohesion`. `info`, `links` and `unassigned` are read-only statistics. Import errors (unknown or duplicated references, invalid sides, regions outside the board) are reported all at once. `place-board.mjs` defaults to `--quality` on the GPU backend with the large budget; `--plain` switches the quality options off.
 
-`--route` evaluates both the original and the optimized placement with `bench/pcb-router.mjs`, a two-layer PathFinder router on the real pads (0.4 mm grid, vias, SMD pads on their side), and reports nets routed without sharing cells. `bench/render-kicad.mjs --in <results with --save-layouts>` draws the original copper and both routed placements side by side.
+`--route` evaluates both the original and the optimized placement with `src/router/board-router.js`, a multi-layer PathFinder router on the real pads (0.4 mm grid, vias, SMD pads on their side), and reports nets routed without sharing cells. `bench/render-kicad.mjs --in <results with --save-layouts>` draws the original copper and both routed placements side by side.
 
 ## Architecture
 

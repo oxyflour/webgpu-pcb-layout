@@ -29,6 +29,8 @@ export function pinAnchorOutsideFixed(problem, layout, pinIndex, gap=4){
 export function resolveGlobalPlacerOptions(options={}){
   return {
     iterations: options.iterations ?? 500,
+    // Optional wall-clock deadline (performance.now() ms) for interactive use.
+    deadline: options.deadline,
     wireStrength: options.wireStrength ?? 1.0,
     densityStrength: options.densityStrength ?? 0.50,
     overlapStrength: options.overlapStrength ?? 2.5,
@@ -294,7 +296,10 @@ export class AnalyticalGlobalPlacer {
     const vx=new Float64Array(p.components.length),vy=new Float64Array(p.components.length);
     const trace=[];
     let step=o.step;
+    let lastIterMs=0;
     for(let it=0;it<o.iterations;it++){
+      const tIter=performance.now();
+      if(o.deadline!==undefined && it>0 && tIter+lastIterMs>=o.deadline)break;
       const fx=new Float64Array(p.components.length),fy=new Float64Array(p.components.length);
       // Density/overlap starts stronger, then wire attraction becomes relatively dominant.
       const phase=it/Math.max(1,o.iterations-1);
@@ -319,6 +324,7 @@ export class AnalyticalGlobalPlacer {
         maxDelta=Math.max(maxDelta,Math.hypot(vx[i],vy[i]));
       }
       step*=o.cooling;
+      lastIterMs=performance.now()-tIter;
       if(it===0 || it%o.recordEvery===o.recordEvery-1 || it===o.iterations-1){
         const row={iteration:it,maxDelta,layout:cloneLayout(layout)};trace.push(row);
         if(o.onIteration) await o.onIteration(row);

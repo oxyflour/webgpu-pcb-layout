@@ -67,9 +67,12 @@ export class GpuLnsOptimizer {
     let [currentScore]=await this.scorer.scoreLayouts([current]); let best=cloneLayout(current),bestScore=currentScore;
     let temp=this.options.temperature,scale=this.options.translationScale;
     const trace=[];
+    let lastIterMs=0;
     for(let it=0;it<this.options.iterations;it++) {
-      // Optional wall-clock deadline (performance.now() ms) for interactive use.
-      if(this.options.deadline!==undefined && performance.now()>=this.options.deadline) break;
+      // Optional wall-clock deadline (performance.now() ms) for interactive use: stop when
+      // another iteration as long as the last one would end past it.
+      const tIter=performance.now();
+      if(this.options.deadline!==undefined && tIter+lastIterMs>=this.options.deadline) break;
       let cand,candScore;
       if(typeof this.scorer.scoreSlabs==='function') {
         ({layout:cand,score:candScore}=await this.#scorePopulationSlabs(current,rnd,scale));
@@ -85,6 +88,7 @@ export class GpuLnsOptimizer {
       if(delta<=0 || rnd()<Math.exp(-delta/(Math.max(1e-12,temp)*denom))) { current=cand;currentScore=candScore; }
       if(candScore.total<bestScore.total) { best=cloneLayout(cand);bestScore=candScore; }
       temp*=this.options.cooling; scale*=Math.max(0.985,this.options.cooling);
+      lastIterMs=performance.now()-tIter;
       const row={iteration:it,current:currentScore.total,best:bestScore.total,temperature:temp,scale};trace.push(row);if(onIteration)await onIteration({...row,currentLayout:cloneLayout(current),bestLayout:cloneLayout(best),currentScore:{...currentScore},bestScore:{...bestScore}});
     }
     return {layout:best,score:bestScore,trace};

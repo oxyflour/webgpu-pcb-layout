@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relayout Latency</title>
+<style>
+  :root { --bg: #fafaf9; --fg: #1c1917; --muted: #78716c; --line: #e7e5e4; --card: #fff; --accent: #2563eb; --bad: #dc2626; --good: #16a34a; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1c1917; --fg: #f5f5f4; --muted: #a8a29e; --line: #44403c; --card: #292524; --accent: #60a5fa; --bad: #f87171; --good: #4ade80; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+  main { max-width: 1400px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 20px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: end; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  fieldset { border: 0; padding: 0; margin: 0; }
+  legend, label.field { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  fieldset label { margin-right: 12px; white-space: nowrap; }
+  input[type=text], input[type=number] { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); width: 130px; }
+  button { font: inherit; padding: 6px 16px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { margin: 16px 0 8px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .status b { color: var(--fg); font-weight: 600; }
+  .error { color: var(--bad); white-space: pre-wrap; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th { font-size: 12px; font-weight: 600; color: var(--muted); vertical-align: bottom; white-space: normal; min-width: 80px; }
+  td:first-child, th:first-child, td:nth-child(3), th:nth-child(3) { text-align: left; }
+  tr:last-child td { border-bottom: 0; }
+  .over { color: var(--bad); font-weight: 600; }
+  .ok { color: var(--good); }
+</style>
+</head>
+<body>
+<main>
+  <h1>浏览器局部重排延迟</h1>
+  <p class="lead">在 Web Worker 中用浏览器 WebGPU 运行与 <code>bench/session-bench.mjs</code> 相同的拖动 / 模块重做场景，并与 Node + Dawn 的结果（<code>bench/results/session-node.json</code>，若存在）对照。</p>
+
+  <div class="controls">
+    <fieldset id="boards"><legend>板子（器件数）</legend></fieldset>
+    <fieldset id="modes"><legend>场景</legend>
+      <label><input type="checkbox" value="drag" checked> 拖动</label>
+      <label><input type="checkbox" value="redo" checked> 模块重做</label>
+    </fieldset>
+    <div><label class="field" for="budgets">预算（ms，逗号分隔）</label><input id="budgets" type="text" value="50,100,200"></div>
+    <div><label class="field" for="drags">每组运行次数</label><input id="drags" type="number" min="1" value="20"></div>
+    <button id="run">运行</button>
+    <button id="save" class="secondary" disabled>保存 JSON</button>
+  </div>
+
+  <div class="status" id="status">未运行</div>
+  <div class="table-wrap"><table id="table"><thead></thead><tbody></tbody></table></div>
+</main>
+<script type="module">
+const $ = (s) => document.querySelector(s);
+const rows = [];
+let env = {}, node = null;
+// ?boards=edk,safety&modes=drag&budgets=100,200&drags=20&out=name.json&autorun=1 presets the form (and runs it).
+const params = new URLSearchParams(location.search);
+
+const boards = await (await fetch('./boards/index.json')).json().catch(() => []);
+for (const b of boards) $('#boards').insertAdjacentHTML('beforeend', `<label><input type="checkbox" value="${b.name}" ${b.footprints < 1000 ? 'checked' : ''}> ${b.name} (${b.footprints})</label>`);
+if (!boards.length) $('#status').innerHTML = '<span class="error">web/boards/index.json 不存在：先运行 node bench/export-web-boards.mjs</span>';
+try { node = await (await fetch('../bench/results/session-node.json')).json(); } catch { node = null; }
+const nodeRow = (row) => node?.rows.find((r) => r.board === row.board && r['budget (ms)'] === row['budget (ms)'] && r.mode === row.mode);
+
+const COLUMNS = [
+  ['board', (r) => r.board, '板子'],
+  ['budget', (r) => r['budget (ms)'], '预算 (ms)'],
+  ['mode', (r) => r.mode === 'drag' ? '拖动' : '模块重做', '场景'],
+  ['runs', (r) => r['runs (count)'], '运行次数 (count)'],
+  ['parts', (r) => r['parts re-placed, median (count)'], '重排器件数，中位数 (count)'],
+  ['time', (r) => r['time p50 / p90 / max (ms)'], '浏览器：耗时 p50 / p90 / max (ms)'],
+  ['nodeTime', (r) => nodeRow(r)?.['time p50 / p90 / max (ms)'] ?? '—', 'Node+Dawn：耗时 p50 / p90 / max (ms)'],
+  ['over', (r) => r['runs over budget by > 20 ms (count)'], '浏览器：超预算 >20 ms 次数 (count)'],
+  ['stages', (r) => r['build / global / LNS / legalize, median (ms)'], '浏览器：建子问题 / 全局 / LNS / 合法化，中位数 (ms)'],
+  ['iters', (r) => r['LNS iterations, median (count)'], '浏览器：LNS 迭代数，中位数 (count)'],
+  ['nodeIters', (r) => nodeRow(r)?.['LNS iterations, median (count)'] ?? '—', 'Node+Dawn：LNS 迭代数，中位数 (count)'],
+  ['attempts', (r) => r['attempts, median / max (count)'], '浏览器：尝试次数，中位数 / max (count)'],
+  ['hpwl', (r) => r['HPWL after / before, median (ratio)'], '浏览器：HPWL 后/前，中位数 (比值)'],
+  ['ovl', (r) => r['overlapping pairs added, median / max (count)'], '浏览器：新增重叠对，中位数 / max (count)'],
+  ['create', (r) => r['session create (ms)'], '浏览器：创建 session (ms)'],
+];
+$('#table thead').innerHTML = `<tr>${COLUMNS.map((c) => `<th>${c[2]}</th>`).join('')}</tr>`;
+
+function addRow(row) {
+  rows.push(row);
+  const tr = document.createElement('tr');
+  for (const [key, get] of COLUMNS) {
+    const td = document.createElement('td'); td.textContent = get(row);
+    if (key === 'over') td.className = row['runs over budget by > 20 ms (count)'] ? 'over' : 'ok';
+    tr.appendChild(td);
+  }
+  $('#table tbody').appendChild(tr);
+}
+
+function envLine(extra = '') {
+  const rt = env.roundTrip ? `GPU 单次派发往返 p50 / p90：<b>${env.roundTrip.p50.toFixed(2)} / ${env.roundTrip.p90.toFixed(2)} ms</b>` : '';
+  const nrt = node?.roundTrip ? `（Node+Dawn：${node.roundTrip.p50.toFixed(2)} / ${node.roundTrip.p90.toFixed(2)} ms）` : '';
+  const cpu = env.cpuProbeMs ? `CPU 探针：<b>${env.cpuProbeMs.toFixed(0)} ms</b>${node?.cpuProbeMs ? `（Node：${node.cpuProbeMs.toFixed(0)} ms）` : ''}` : '';
+  return [env.adapter && `适配器：<b>${env.adapter}</b>`, rt && rt + nrt, cpu, extra].filter(Boolean).join(' · ');
+}
+
+$('#run').onclick = () => {
+  if (!navigator.gpu) { $('#status').innerHTML = '<span class="error">此浏览器不支持 WebGPU</span>'; return; }
+  const pick = (id) => [...document.querySelectorAll(`#${id} input:checked`)].map((i) => i.value);
+  const job = { type: 'run', boards: pick('boards'), modes: pick('modes'), budgets: $('#budgets').value.split(',').map(Number).filter(Boolean), drags: +$('#drags').value || 20 };
+  rows.length = 0; $('#table tbody').innerHTML = ''; env = {};
+  $('#run').disabled = true; $('#save').disabled = true;
+  const worker = new Worker('./latency-worker.js', { type: 'module' });
+  const t0 = performance.now();
+  let hiddenDuringRun = document.hidden;
+  const onVisibility = () => { hiddenDuringRun ||= document.hidden; };
+  document.addEventListener('visibilitychange', onVisibility);
+  worker.onmessage = ({ data }) => {
+    if (data.type === 'device') env.adapter = data.adapter;
+    if (data.type === 'roundTrip') { env.roundTrip = data.roundTrip; env.cpuProbeMs = data.cpuProbeMs; }
+    if (data.type === 'row') addRow(data.row);
+    if (data.type === 'status') $('#status').innerHTML = envLine(data.message);
+    if (data.type === 'done' || data.type === 'error') {
+      $('#status').innerHTML = envLine(data.type === 'done' ? `完成，用时 ${((performance.now() - t0) / 1000).toFixed(0)} s` : '')
+        + (data.type === 'error' ? `<div class="error">${data.message}</div>` : '');
+      $('#run').disabled = false; $('#save').disabled = !rows.length;
+      worker.terminate();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.latencyResult = { environment: 'browser', userAgent: navigator.userAgent, pageHiddenDuringRun: hiddenDuringRun, ...env, rows };
+      // Served by web/serve.mjs: keep a copy next to the Node results.
+      const out = params.get('out') ?? `session-browser-${hiddenDuringRun ? 'hidden' : 'visible'}.json`;
+      if (rows.length) fetch(`/results/${out}`, { method: 'POST', body: JSON.stringify(window.latencyResult, null, 1) }).catch(() => {});
+    }
+  };
+  worker.onerror = (e) => { $('#status').innerHTML = `<span class="error">${e.message}</span>`; $('#run').disabled = false; };
+  worker.postMessage(job);
+};
+
+if (params.get('budgets')) $('#budgets').value = params.get('budgets');
+if (params.get('drags')) $('#drags').value = params.get('drags');
+if (params.get('boards')) { const want = params.get('boards').split(','); document.querySelectorAll('#boards input').forEach((i) => { i.checked = want.includes(i.value); }); }
+if (params.get('modes')) { const want = params.get('modes').split(','); document.querySelectorAll('#modes input').forEach((i) => { i.checked = want.includes(i.value); }); }
+if (params.get('autorun')) $('#run').click();
+
+$('#save').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(window.latencyResult, null, 1)], { type: 'application/json' }));
+  a.download = 'session-browser.json'; a.click();
+};
+</script>
+</body>
+</html>

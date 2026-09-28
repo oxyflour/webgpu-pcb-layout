@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCB Layout Editor</title>
+<style>
+  :root {
+    --bg: #f6f5f3; --panel: #ffffff; --fg: #1c1917; --muted: #78716c; --line: #e7e5e4;
+    --accent: #2563eb; --accent-fg: #ffffff; --bad: #dc2626; --good: #15803d;
+    --board: #e9efe6; --board-edge: #4d7c0f; --canvas-bg: #d6d3d1;
+    --part-fixed: #a8a29e; --part-free: #d6d3d1; --pad: #b45309; --rats: #0f172a; --sel: #2563eb; --flash: #f59e0b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1917; --panel: #262322; --fg: #f5f5f4; --muted: #a8a29e; --line: #3f3a37;
+      --accent: #60a5fa; --accent-fg: #0b1220; --bad: #f87171; --good: #4ade80;
+      --board: #1f2a1d; --board-edge: #84cc16; --canvas-bg: #121110;
+      --part-fixed: #57534e; --part-free: #44403c; --pad: #f59e0b; --rats: #e2e8f0; --sel: #60a5fa; --flash: #fbbf24;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1917; --panel: #262322; --fg: #f5f5f4; --muted: #a8a29e; --line: #3f3a37;
+    --accent: #60a5fa; --accent-fg: #0b1220; --bad: #f87171; --good: #4ade80;
+    --board: #1f2a1d; --board-edge: #84cc16; --canvas-bg: #121110;
+    --part-fixed: #57534e; --part-free: #44403c; --pad: #f59e0b; --rats: #e2e8f0; --sel: #60a5fa; --flash: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 320px; height: 100vh; }
+  .stage { position: relative; min-width: 0; background: var(--canvas-bg); overflow: hidden; }
+  canvas#view { display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
+  .hud { position: absolute; left: 12px; bottom: 12px; right: 12px; display: flex; gap: 12px; flex-wrap: wrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .hud span { background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+  .hud .busy { color: var(--accent); }
+  .drop { position: absolute; inset: 16px; border: 2px dashed var(--muted); border-radius: 12px; display: grid; place-items: center; text-align: center; color: var(--muted); font-size: 15px; pointer-events: none; }
+  .drop.hidden { display: none; }
+  .drop.over { border-color: var(--accent); color: var(--accent); }
+  aside { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px 14px 24px; }
+  h1 { font-size: 15px; margin: 0 0 2px; }
+  .sub { color: var(--muted); margin: 0 0 12px; }
+  section { border-top: 1px solid var(--line); padding: 12px 0; }
+  section:first-of-type { border-top: 0; padding-top: 4px; }
+  h2 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 8px; }
+  label { display: flex; align-items: center; gap: 6px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .row > .grow { flex: 1; min-width: 0; }
+  button, select, input[type=file] { font: inherit; color: inherit; }
+  button { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.on { border-color: var(--accent); color: var(--accent); }
+  select { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); max-width: 100%; }
+  input[type=file] { max-width: 100%; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; padding: 4px 9px; }
+  .seg button.on { background: var(--accent); color: var(--accent-fg); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-variant-numeric: tabular-nums; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; text-align: right; }
+  .good { color: var(--good); } .bad { color: var(--bad); }
+  .error { color: var(--bad); white-space: pre-wrap; word-break: break-word; }
+  .modules { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; }
+  .modules li { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
+  .modules li:hover { background: var(--bg); }
+  .modules li.active { outline: 1px solid var(--accent); }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .modules .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modules .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .modules button { padding: 1px 6px; font-size: 12px; }
+  .ids { color: var(--muted); word-break: break-all; }
+  #layerToggles label { font-size: 12px; }
+  .keys { color: var(--muted); display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
+  kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--bg); color: var(--fg); }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: 60vh auto; height: auto; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage" id="stage">
+    <canvas id="view"></canvas>
+    <div class="drop" id="drop">把 .kicad_pcb 或 Board IR (.board.json) 拖到这里<br>或在右侧选择文件</div>
+    <div class="hud" id="hud"></div>
+  </div>
+  <aside>
+    <h1>交互布局编辑器</h1>
+    <p class="sub" id="gpu">WebGPU：未初始化</p>
+
+    <section>
+      <h2>载入</h2>
+      <div class="row"><input type="file" id="file" accept=".kicad_pcb,.json"></div>
+      <div class="row" id="samplesRow" hidden><select id="samples" class="grow"><option value="">示例板子…</option></select></div>
+      <div class="row">
+        <label><input type="radio" name="placement" value="original" checked> 保留文件里的布局</label>
+        <label><input type="radio" name="placement" value="auto"> 自动布局</label>
+      </div>
+      <div class="row"><button id="load" class="primary" disabled>载入</button><span id="loadStatus" class="grow"></span></div>
+    </section>
+
+    <section id="boardSection" hidden>
+      <h2>板子</h2>
+      <dl class="kv" id="boardInfo"></dl>
+      <div class="row">
+        <span>重排预算</span>
+        <select id="budget"><option>100</option><option selected>150</option><option>200</option><option>300</option></select><span>ms</span>
+        <button id="undo" title="Ctrl+Z">撤销</button>
+      </div>
+      <dl class="kv" id="lastOp"></dl>
+    </section>
+
+    <section id="selSection" hidden>
+      <h2>选中</h2>
+      <p class="ids" id="selIds"></p>
+      <div class="row">
+        <select id="moduleSelect" class="grow"></select>
+        <button id="assign">划入</button>
+      </div>
+      <div class="row">
+        <button id="lockBtn">固定</button>
+        <button id="rotateBtn" title="R">旋转 90°</button>
+        <button id="flipBtn" title="F">换面</button>
+      </div>
+    </section>
+
+    <section id="modSection" hidden>
+      <h2>模块</h2>
+      <ul class="modules" id="modules"></ul>
+    </section>
+
+    <section id="routeSection" hidden>
+      <h2>布线</h2>
+      <div class="row">
+        <label><input type="checkbox" id="autoRoute"> 改动后自动布线</label>
+        <button id="routeNow">立即布线</button>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="showRoutes" checked> 显示走线</label>
+        <span>网格</span><select id="routeCell"><option value="0.4" selected>0.4</option><option value="0.3">0.3</option><option value="0.25">0.25</option></select><span>mm</span>
+      </div>
+      <p class="sub" id="routeStatus">未布线</p>
+      <dl class="kv" id="routeInfo"></dl>
+      <div class="row" id="layerToggles"></div>
+    </section>
+
+    <section id="viewSection" hidden>
+      <h2>显示</h2>
+      <div class="row"><span>层面</span><span class="seg" id="sideSeg"><button data-v="both" class="on">两面</button><button data-v="top">顶面</button><button data-v="bottom">底面</button></span></div>
+      <div class="row"><span>飞线</span><span class="seg" id="ratsSeg"><button data-v="sel" class="on">选中</button><button data-v="all">全部</button><button data-v="none">无</button></span></div>
+      <div class="row"><label><input type="checkbox" id="labels" checked> 位号</label><label><input type="checkbox" id="pads" checked> 焊盘</label><button id="fit">适应窗口</button></div>
+      <div class="row"><button id="export">导出 placement JSON</button></div>
+    </section>
+
+    <section>
+      <h2>操作</h2>
+      <div class="keys">
+        <span>拖动器件</span><span>移动并固定，模块内自动重排</span>
+        <span>拖动空白</span><span>框选（<kbd>Shift</kbd> 追加）</span>
+        <span>双击器件</span><span>选中整个模块</span>
+        <span>右键或中键拖动</span><span>平移；滚轮缩放</span>
+        <span><kbd>R</kbd> <kbd>F</kbd> <kbd>L</kbd></span><span>旋转 / 换面 / 固定切换</span>
+        <span><kbd>Ctrl</kbd>+<kbd>Z</kbd></span><span>撤销</span>
+        <span><kbd>Esc</kbd></span><span>取消选择</span>
+      </div>
+    </section>
+    <p class="error" id="error"></p>
+  </aside>
+</div>
+<script type="module" src="./editor.js"></script>
+</body>
+</html>

@@ -1,6 +1,5 @@
 // Shared KiCad placement pipeline used by kicad-boards.mjs (benchmark over many boards)
 // and place-board.mjs (one board, with editable module JSON).
-import { performance } from 'node:perf_hooks';
 import { normalizeProblem, rotatedSize, sharesSide, clampToRegion } from '../src/problem.js';
 import { PriorityCpuBatchScorer } from '../src/cpu/priority-batch-scorer.js';
 import { PriorityGpuBatchScorer } from '../src/gpu/batch-scorer.js';
@@ -12,7 +11,7 @@ import { GpuAnalyticalGlobalPlacer } from '../src/gpu/global-placer.js';
 import { legalizeLayout } from '../src/optimizer/legalizer.js';
 import { moduleProblem, expandModules, withModuleNets, isModuleNet, splitModuleSides, MODULE_NET_PREFIX } from '../src/optimizer/modules.js';
 import { withPowerEdges, isPowerEdge } from './power-edges.mjs';
-import { routeBoard } from './pcb-router.mjs';
+import { routeBoard } from '../src/router/board-router.js';
 
 /** Command-line options shared by the KiCad scripts (see kicad-boards.mjs for docs). */
 export function parseOptions(argv, defaults = {}) {
@@ -42,6 +41,9 @@ export function parseOptions(argv, defaults = {}) {
     moduleResolution: Number(arg('module-resolution', 1)),
     // Split modules across both sides (small parts under the ICs); --no-split disables.
     split: !has('no-split'),
+    // Give every module an exclusive square region from the (legalized) module-level
+    // placement; all later stages keep its members inside it.
+    moduleRegions: has('module-regions'),
     // Bottom-side cost, HPWL-mm per mm² of part area: a number or 'auto' (see backsideCost).
     backside: arg('backside', 'auto'),
     // Global iterations scale with the part count unless given; parts moved per LNS candidate.
@@ -50,7 +52,7 @@ export function parseOptions(argv, defaults = {}) {
   };
   o.mode = [o.preplace && 'preplace', o.power && 'power', o.sides !== 'single' && `sides-${o.sides}`, o.density > 0 && `density${o.density}`,
     o.noLns && 'nolns', o.congestion !== 0.5 && `cong${o.congestion}`, o.modules && `modules-${o.modules === 'auto' ? 'auto' : 'file'}`,
-    o.modules && !o.split && 'nosplit', o.backside !== 'auto' && `backside${o.backside}`, o.legalize && 'legal'].filter(Boolean).join('+') || 'plain';
+    o.modules && !o.split && 'nosplit', o.modules && o.moduleRegions && 'regions', o.backside !== 'auto' && `backside${o.backside}`, o.legalize && 'legal'].filter(Boolean).join('+') || 'plain';
   return o;
 }
 
@@ -193,6 +195,20 @@ async function placeModules(problem, modules, o, cfg, device, seed, starts, alte
   const res = await new MultiStartGlobalPlacer(p, scorer, { seed: seed ^ 0x3D17, device, starts: 64, coarseIterations: Math.round(200 * gs), finalists: alternatives, fineIterations: Math.round(300 * gs), placer }).optimize();
   scorer.destroy?.();
   const order = res.fineScores.map((_, k) => k).sort((a, b) => res.fineScores[a].total - res.fineScores[b].total);
+  if (o.moduleRegions) {
+    // One module structure: the best one, legalized so that module squares on the same
+    // side do not overlap; each square becomes its module's region.
+    const legal = legalizeLayout(p, res.fineLayouts[order[0]], { clearance: 0, cell: Math.max(0.25, Math.min(1, Math.max(p.canvas.width, p.canvas.height) / 500)) });
+    const regions = modules.map(() => null);
+    mp.owners.forEach((owner, k) => {
+      if (owner.module === undefined) return;
+      const c = p.components[k], pl = legal.layout[k], W = problem.canvas.width, H = problem.canvas.height;
+      const x0 = Math.max(0, pl.x - c.width / 2), y0 = Math.max(0, pl.y - c.height / 2);
+      regions[owner.module] = { x: x0, y: y0, width: Math.min(W, pl.x + c.width / 2) - x0, height: Math.min(H, pl.y + c.height / 2) - y0 };
+    });
+    const initials = Array.from({ length: starts }, (_, k) => expandModules(problem, mp, legal.layout, modules, seed + 101 * k));
+    return { initials, moduleLayout: legal.layout, moduleProblem: mp, regions, legalFailed: legal.failed, ms: performance.now() - t0 };
+  }
   const initials = Array.from({ length: starts }, (_, k) => expandModules(problem, mp, res.fineLayouts[order[k % order.length]], modules, seed + 101 * k));
   return { initials, moduleLayout: res.layout, moduleProblem: mp, ms: performance.now() - t0 };
 }
@@ -230,6 +246,11 @@ export async function placeBoard(adapted, o, { device = null, seed = 1, plan = n
     }
     const placed = await placeModules(problem, modules, o, cfg, device, seed, 8);
     initials = placed.initials; moduleInfo = { sides: modules.map((m) => m.side), layout: placed.moduleLayout, ms: placed.ms };
+    // Module regions from the module-level placement (explicit plan regions win).
+    if (placed.regions) {
+      modules = modules.map((m, k) => m.region ? m : { ...m, region: placed.regions[k] });
+      moduleInfo.regions = modules.map((m) => m.region); moduleInfo.regionsLegalFailed = placed.legalFailed;
+    }
     input = withModuleNets(input, modules);
     timing.modulesMs = placed.ms;
     // Members of a module with a region must stay inside it in every later stage.

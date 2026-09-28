@@ -1,3 +1,4 @@
 node_modules/
 bench/results/*.log
 bench/results/review-*.html
+web/boards/

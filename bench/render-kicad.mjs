@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { normalizeProblem, rotatedSize, worldPin, sharesSide } from '../src/problem.js';
 import { loadKicadParser, designToProblem, parseTracks } from './kicad-adapter.mjs';
 import { irToProblem } from '../src/ir/to-problem.js';
-import { routeBoard } from './pcb-router.mjs';
+import { routeBoard } from '../src/router/board-router.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const f1 = (v) => (Math.round(v * 10) / 10).toString();

@@ -83,6 +83,11 @@ export async function relayoutMembers(problem, layout, members, options = {}) {
   // Terminals are zero-area and twoSided so they never collide or get legalized.
   const t1 = now();
 
+  // Time kept for legalization: options.legalizeReserveMs, or predicted from the region's
+  // grid size and the observed cost per million cells (options.legalizeMsPerMcell).
+  const cell = options.cell ?? 0.1, mcells = (x1 - x0) * (y1 - y0) / (cell * cell) / 1e6;
+  const legalizeReserveMs = options.legalizeReserveMs ?? Math.max(8, 1.5 * (options.legalizeMsPerMcell ?? 40) * mcells + 2);
+
   // Global placement from the current positions (or scattered, when asked to start over).
   let init = subLayout;
   if (options.scatter) {
@@ -93,27 +98,37 @@ export async function relayoutMembers(problem, layout, members, options = {}) {
   const placer = new AnalyticalGlobalPlacer(sub, {
     iterations: options.globalIterations ?? 120, clearance: 0.2, macroClearance: 0.3, egressGap: 0.5, maxMove: 0.03 * L, step: 0.58, damping: .66, cooling: .995,
     wireStrength: .92, densityStrength: .86, overlapStrength: 4, macroStrength: 7.4, boundaryStrength: 2.6, recordEvery: 1e9,
+    // With a deadline, global placement gets at most 40% of the remaining time.
+    deadline: options.deadline !== undefined ? t1 + 0.4 * (options.deadline - t1) : undefined,
   });
-  let cur = (await placer.optimize(init)).layout;
+  let cur = (await placer.optimize(init)).layout, lnsIterations = 0;
   const t2 = now();
 
   // LNS on the exact objective: on the GPU (cached pipelines, ~1 ms per 1024 candidates)
   // until the deadline minus a legalization reserve, or a few CPU iterations.
-  if (options.device || options.lnsIterations) {
+  if ((options.device || options.lnsIterations) && options.lnsIterations !== 0) {
     const scorerOptions = { weights: { hpwl: 1, overlap: 200, bounds: 200, congestion: 0 }, coarse: { gridWidth: 16, gridHeight: 12, capacity: 4 } };
     const scorer = options.device ? new PriorityGpuBatchScorer(options.device, sub, scorerOptions) : new PriorityCpuBatchScorer(sub, scorerOptions);
-    const deadline = options.deadline !== undefined ? options.deadline - (options.legalizeReserveMs ?? 15) : undefined;
-    cur = (await new GpuLnsOptimizer(sub, scorer, {
-      iterations: options.lnsIterations ?? (options.device ? 200 : 0), population: options.lnsPopulation ?? (options.device ? 512 : 32),
+    const deadline = options.deadline !== undefined ? options.deadline - legalizeReserveMs : undefined;
+    const lns = await new GpuLnsOptimizer(sub, scorer, {
+      // Large sub-problems get a smaller population so an iteration stays a few ms.
+      iterations: options.lnsIterations ?? (options.device ? 200 : 0), population: options.lnsPopulation ?? (options.device ? Math.max(64, Math.min(512, Math.round(512 * 150 / sub.components.length))) : 32),
       movesPerCandidate: 1, translationScale: 0.02 * L, rotationProbability: 0.1, temperature: .01, cooling: .97, seed: options.seed ?? 1, deadline,
-    }).optimize(cur)).layout;
+    }).optimize(cur);
+    cur = lns.layout; lnsIterations = lns.trace.length;
     scorer.destroy?.();
   }
   const t3 = now();
 
   // Legalize inside the region: members only (obstacles and terminals are fixed).
   // Bounded search: a part that finds no room within maxRadius keeps its global position.
-  const legal = legalizeLayout(sub, cur, { clearance: 0.1, cell: options.cell ?? 0.1, ignore: [hub], maxRadius: options.maxRadius ?? 3 });
+  let legal = legalizeLayout(sub, cur, { clearance: 0.1, cell, ignore: [hub], maxRadius: options.maxRadius ?? 3, deadline: options.deadline });
+  // Parts with no room nearby: search the whole region while time remains, instead of
+  // leaving them overlapping.
+  if (legal.failed && (options.deadline === undefined || now() < options.deadline)) {
+    const wide = legalizeLayout(sub, legal.layout, { clearance: 0.1, cell, ignore: [hub], maxRadius: Math.max(sub.canvas.width, sub.canvas.height), deadline: options.deadline });
+    if (wide.failed < legal.failed) legal = { ...wide, timing: { ...wide.timing, totalMs: wide.timing.totalMs + legal.timing.totalMs, widePass: true } };
+  }
   const t4 = now();
 
   const out = layout.map((p) => ({ ...p }));
@@ -121,7 +136,7 @@ export async function relayoutMembers(problem, layout, members, options = {}) {
   return {
     layout: out,
     timing: { buildMs: t1 - t0, globalMs: t2 - t1, lnsMs: t3 - t2, legalizeMs: t4 - t3, totalMs: t4 - t0 },
-    stats: { members: members.length, obstacles, terminals, nets: nets.length, region: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }, legalFailed: legal.failed },
+    stats: { members: members.length, obstacles, terminals, nets: nets.length, region: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }, legalFailed: legal.failed, lnsIterations, legalize: { ...legal.timing, mcells, reserveMs: legalizeReserveMs } },
   };
 }
 
