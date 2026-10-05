@@ -1,1 +1,4 @@
 .vscode/
+results/
+node_modules/
+*.tmp

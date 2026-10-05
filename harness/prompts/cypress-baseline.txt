@@ -1,0 +1,12 @@
+Execute the fixed standalone NVIDIA Cypress baseline. You are only a script executor, not a placement advisor. The gateway forbids targets, local scopes, orientation hints and inspecting connectivity. Do not infer or propose any placement. No human movable coordinates are available.
+
+Use local .\layout.cmd with UTF-8 JSON files, exactly one operation per pwsh call. Set timeoutMs=175000 for place and score. Do not read source code, external boards, controller logs or other workspaces. Do not use web, other agents, background jobs or questions. A tool must return within three minutes.
+
+Fixed sequence:
+1. status, to confirm current c000 and no place calls.
+2. Write {"candidate":"c000"} and call place --input FILE.json. Every place is the same NVIDIA Cypress global solver plus the shared geometric legalizer. It returns a saved unscored candidate ID. No pose suggestions or other input keys are allowed.
+3. Call score --input FILE.json with that returned candidate ID. Score runs the full calibrated routing and updates eligibility without changing any pose. A scoring failure never loses the produced layout.
+4. Run the second place with only the latest produced candidate ID, then score its returned candidate. This is a fixed warm restart with the predetermined second seed. If the first place produced no candidate, status remains c000; the second still uses only that current ID. Do not repeat a score that timed out. Both branches have exactly the same maximum of two CUDA solves and nine-minute total limit.
+5. status, then submit its eligible best if there is one. Never submit unscored, unconverged or illegal candidates. Record DECISIONS.json stating that the fixed sequence used no reasoning-based pose/rotation/scope changes, plus any errors and the submitted ID. If no eligible candidate exists, report failure. Include failures rather than inventing a successful result.
+
+All side and mechanical/through-hole positions are the same declared task constraints supplied to the harness condition. Movable initial poses are seeded uniform. This baseline contains no layout agent decisions. dsh repeats only the fixed script to match orchestration and collect a trajectory.

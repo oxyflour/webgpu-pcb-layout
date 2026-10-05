@@ -1,0 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { args, readJson, writeJson, sha } from './io.mjs';
+const a = args(), out = path.resolve(a.out ?? 'results/runtime');
+const source = path.resolve(a.source ?? 'C:/Projects/webgpu-layout-code');
+const bridgeSource = path.resolve(a.bridge ?? 'C:/Users/oxyfl/.codex/worktrees/7fa1/webgpu-layout-code');
+if (fs.existsSync(out)) throw Error('Choose a fresh runtime directory');
+fs.mkdirSync(out, { recursive: true });
+for (const dir of ['src', 'bench']) fs.cpSync(path.join(source, dir), path.join(out, dir), { recursive: true, filter: f => !f.split(path.sep).includes('results') && !f.split(path.sep).includes('node_modules') });
+fs.cpSync(path.join(bridgeSource, 'bench/cypress'), path.join(out, 'bench/cypress'), { recursive: true });
+fs.copyFileSync(path.join(source, 'package.json'), path.join(out, 'package.json'));
+fs.symlinkSync(path.join(source, 'node_modules'), path.join(out, 'node_modules'), 'junction');
+const hashFiles = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? hashFiles(path.join(dir,e.name)) : [path.join(dir,e.name)]);
+const provenance = { source, bridgeSource, sourceRevision: execFileSync('git',['rev-parse','HEAD'],{cwd:source,encoding:'utf8'}).trim(), bridgeRevision: execFileSync('git',['rev-parse','HEAD'],{cwd:bridgeSource,encoding:'utf8'}).trim(), files: Object.fromEntries(['src','bench'].flatMap(d => hashFiles(path.join(out,d))).sort().map(f => [path.relative(out,f).replaceAll('\\','/'),sha(fs.readFileSync(f))])), dependencyManifest: sha(fs.readFileSync(path.join(source,'package-lock.json'))) };
+writeJson(path.join(out,'provenance.json'), provenance);
+console.log(JSON.stringify({runtime:out,files:Object.keys(provenance.files).length,...Object.fromEntries(['sourceRevision','bridgeRevision'].map(k=>[k,provenance[k]]))}));

@@ -1,0 +1,11 @@
+Observed issues to resolve after the frozen v4 three-pair cohort:
+
+1. Do not evaluate random c000. The full calibrated router can exhaust 165 seconds on this state, consuming the floorplanning budget without yielding an eligible candidate.
+2. Require inspecting real main-IC and connector geometry before global placement. A fallback unconstrained measurement currently lets dsh skip the central task after a slow initial evaluate.
+3. Separate immutable target compatibility from overlaps in the rest of the random board. U201 (60,40,90) had overlapped fixed X202 in a diagnostic replay. Human U201/U302/U1302 poses passed the same independent compatibility test.
+4. Global density convergence does not establish good signal placement. A diagnostic solve converged at 736 steps in 17.36 seconds but raw HPWL remained 22953 mm vs the human 5799 mm. Geometry legalizer displacement was modest (final HPWL 23307 mm); the global floorplan was already poor.
+5. Propose a transparent soft initialization interface, where dsh can seed named neighbours from inspected nets before Cypress freely optimizes them. This must remain numeric poses supplied by dsh, with every optimized result produced by Cypress. Do not silently introduce a netlist-derived custom placer, hidden human scaffold, or force exact small-part answers.
+6. Any prompt/tool/preset change needs its own complete three-dsh-repeat evaluation, preserving same seeded starts, declared mechanical constraints, source hashes and routing configuration. Do not select only converged samples.
+
+Runtime fixes already tested separately from metric claims:
+Crossing flag in upstream evaluation was ignored. Guarding the existing evaluation/rotation paths avoids the expensive kernel without removing objective pins. FLUTE's post-solve MAXD=150 diagnostic crashed on the restored 246-pin ground net; only that diagnostic is capped. Source copies, diffs and hashes are retained.
