@@ -17,7 +17,7 @@ The WebGPU placer / LNS of webgpu-layout-code is not used.
 | `lib/modules.mjs` | Netlist modules (IC + small parts linked only to it). |
 | `lib/cypress.mjs` | One Cypress job: Bookshelf export, warm start, net weights, hard timeout (150 s), import, final pin check (<= 0.025 mm). |
 | `cypress/run.py` | Container-side runner: copy of the adapter `run.py` + job-local log (parallel jobs), warm-start orientation (`hints.json`), per-net weights. |
-| `lib/init.mjs` | Start layout from a partial plan (see "Init" below). |
+| `lib/start-layout.mjs`, `lib/init.mjs` | Start layout from a partial plan (see "Init" below). `start-layout.mjs` has no Node imports (geometry passed in) so the editor worker loads it too; `init.mjs` binds it for Node. |
 | `agent/session.mjs` | Tool commands: `info`, `map`, `check`, `place`, `inspect`, `status`, `knobs`, `submit`. |
 | `agent/cli.mjs` | In-sandbox client `pcb` (strict flags, JSON over HTTP). |
 | `agent/run-agent.mjs` | One dsh session: gateway outside the sandbox, task prompt, audit, trajectory (`events.jsonl`, `session/tools.jsonl`), independent final re-evaluation. |

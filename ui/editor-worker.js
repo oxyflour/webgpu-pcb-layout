@@ -6,11 +6,15 @@ import { requestWebGpuDevice } from '../src/gpu/device.js';
 import { parseKicadBoard, kicadToIR } from '../src/kicad/adapter.js';
 import { irToProblem, placementResult, toYDown } from '../src/ir/to-problem.js';
 import { validateBoardIR } from '../src/ir/validate.js';
-import { normalizeProblem } from '../src/problem.js';
+import { normalizeProblem, worldPin, rotatedSize } from '../src/problem.js';
 import { PlacementSession } from '../src/session.js';
 import { autoModules } from '../src/optimizer/modules.js';
 import { memberOverlaps } from '../src/optimizer/relayout.js';
 import { parseOptions, placeBoard } from '../bench/pipeline.mjs';
+// Served by harness/ui/server.mjs from the harness (same start layout as the agent tool).
+import { createStartLayout } from '../harness/lib/start-layout.mjs';
+
+const { startLayout } = createStartLayout({ worldPin, rotatedSize });
 
 const post = (type, data = {}) => self.postMessage({ type, ...data });
 let device = null, board = null, session = null, cleanup = null;
@@ -60,8 +64,13 @@ async function load({ name, text, placement, seed = 1 }) {
     const o = parseOptions(['--quality', '--modules', 'auto', '--cohesion', '3'], { backend: 'gpu', budget: 'same' });
     const plan = autoModules(problem, { resolution: o.moduleResolution, seed });
     plan.modules.forEach((m) => { m.side = 'auto'; m.cohesion = o.cohesion; });
+    // The global stage starts from the harness tool start layout (lib/start-layout.mjs: parts at
+    // the weighted centre of the pins they connect to, anchored on the fixed parts) instead of
+    // random multi-starts: harness/experiments/editor-init.mjs, webgpu-vs-cypress.mjs.
+    post('progress', { message: `工具初始布局：${problem.components.length} 个器件` });
+    const initLayout = startLayout({ p: problem, a: { ...adapted, ir } }, {}, { seed });
     post('progress', { message: `自动布局：${problem.components.length} 个器件、${plan.modules.length} 个模块` });
-    const out = await placeBoard(adapted, o, { device, seed, plan });
+    const out = await placeBoard(adapted, o, { device, seed, plan, initLayout, initMode: 'global' });
     layout = out.layout; timing = out.timing;
     modules = plan.modules.map((m) => ({ members: [...m.members] }));
   }

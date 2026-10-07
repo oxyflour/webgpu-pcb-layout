@@ -15,7 +15,8 @@ const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ?
 const port = Number(arg('port', 8173));
 const boards = path.resolve(arg('boards', 'C:/Projects/webgpu-layout/web/boards'));
 const jobs = path.join(HARNESS_ROOT, 'results', 'ui-jobs');
-const mounts = [['/web/boards/', boards], ['/web/', path.join(REPO_ROOT, 'ui')], ['/src/', path.join(LAYOUT_ROOT, 'src')], ['/bench/', path.join(LAYOUT_ROOT, 'bench')]];
+// /harness/lib/: the editor worker imports the tool start layout (start-layout.mjs, browser-safe).
+const mounts = [['/web/boards/', boards], ['/web/', path.join(REPO_ROOT, 'ui')], ['/src/', path.join(LAYOUT_ROOT, 'src')], ['/bench/', path.join(LAYOUT_ROOT, 'bench')], ['/harness/lib/', path.join(HARNESS_ROOT, 'lib')]];
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.wgsl': 'text/plain' };
 const writeJson = (f, v) => fs.writeFileSync(f, JSON.stringify(v, null, 1));
 let busy = null;

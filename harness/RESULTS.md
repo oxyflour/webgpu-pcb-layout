@@ -254,3 +254,52 @@ Human reference: 8802 / 3955 / 56567. The rules recover about half of the cost o
 when everything else is human, but change nothing in the agent layouts or at tool level (within the
 routing noise) while HPWL rises 1.5-2 %: series parts pulled next to U1 lengthen the other leg
 unless the partner IC also sits next to U1. Kept off.
+
+## WebGPU vs Cypress vs tool start layout (2026-10-07, 13 non-ppc boards, 3 seeds)
+
+`experiments/webgpu-vs-cypress.mjs` (report: `webgpu-vs-cypress-report.mjs` -> `results/webgpu-vs-cypress/report.html`).
+Harness protocol (THT + mechanical fixed, original sides, shared 0.1 mm legalizer, evaluateRobust with the
+exact native router). Methods: WebGPU = adapter `placeBoard` with the `compare.mjs` options (random
+multi-start); Cypress = benchmark config from a random start; tool start layout = `lib/start-layout.mjs`
+(empty plan), alone, + Cypress (harness defaults), + WebGPU (`initMode` global: the start layout is the only
+global-stage start) and + WebGPU LNS only. Medians of 3 seeds per board, aggregated over the 13 boards:
+
+| Method | Clean rate, mean over boards (%) | Vias ÷ human legal, geometric mean (×) | HPWL ÷ human legal, geometric mean (×) | Placement time, median (s) |
+|---|---|---|---|---|
+| WebGPU, random start | 89.8 | 2.38 | 1.46 | 5.5 |
+| Cypress, random start | 78.4 | 3.95 | 2.24 | 64.9 |
+| Tool start layout alone | 97.0 | 1.59 | 1.04 | 0.0 |
+| Tool start layout + Cypress | 97.0 | 1.55 | 1.03 | 14.7 |
+| Tool start layout + WebGPU global | 100.0 | 1.30 | 0.99 | 4.5 |
+| Tool start layout + WebGPU LNS only | 96.5 | 1.61 | 1.09 | 5.0 |
+
+The start layout carries most of the gain: Cypress's gentle pass barely changes it (clean equal on 11
+boards, vias 6 better / 7 worse). Starting WebGPU's global stage from it is best (fewer vias than
+start + Cypress on 11 / 13 boards; k60 318/318 clean, pic 308/310). Remaining gap is vias (k60 557 vs
+human 345, pic 492 vs 363).
+
+### Editor whole-board layout with the tool start layout (`experiments/editor-init.mjs`)
+
+The editor's 自动布局 (its problem: `irToProblem` sides 'ir', THT not pinned; its options: `--quality
+--modules auto --cohesion 3`, budget same) with and without the start layout as the global start. Same
+routing evaluation; seeds 1 / 2 / 3; now the editor default.
+
+| Board | Editor before, median of 3 seeds: clean nets / vias / HPWL (mm) | Editor + tool start layout, median of 3 seeds: clean nets / vias / HPWL (mm) | Start layout better on clean / vias / HPWL (seeds, of 3) |
+|---|---|---|---|
+| z3r0 | 46/46 / 39 / 743 | 46/46 / 30 / 689 | 0 / 3 / 3 |
+| pico | 86/86 / 80 / 1033 | 86/86 / 71 / 975 | 0 / 2 / 3 |
+| edk | 124/124 / 140 / 3332 | 122/124 / 207 / 3003 | 0 / 0 / 3 |
+| edu-fpga | 108/108 / 113 / 2225 | 108/108 / 116 / 2130 | 0 / 2 / 2 |
+| fsl-mini | 162/162 / 341 / 6560 | 162/162 / 279 / 5676 | 1 / 3 / 3 |
+| edu-k60 | 157/157 / 283 / 5620 | 157/157 / 264 / 5378 | 0 / 3 / 3 |
+| edu-nxp | 163/163 / 343 / 5970 | 163/163 / 268 / 5390 | 0 / 3 / 3 |
+| safety | 184/186 / 544 / 6411 | 186/186 / 421 / 5494 | 2 / 3 / 3 |
+| pic | 300/310 / 826 / 8118 | 310/310 / 580 / 7098 | 3 / 3 / 3 |
+| nxp | 370/370 / 898 / 10855 | 370/370 / 844 / 9908 | 0 / 3 / 3 |
+| rx | 400/400 / 1007 / 11383 | 400/400 / 874 / 8995 | 0 / 3 / 3 |
+| k60 | 211/318 / 1302 / 10101 | 308/318 / 892 / 8989 | 3 / 3 / 3 |
+| acc | 517/617 / 4551 / 22117 | 617/617 / 3459 / 18157 | 3 / 3 / 3 |
+
+Placement time unchanged (1.5-2.9 s). Regression: edk is worse on every seed (vias 140 -> 167 / 207 /
+209, clean 124 -> 122 / 122 / 120) although HPWL drops 7-15 %; with the benchmark options the same start
+layout improved edk (vias 123 -> 101), so it interacts with the editor's module / free-side setup. Open.
