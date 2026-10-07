@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>自进化 Harness：PCB 布局</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#e9e8e3; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --rule:#dcdad3;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --human:#52514e; --accent:#2a78d6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif}
+.frame{width:100vw;aspect-ratio:16/9;max-height:100vh;position:relative;overflow:hidden;scroll-snap-align:start;margin:0 auto 12px}
+html{scroll-snap-type:y mandatory}
+.slide{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;background:var(--surface);padding:44px 56px 36px;display:flex;flex-direction:column}
+h1{font-size:44px;margin:0 0 12px;font-weight:700;letter-spacing:.5px}
+h2{font-size:30px;margin:0 0 6px;font-weight:700}
+.sub{color:var(--ink2);font-size:17px;margin:0 0 18px;line-height:1.5}
+.kicker{color:var(--accent);font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:6px}
+.grid{display:grid;gap:22px;flex:1;min-height:0}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g21{grid-template-columns:1.5fr 1fr}.g12{grid-template-columns:1fr 1.5fr}
+.card{display:flex;flex-direction:column;min-height:0}
+.card h3{font-size:16px;margin:0 0 4px;font-weight:700}
+.card .note{font-size:12.5px;color:var(--ink2);margin:0 0 6px;line-height:1.45}
+.chart{position:relative;flex:1;min-height:0}
+ul.pts{margin:0;padding-left:20px;font-size:17px;line-height:1.65;color:var(--ink)}
+ul.pts li{margin-bottom:6px}
+ul.pts b{color:var(--accent)}
+.foot{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.4}
+.pageno{position:absolute;right:24px;bottom:12px;font-size:14px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.big{font-size:56px;font-weight:700;color:var(--accent);line-height:1}
+.bigl{font-size:14px;color:var(--ink2);margin-top:6px}
+.tiles{display:flex;gap:28px;margin:6px 0 14px}
+.tile{flex:1;border-top:3px solid var(--rule);padding-top:10px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:0}
+.pair figure{margin:0;display:flex;flex-direction:column;min-height:0}
+.pair img{width:100%;flex:1;min-height:0;object-fit:contain;background:#fff;border:1px solid var(--rule)}
+.pair figcaption{font-size:12.5px;color:var(--ink2);margin-top:4px;text-align:center}
+.legend-line{font-size:12px;color:var(--ink2);margin-top:4px}
+svg text{font-family:inherit}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;font-size:12.5px;color:var(--muted);margin:4px 0 8px}
+.flow span{background:#f1f0ec;border:1px solid var(--rule);border-radius:6px;padding:3px 7px;color:var(--ink)}
+.flow span.ok{background:#e6f6ef;border-color:#bfe6d3}.flow span.bad{background:#fdeee6;border-color:#f3cdb9}
+.fl{font-size:13.5px;line-height:1.5;margin:0 0 6px}.fl b{color:var(--ink)}.fl.pcb{background:#eaf2fb;border-radius:6px;padding:6px 8px;margin-top:auto}
+.cmp{display:grid;grid-template-columns:78px 1fr 1fr;gap:5px;font-size:13px;line-height:1.45}
+.cmp>div{padding:6px 8px;border-radius:6px;background:#f6f5f1}
+.cmp .h{background:none;font-weight:700;font-size:14px;padding-bottom:2px}.cmp .h.c{color:#eb6834}.cmp .h.w{color:#2a78d6}
+.cmp .k{background:none;font-weight:700;color:var(--ink2)}
+.sec{position:absolute;top:44px;right:56px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- 1 Cover -->
+<div class="frame"><div class="slide" style="justify-content:center">
+  <div class="kicker">AI4AI · 递归自我改进（RSI）</div>
+  <h1>自进化 Harness：让 Agent 的 PCB 布局接近人工水平</h1>
+  <p class="sub" style="font-size:20px">外层 Agent（Opus）编写并改进工具和 prompt，内层 Agent（dsh / DeepSeek Flash）用它们做布局；<br>指标：布通网络数、过孔数、HPWL。全部数字来自 webgpu-layout 与 cypress-layout 两个仓库的实验记录（2026-09-25 至 10-07）。</p>
+  <div class="tiles" style="margin-top:30px">
+    <div class="tile"><div class="big">13</div><div class="bigl">块真实 KiCad 板（46–1607 个信号网络）</div></div>
+    <div class="tile"><div class="big">v1→v12</div><div class="bigl">prompt / tool 版本，每版 3 个 dsh 会话</div></div>
+    <div class="tile"><div class="big">0.35–0.52</div><div class="bigl">元 / 每个 15 分钟布局会话</div></div>
+  </div>
+</div></div>
+
+<!-- 2 Concept: agent = LLM + harness -->
+<div class="frame"><div class="slide">
+  <div class="kicker">1 · 基本思路</div>
+  <h2>Agent = LLM + Harness；外层 Agent 优化内层 Agent 的 Harness</h2>
+  <p class="sub">LLM 是固定的，能改的是 Harness：给它看什么（prompt / skill / memory）、给它什么手（tool / MCP / CLI）、谁来规划和验收（planner / verifier）。</p>
+  <div class="grid g2">
+    <svg viewBox="0 0 560 470" width="100%" height="100%">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#52514e"/></marker></defs>
+      <rect x="10" y="10" width="540" height="450" rx="14" fill="none" stroke="#2a78d6" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="28" y="40" font-size="16" font-weight="700" fill="#2a78d6">外层 Agent（Opus）：读轨迹 → 改 Harness</text>
+      <rect x="40" y="70" width="480" height="370" rx="12" fill="#f3f2ee" stroke="#dcdad3"/>
+      <text x="60" y="100" font-size="15" font-weight="700" fill="#0b0b0b">内层 Agent（dsh / DeepSeek Flash）</text>
+      <rect x="60" y="120" width="130" height="70" rx="10" fill="#fff" stroke="#52514e"/><text x="125" y="160" font-size="18" text-anchor="middle" font-weight="700">LLM</text>
+      <text x="205" y="162" font-size="26" fill="#52514e">+</text>
+      <rect x="235" y="115" width="265" height="305" rx="10" fill="#fff" stroke="#2a78d6" stroke-width="2"/>
+      <text x="367" y="140" font-size="15" font-weight="700" text-anchor="middle" fill="#2a78d6">Harness（可被优化）</text>
+      <rect x="252" y="155" width="230" height="60" rx="8" fill="#eaf2fb"/><text x="267" y="180" font-size="14" font-weight="700">Prompt</text><text x="267" y="201" font-size="12.5" fill="#52514e">设计规则、经验、建议；skill / memory</text>
+      <rect x="252" y="225" width="230" height="60" rx="8" fill="#fdeee6"/><text x="267" y="250" font-size="14" font-weight="700">Tool</text><text x="267" y="271" font-size="12.5" fill="#52514e">CLI：初始布局、布局器、布线器；MCP</text>
+      <rect x="252" y="295" width="230" height="52" rx="8" fill="#e6f6ef"/><text x="267" y="318" font-size="14" font-weight="700">Verifier</text><text x="267" y="336" font-size="12.5" fill="#52514e">评分器：鲁棒路由打分</text>
+      <rect x="252" y="355" width="230" height="52" rx="8" fill="#fdf5e0"/><text x="267" y="378" font-size="14" font-weight="700">Planner（可选）</text><text x="267" y="396" font-size="12.5" fill="#52514e">预算、调用次数、停止条件</text>
+      <text x="125" y="240" font-size="13" text-anchor="middle" fill="#52514e">不改模型权重</text>
+      <text x="125" y="260" font-size="13" text-anchor="middle" fill="#52514e">只改它的环境</text>
+    </svg>
+    <div class="card" style="justify-content:center">
+      <ul class="pts">
+        <li><b>AI4AI 的一个用法</b>：外层 Agent 不直接解题，而是改进内层 Agent 解题用的 Harness。</li>
+        <li><b>Prompt</b>：外层 Agent 从轨迹里总结的人工布局经验，写成内层 Agent 能执行的规则。</li>
+        <li><b>Tool</b>：外层 Agent 写代码，改接口、改算法、修 bug，每次调用控制在 3 分钟以内。</li>
+        <li><b>Verifier</b>：评分本身也是被优化的对象。评分噪声太大时，好的 prompt 也选不出来。</li>
+      </ul>
+    </div>
+  </div>
+  <span class="pageno">2</span>
+</div></div>
+
+<!-- 3 RSI loop -->
+<div class="frame"><div class="slide">
+  <div class="kicker">1 · 基本思路</div>
+  <h2>基本 RSI 循环：运行 → 收集轨迹 → 分析 → 改 prompt + tool</h2>
+  <div class="grid g12">
+    <svg viewBox="0 0 470 470" width="100%" height="100%">
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" fill="#2a78d6"/></marker></defs>
+      <circle cx="235" cy="235" r="150" fill="none" stroke="#dcdad3" stroke-width="2"/>
+      <path d="M 300 100 A 150 150 0 0 1 380 200" fill="none" stroke="#2a78d6" stroke-width="3" marker-end="url(#ar2)"/>
+      <path d="M 380 275 A 150 150 0 0 1 300 370" fill="none" stroke="#2a78d6" stroke-width="3" marker-end="url(#ar2)"/>
+      <path d="M 170 370 A 150 150 0 0 1 90 275" fill="none" stroke="#2a78d6" stroke-width="3" marker-end="url(#ar2)"/>
+      <path d="M 90 200 A 150 150 0 0 1 170 100" fill="none" stroke="#2a78d6" stroke-width="3" marker-end="url(#ar2)"/>
+      <g font-size="15" text-anchor="middle">
+        <rect x="160" y="55" width="150" height="56" rx="10" fill="#fff" stroke="#0b0b0b"/><text x="235" y="80" font-weight="700">1 运行</text><text x="235" y="100" font-size="12" fill="#52514e">3 个 dsh 会话并行</text>
+        <rect x="340" y="207" width="125" height="56" rx="10" fill="#fff" stroke="#0b0b0b"/><text x="402" y="232" font-weight="700">2 轨迹</text><text x="402" y="252" font-size="12" fill="#52514e">events.jsonl</text>
+        <rect x="160" y="360" width="150" height="56" rx="10" fill="#fff" stroke="#0b0b0b"/><text x="235" y="385" font-weight="700">3 分析</text><text x="235" y="405" font-size="12" fill="#52514e">耗时、决策、失败点</text>
+        <rect x="5" y="207" width="125" height="56" rx="10" fill="#fff" stroke="#0b0b0b"/><text x="67" y="232" font-weight="700">4 改进</text><text x="67" y="252" font-size="12" fill="#52514e">prompt vN+1、tool</text>
+      </g>
+      <text x="235" y="230" font-size="14" text-anchor="middle" fill="#52514e">外层 Agent</text>
+      <text x="235" y="250" font-size="14" text-anchor="middle" fill="#52514e">驱动每一轮</text>
+    </svg>
+    <div class="card">
+      <h3>k60（cypress-layout harness）：每一轮 RSI 之后的结果</h3>
+      <p class="note">点 = 单个会话（或种子），线 = 均值，虚线 = 人工布局。每一步都是外层 Agent 读轨迹后改了 tool 或 prompt。</p>
+      <div class="chart"><canvas id="c-versions"></canvas></div>
+      <div class="chart"><canvas id="c-versions-via"></canvas></div>
+      <p class="foot">加入 Agent：起点改为 pins-small + 去耦电容，由 Agent 定 IC 布局；IC 放置规则：删掉被人工数据否掉的“大 IC 下不放件”规则，place 提速；器件旋转：冻结 Cypress 旋转，IC 旋转由 Agent 定、小件旋转由工具推导。另一个 harness 上迭代了 12 个版本后发现，会话之间的差距大于版本之间的差异，这引出了后面的“评分器降噪”。</p>
+    </div>
+  </div>
+  <span class="pageno">3</span>
+</div></div>
+
+<!-- 4 No-AI baseline: Cypress -->
+<div class="frame"><div class="slide">
+  <div class="kicker">2 · 场景：自动布局</div>
+  <h2>没有 AI 时：拼算法。Cypress（NVlabs，ISPD'25）单独使用的效果</h2>
+  <p class="sub">相同协议：原始板面、机械件和插件固定、0.1 mm 合法化、原生精确布线器（多网格相位取中位）。随机起点，3 个种子取中位数。</p>
+  <div class="grid g2">
+    <div class="card"><h3>布通率（%，布通的信号网络 ÷ 总数）</h3><p class="note">人工布局都是 100%。</p><div class="chart"><canvas id="c-cyp-clean"></canvas></div></div>
+    <div class="card"><h3>过孔数 ÷ 人工过孔数（倍）</h3><p class="note">1 = 与人工持平。</p><div class="chart"><canvas id="c-cyp-via"></canvas></div></div>
+  </div>
+  <p class="foot">k60：Cypress 只布通 16/318，过孔 4245，人工 345；pic：35/310。单次放置时间中位数 64.9 s（13 板），acc 上 390 s。</p>
+  <span class="pageno">4</span>
+</div></div>
+
+<!-- 5 AI4AI mapping -->
+<div class="frame"><div class="slide">
+  <div class="kicker">2 · 场景：自动布局</div>
+  <h2>用 AI4AI 的思路：布局问题里的 Harness 是什么</h2>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="card" style="border-top:4px solid var(--s1);padding-top:12px"><h3 style="font-size:20px">Prompt：给 Agent 的设计规则</h3>
+      <ul class="pts" style="font-size:15.5px"><li>先定 IC 的位置、面、旋转</li><li>先写 3 个结构不同的 floorplan</li><li>差值在 <code>metrics.noise</code> 以内就是噪声</li><li>被数据否掉的规则会删掉，比如“大 IC 下面不放件”</li></ul></div>
+    <div class="card" style="border-top:4px solid var(--s2);padding-top:12px"><h3 style="font-size:20px">Tool：布局器、布线器、初始布局</h3>
+      <ul class="pts" style="font-size:15.5px"><li><code>info / map / check / place / inspect / submit</code></li><li>初始布局（起点）：从网表推导</li><li>WebGPU 布局器 / Cypress</li><li>原生 C++ 布线器</li></ul></div>
+    <div class="card" style="border-top:4px solid var(--s3);padding-top:12px"><h3 style="font-size:20px">Verifier：评分器</h3>
+      <ul class="pts" style="font-size:15.5px"><li>按板子线距和规则布线，用人工的真实走线校准</li><li>多网格相位取中位数，去掉噪声</li><li>每次提交都由外部重新评估</li><li>合法性：重叠、外框、禁布区、固定件</li></ul></div>
+  </div>
+  <p class="sub" style="margin-top:18px">这三样都由外层 Agent 优化。下面依次看流程，以及三个关键模块的演化：初始布局、布局器、布线器。</p>
+  <span class="pageno">5</span>
+</div></div>
+
+<!-- Metrics -->
+<div class="frame"><div class="slide">
+  <div class="kicker">2 · 场景：自动布局</div>
+  <h2>三个关键指标怎么算：布通网络数、过孔数、HPWL</h2>
+  <p class="sub" style="margin-bottom:10px">每个候选布局都先过同一个合法化器，再用同一个布线器真实地布一遍线，指标从布线结果里读出来。HPWL 不需要布线。</p>
+  <div class="grid g3" style="gap:18px">
+    <div class="card fw" style="border-top:4px solid var(--s1)">
+      <h3 style="font-size:19px">布通网络数（个，越多越好）</h3>
+      <svg viewBox="0 0 320 170" width="100%" style="height:auto;aspect-ratio:320/170;flex:none">
+        <defs><pattern id="gr" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M16 0H0V16" fill="none" stroke="#e4e2dc" stroke-width="1"/></pattern></defs>
+        <rect x="0" y="0" width="320" height="170" fill="url(#gr)"/>
+        <rect x="14" y="20" width="18" height="18" fill="#52514e"/><rect x="258" y="20" width="18" height="18" fill="#52514e"/>
+        <path d="M32 29 H258" stroke="#2a78d6" stroke-width="5"/><text x="145" y="16" font-size="11" text-anchor="middle" fill="#2a78d6">A：布通（clean）</text>
+        <rect x="14" y="76" width="18" height="18" fill="#52514e"/><rect x="258" y="76" width="18" height="18" fill="#52514e"/>
+        <rect x="134" y="110" width="18" height="18" fill="#52514e"/><rect x="134" y="44" width="18" height="18" fill="#52514e"/>
+        <path d="M32 85 H258" stroke="#1baf7a" stroke-width="5"/><path d="M143 62 V110" stroke="#eda100" stroke-width="5"/>
+        <rect x="136" y="78" width="14" height="14" fill="none" stroke="#e34948" stroke-width="2.5"/>
+        <text x="166" y="106" font-size="11" fill="#e34948">B、C 抢同一格：overflow</text>
+        <rect x="14" y="140" width="18" height="18" fill="#52514e"/><rect x="258" y="140" width="18" height="18" fill="#52514e"/>
+        <path d="M32 149 H120" stroke="#e87ba4" stroke-width="5"/><path d="M120 149 H258" stroke="#e34948" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text x="190" y="140" font-size="11" fill="#e34948">D：没连上（open）</text>
+      </svg>
+      <p class="fl">在 0.4 mm 网格上，用板子自己的层数做 PathFinder 协商布线：所有网络先各自走最短路，再逐轮给拥挤格加价重布，最多 40 轮。</p>
+      <p class="fl">结束时一条信号网络所有引脚都连通，且不与别的网络共用格子，才算<b>布通</b>。占用冲突（overflow）或没连上（open）都不算。</p>
+    </div>
+    <div class="card fw" style="border-top:4px solid var(--s2)">
+      <h3 style="font-size:19px">过孔数（个，越少越好）</h3>
+      <svg viewBox="0 0 320 170" width="100%" style="height:auto;aspect-ratio:320/170;flex:none">
+        <g font-size="11" fill="#52514e"><text x="4" y="34">L1 顶层</text><text x="4" y="74">L2</text><text x="4" y="114">L3</text><text x="4" y="154">L4 底层</text></g>
+        <g stroke="#dcdad3" stroke-width="1"><path d="M60 30H316"/><path d="M60 70H316"/><path d="M60 110H316"/><path d="M60 150H316"/></g>
+        <path d="M70 30H140" stroke="#e34948" stroke-width="5"/><rect x="134" y="24" width="12" height="132" rx="3" fill="#eb6834" opacity=".9"/><path d="M140 150H200" stroke="#2a78d6" stroke-width="5"/>
+        <text x="140" y="14" font-size="11" text-anchor="middle" fill="#0b0b0b">贯穿 L1→L4</text>
+        <path d="M220 30H260" stroke="#e34948" stroke-width="5"/><rect x="254" y="24" width="12" height="52" rx="3" fill="#eb6834" opacity=".9"/><path d="M260 70H310" stroke="#1baf7a" stroke-width="5"/>
+        <text x="260" y="14" font-size="11" text-anchor="middle" fill="#0b0b0b">L1→L2</text>
+        <text x="140" y="168" font-size="11" text-anchor="middle" fill="#eb6834">层间切换 3 次，物理过孔 1 个</text>
+        <text x="270" y="100" font-size="11" text-anchor="middle" fill="#eb6834">切换 1 次</text>
+      </svg>
+      <p class="fl">布线在相邻两层之间每换一次层，记 1 次<b>层间切换</b>。本片中的“过孔”默认就是层间切换数，对全部信号网络的布线求和。</p>
+      <p class="fl">在 10 层的 ppc 板上，一个贯穿孔最多会被记 9 次，所以另外统计<b>物理过孔</b>：同一格上叠在一起的切换只算 1 个。双层板上两者相同。</p>
+    </div>
+    <div class="card fw" style="border-top:4px solid var(--s3)">
+      <h3 style="font-size:19px">HPWL（mm，越短越好）</h3>
+      <svg viewBox="0 0 320 170" width="100%" style="height:auto;aspect-ratio:320/170;flex:none">
+        <rect x="60" y="30" width="200" height="110" fill="#e6f6ef" stroke="#1baf7a" stroke-width="1.5" stroke-dasharray="6 4"/>
+        <g fill="#0b0b0b"><circle cx="60" cy="90" r="6"/><circle cx="150" cy="30" r="6"/><circle cx="260" cy="120" r="6"/><circle cx="190" cy="140" r="6"/><circle cx="120" cy="100" r="6"/></g>
+        <path d="M60 154H260M60 149V159M260 149V159" stroke="#1baf7a" stroke-width="1.5"/><text x="160" y="168" font-size="12" text-anchor="middle" fill="#0b0b0b">宽 w</text>
+        <path d="M282 30V140M277 30H287M277 140H287" stroke="#1baf7a" stroke-width="1.5"/><text x="292" y="90" font-size="12" fill="#0b0b0b">高 h</text>
+        <text x="160" y="16" font-size="12" text-anchor="middle" fill="#0b0b0b">一个网络的 5 个引脚</text>
+      </svg>
+      <p class="fl">对每个<b>信号网络</b>，取它所有引脚的外接矩形，记半周长 w + h；把所有信号网络的半周长加起来就是 HPWL。电源和地网络不计，各网络权重相同。</p>
+      <p class="fl">它不需要布线、算得最快，是布局器优化的主目标。但它衡量不了绕线和换层：k60 上 Agent v7 的 HPWL 只比人工高约 16%（6711 vs 5799 mm），过孔却多了约 69%（489 vs 289）。</p>
+    </div>
+  </div>
+  <p class="foot">去噪：同一个布局只平移 0.01 mm，布线结果就会变（见“评分器降噪”一页）。所以工具、人工目标和最终评估都把网格整体平移若干个相位（5 个；超过 1000 件的板 3 个），在 worker 线程里各布一遍，取中位数，并报告最小—最大的范围。实现见 harness/lib/board.mjs 的 evaluate / evaluateRobust。</p>
+</div></div>
+
+<!-- 6 Flow -->
+<div class="frame"><div class="slide">
+  <div class="kicker">3 · AI4AI 流程</div>
+  <h2>流程：初版 CLI → 小板并行 + 预算 → 分析轨迹</h2>
+  <div class="grid g3">
+    <div class="card"><h3>① 初版 CLI（2026-10-03）</h3><p class="note">board-info / place / evaluate / submit。dsh 的沙箱拦掉了 GPU 进程池的命名管道，于是改为由 broker 在沙箱外执行工具。</p>
+      <h3 style="margin-top:10px">② 并行 + 预算</h3><p class="note">每版 3 个会话并行，15–30 分钟，place 调用次数有上限，单次调用不超过 3 分钟。第一批试跑：pic / k60 / acc。</p>
+      <div class="chart"><canvas id="c-first"></canvas></div>
+      <p class="foot">首批 dsh 在 pic 上的 HPWL（mm），人工为 5955。</p></div>
+    <div class="card"><h3>③ 一个会话的时间花在哪（k60，v1–v5）</h3><p class="note">工具调用占了大头。所以先优化工具速度，而不是模型。</p><div class="chart"><canvas id="c-time"></canvas></div></div>
+    <div class="card"><h3>③ 一条典型轨迹：在最好布局上连续 refine（k60）</h3><p class="note">从最好的布局出发，连续 refine 带来了大部分提升。</p><div class="chart"><canvas id="c-chain"></canvas></div>
+      <p class="foot">轨迹里还查出几个工具 bug：v2 用 edit 设定的面，被下一次 refine 翻回去；坐标用 toFixed(6) 保存，布通数因此抖动 2–11 条。</p></div>
+  </div>
+  <span class="pageno">6</span>
+</div></div>
+
+<!-- 7 Init history 1 -->
+<div class="frame"><div class="slide">
+  <div class="kicker">4 · 关键模块：初始布局（最关键）</div>
+  <h2>起点决定结构：从“调目标函数”转向“给一个好起点”</h2>
+  <div class="grid g2">
+    <div class="card"><h3>pico：布通网络数（个，共 86）随方法演进</h3><p class="note">多种子均值。每一步的配置都比前一步多加了一项；最后一步把连接器作为任务约束给定。</p><div class="chart"><canvas id="c-pico-evo"></canvas></div></div>
+    <div class="card"><h3>好起点测试：起点 → 全流程 → 布通网络数</h3><p class="note">从人工布局出发，流程能保持结果；从随机起点出发，波动很大（4 个种子）。</p><div class="chart"><canvas id="c-goodstart"></canvas></div>
+      <p class="foot">结论：后续阶段不会破坏好结构；不稳定来自随机起点。所以 VLM 的指导应该以“起点”的形式进入，而不是弱锚点。</p></div>
+  </div>
+  <span class="pageno">7</span>
+</div></div>
+
+<!-- 8 Init history 2: VLM/VeoPlace + constructive -->
+<div class="frame"><div class="slide">
+  <div class="kicker">4 · 关键模块：初始布局</div>
+  <h2>VLM 出 floorplan、复现 VeoPlace：都赢不过“从最好的结果重启”</h2>
+  <div class="grid g3">
+    <div class="card"><h3>VeoPlace 复现，pico，HPWL（mm）</h3><p class="note">每组 160 次运行的最好值。接通“构造式起点”这个通道后，VLM 才有作用。</p><div class="chart"><canvas id="c-veo"></canvas></div></div>
+    <div class="card"><h3>构造式起点：大件定位，其余放到邻居引脚的中位点</h3><p class="note">HPWL ÷ 人工（倍），6 个种子均值，越低越好。</p><div class="chart"><canvas id="c-constr"></canvas></div></div>
+    <div class="card"><h3>“从最好的结果重启”链的结构</h3><p class="note">pico，10 轮，每轮 16 次运行，两条链的结构和运行次数相同；唯一区别是新起点从哪来。</p>
+      <svg viewBox="0 0 360 430" width="100%" height="100%">
+        <defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#52514e"/></marker>
+        <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#2a78d6"/></marker></defs>
+        <g font-size="12.5" text-anchor="middle">
+          <rect x="95" y="6" width="170" height="40" rx="8" fill="#fff" stroke="#0b0b0b"/><text x="180" y="24" font-weight="700">当前最好布局</text><text x="180" y="39" font-size="11" fill="#52514e">按 HPWL 选</text>
+          <path d="M150 46 L80 88" stroke="#e87b4c" stroke-width="1.8" fill="none" marker-end="url(#ar3)"/>
+          <path d="M210 46 L253 88" stroke="#2a78d6" stroke-width="1.8" fill="none" marker-end="url(#ar4)"/>
+          <rect x="5" y="90" width="150" height="62" rx="8" fill="#fdeee6" stroke="#eb6834"/><text x="80" y="110" font-weight="700">VeoPlace：问 VLM</text><text x="80" y="127" font-size="11">看图，给 20 个大件</text><text x="80" y="142" font-size="11">各画一个框</text>
+          <rect x="178" y="90" width="150" height="62" rx="8" fill="#eaf2fb" stroke="#2a78d6"/><text x="253" y="110" font-weight="700">重启：不问 VLM</text><text x="253" y="127" font-size="11">直接取最好布局里</text><text x="253" y="142" font-size="11">20 个大件的位置</text>
+          <path d="M80 152 L160 190" stroke="#52514e" stroke-width="1.5" fill="none" marker-end="url(#ar3)"/>
+          <path d="M253 152 L200 190" stroke="#52514e" stroke-width="1.5" fill="none" marker-end="url(#ar3)"/>
+          <rect x="60" y="192" width="240" height="52" rx="8" fill="#fff" stroke="#0b0b0b"/><text x="180" y="212" font-weight="700">构造式起点</text><text x="180" y="230" font-size="11" fill="#52514e">20 个大件就位，其余件放到邻居引脚中位点</text>
+          <path d="M180 244 L180 268" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar3)"/>
+          <rect x="60" y="270" width="240" height="52" rx="8" fill="#fff" stroke="#0b0b0b"/><text x="180" y="290" font-weight="700">布局运行 ×8（+ 无引导运行 ×8）</text><text x="180" y="308" font-size="11" fill="#52514e">全局放置 + LNS + 合法化</text>
+          <path d="M180 322 L180 346" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar3)"/>
+          <rect x="60" y="348" width="240" height="40" rx="8" fill="#fff" stroke="#0b0b0b"/><text x="180" y="373" font-weight="700">更新最好布局</text>
+          <path d="M300 368 C 350 368, 350 26, 268 26" stroke="#52514e" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#ar3)"/>
+          <text x="318" y="265" font-size="11" fill="#52514e" text-anchor="end">下一轮 ↺</text>
+          <text x="80" y="412" font-size="12.5" fill="#eb6834" font-weight="700">最好 HPWL 870 mm</text>
+          <text x="253" y="412" font-size="12.5" fill="#2a78d6" font-weight="700">最好 HPWL 856 mm</text>
+        </g>
+      </svg></div>
+  </div>
+  <p class="foot">VLM 每次的回答都是“在当前最好的布局周围画紧框”，等于在纯利用。在 HPWL 目标上，VLM 没有提供布局器自己做不到的东西；HPWL 也早就低于人工（856–870 vs 915 mm），它不是和人工的差距所在。</p>
+  <span class="pageno">8</span>
+</div></div>
+
+<!-- 9 Init history 3: oracle ladders -->
+<div class="frame"><div class="slide">
+  <div class="kicker">4 · 关键模块：初始布局</div>
+  <h2>关键信息阶梯：人工解里哪部分真正决定结果？</h2>
+  <p class="sub">按 AGENTS.md 的思路：先加入人工解的一部分，确认它确实能提升指标，再引导 Agent 从输入自己推导出来。</p>
+  <div class="grid g2">
+    <div class="card"><h3>WebGPU 流程，k60：布通网络数（个）</h3><p class="note">每个点是一条链（共 4 条）的结果，竖线连起最低和最高。给定人工关键件信息的哪一部分。缺的是“面”：有了面就能全布通，单给旋转反而更差。</p><div class="chart"><canvas id="c-oracle"></canvas></div></div>
+    <div class="card"><h3>Cypress 流程，k60：起点给了什么 → 布通数 / 过孔</h3><p class="note">竖线两端 = 3 个种子的最低 / 最高（原始记录只有范围）；最后一项只跑了 1 个种子。只给 IC 的 x、y 和旋转，再加上 pins-small 规则，就逼近人工。</p><div class="chart"><canvas id="c-ladder"></canvas></div><div class="chart"><canvas id="c-ladder-via"></canvas></div></div>
+  </div>
+  <p class="foot">pins-small 规则：两引脚件放在引脚更少的那个伙伴旁边，权重为 1/伙伴引脚数。依据是人工数据：k60 上到小伙伴的中位距离 4.3 mm，到大伙伴 15.8 mm。旋转建议器在人工 IC 位置上，20 个 IC 里有 16 个选出了人工的旋转。</p>
+  <span class="pageno">9</span>
+</div></div>
+
+<!-- 10 Init result: start layout on 13 boards -->
+<div class="frame"><div class="slide">
+  <div class="kicker">4 · 关键模块：初始布局</div>
+  <h2>当前起点算法（start-layout.mjs）：只用网表，0 秒，13 块板</h2>
+  <div class="grid g2">
+    <div class="card"><h3>过孔数 ÷ 人工（倍，对数轴），3 个种子中位数</h3><p class="note">起点单独使用已经远好于两个布局器的随机起点；在它之上跑 WebGPU 全局阶段最好。</p><div class="chart"><canvas id="c-init-via"></canvas></div></div>
+    <div class="card"><h3>布通率（%）</h3><p class="note">k60、pic 上，随机起点基本布不通。</p><div class="chart"><canvas id="c-init-clean"></canvas></div></div>
+  </div>
+  <p class="foot">13 板汇总：起点单独使用时布通率 97.0%、过孔 1.59 倍、HPWL 1.04 倍；起点 + Cypress 为 97.0% / 1.55 / 1.03；起点 + WebGPU 全局为 100% / 1.30 / 0.99。被数据否掉的规则：“大 IC 下不放件”（人工 k60 在 U201 下放了 21 个件）；“大 IC 外围成排放置”（提升被路由噪声淹没，HPWL 还涨 1.5–2%）。</p>
+  <span class="pageno">10</span>
+</div></div>
+
+<!-- WebGPU vs Cypress: why -->
+<div class="frame"><div class="slide">
+  <div class="kicker">5 · 关键模块：WebGPU 布局器</div>
+  <h2>Cypress 是 GPU 加速的布局器，但仍有提升空间：一次梯度下降 vs 多起点 + GPU 批量搜索</h2>
+  <p class="sub" style="margin-bottom:10px">同一协议：固定件、板面、合法化器、布线器都相同，只换布局器。差别在于“搜索方式”和“PCB 特有的知识”。</p>
+  <div class="grid" style="grid-template-columns:1.25fr 1fr;gap:20px">
+    <div class="card">
+      <div class="cmp">
+        <div class="h"></div><div class="h c">Cypress（benchmark 配置）</div><div class="h w">WebGPU 流水线</div>
+        <div class="k">起点</div><div>1 个随机起点，1 次求解</div><div>32 个起点各做粗放置，按精确分挑 4 个继续细化</div>
+        <div class="k">全局放置</div><div>解析式：logsumexp 线长 + 静电密度，Adam 1000 轮；单个布局沿梯度走</div><div>解析式全局放置；GPU 打分含线长 + 重叠 + 越界 + 粗粒度拥塞（L 形需求）</div>
+        <div class="k">局部搜索</div><div>无（legalize / detailed place 都关闭）</div><div>快速 delta LNS：每轮 1024 个候选在 GPU 上并行打分，共 400 轮；再精确 polish</div>
+        <div class="k">布线余量</div><div>静电密度，目标密度 0.65</div><div>每个引脚预留 0.6 mm² 布线面积；顶、底面各算一张密度图</div>
+        <div class="k">PCB 规则</div><div>无</div><div>去耦电容吸附到 IC 电源引脚、晶振靠 IC、电源网络加权</div>
+        <div class="k">交叉项</div><div>开（权重 0.001），每轮还记一次交叉数日志</div><div>本对比中关闭</div>
+      </div>
+      <p class="foot" style="margin-top:10px">Cypress 配置：cypress-config.json（128×128 bins、lr 0.01、net_crossing_flag 1、legalize_flag 0、detailed_place_flag 0）。WebGPU 选项：--preplace --power --legalize --sides original --density 3 --congestion 3，大预算。</p>
+    </div>
+    <div class="card">
+      <div class="tiles" style="margin:0 0 6px;gap:16px">
+        <div class="tile"><div class="big" style="font-size:40px">19 / 39</div><div class="bigl">Cypress 随机起点的运行中，达到收敛标准（overflow ≤ 0.1）的次数（13 板 × 3 种子）</div></div>
+        <div class="tile"><div class="big" style="font-size:40px">14 s vs &gt;150 s</div><div class="bigl">acc 上一次 Cypress：关掉交叉项 vs 开着交叉项（超时）</div></div>
+      </div>
+      <h3>给同一个好起点后，差距大幅缩小</h3>
+      <p class="note">13 板汇总，3 种子中位数。左组：各自随机起点；右组：都从工具起点布局出发。</p>
+      <div class="grid g2" style="gap:10px">
+        <div class="chart"><canvas id="c-why-via"></canvas></div>
+        <div class="chart"><canvas id="c-why-clean"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <p class="foot">解读（根据配置和上面的实验推断）：① 随机起点下差距主要来自搜索方式：一次梯度下降只给一个答案，一半运行没收敛；多起点 + LNS 在 GPU 上并行评估大量候选，等于“先广后深”。② 好起点把这部分补上之后，剩下的差距（过孔 1.55 vs 1.30 倍）来自 PCB 知识：引脚布线余量、拥塞项、去耦 / 晶振规则。③ 速度差主要来自交叉项本身（acc 上开着它就超过 150 s）和 1000 轮串行迭代；WebGPU 的候选是成批并行打分的。</p>
+</div></div>
+
+<!-- 11 WebGPU placer -->
+<div class="frame"><div class="slide">
+  <div class="kicker">5 · 关键模块：WebGPU 布局器</div>
+  <h2>WebGPU 布局器：比 Cypress 快约 12 倍，过孔少约 40%</h2>
+  <div class="grid g2">
+    <div class="card"><h3>单次放置时间（s，对数轴），随机起点，3 个种子中位数</h3><p class="note">WebGPU：多起点全局放置 + 快速 delta LNS + 精确 polish。Cypress：benchmark 配置。</p><div class="chart"><canvas id="c-speed"></canvas></div></div>
+    <div class="card"><h3>逐板对比（随机起点，每组柱子一块板，3 种子中位数）</h3><p class="note">上图：过孔 ÷ 人工（倍，1 = 与人工持平，越低越好）；下图：布通率（%，越高越好）。</p><div class="grid" style="grid-template-rows:1fr 1fr;gap:6px"><div class="chart"><canvas id="c-agg"></canvas></div><div class="chart"><canvas id="c-agg2"></canvas></div></div></div>
+  </div>
+  <p class="foot">CPU 参考实现上，v0.1 → v0.2 放置提速 11.85 倍，目标函数只差 0.66%。GPU 交叉计数在 batch 1024 时，每个候选 4–27 µs。</p>
+  <span class="pageno">11</span>
+</div></div>
+
+<!-- 12 WebGPU objective evolution -->
+<div class="frame"><div class="slide">
+  <div class="kicker">5 · 关键模块：WebGPU 布局器</div>
+  <h2>目标函数的演化：从 HPWL 到“路由器才看得见的东西”</h2>
+  <div class="grid g2">
+    <div class="card"><h3>k60，相同 floorplan：校准规则下的布通网络数（个，共 318）</h3><p class="note">每一步在前一步上加一项。</p><div class="chart"><canvas id="c-obj-clean"></canvas></div></div>
+    <div class="card"><h3>同一组布局：交叉数和只按线距布线的过孔数（个）</h3><p class="note">接口件锚定：只和某个固定连接器相连的件，放到该连接器周围的区域里。</p><div class="chart"><canvas id="c-obj-via"></canvas></div></div>
+  </div>
+  <p class="foot">过孔地图显示：k60 多出来的过孔集中在 MCU 模块 M1 里（人工 97 个，我们 210–260 个），原因是接口件被放到了错误的固定连接器旁边，离人工位置 15–45 mm。单次运行之间的差距很大：pic 同一设置跑两次，完整规则下的布通数分别是 202 和 235。</p>
+  <span class="pageno">12</span>
+</div></div>
+
+<!-- 13 Router history -->
+<div class="frame"><div class="slide">
+  <div class="kicker">6 · 关键模块：布线器</div>
+  <h2>布线器：单线程 JS → 去掉闭包 → 多线程 → 剪枝 + 层启发 → C++ → 增量</h2>
+  <div class="grid g21">
+    <div class="card"><h3>每一步改动前后：一次路由的耗时（s，对数轴）</h3><p class="note">灰 = 改动前，蓝 = 改动后。除标明的项外，路由结果完全一致。</p><div class="chart"><canvas id="c-router"></canvas></div></div>
+    <div class="card"><h3>ppc-n3（2207 件，10 层）：一次路由（s）</h3><p class="note">这块板决定了工具调用能否守住 3 分钟。</p><div class="chart"><canvas id="c-ppc"></canvas></div>
+      <p class="foot">原生 C++ 与 JS 逐位一致（布通数、过孔、轮数、每个网络的状态）。加层启发和增量后不再逐位一致：16 个布局的布通数全部相同，过孔排序的 Spearman 为 0.974。</p></div>
+  </div>
+  <span class="pageno">13</span>
+</div></div>
+
+<!-- 14 Router: calibration + failed paths -->
+<div class="frame"><div class="slide">
+  <div class="kicker">6 · 关键模块：布线器</div>
+  <h2>评估口径：用人工的真实走线校准布线器；GPU 路由走不通</h2>
+  <div class="grid g3">
+    <div class="card"><h3>人工布局的过孔数（个）</h3><p class="note">人工的真实走线（从 .kicad_pcb 读出）、校准前、校准后（完整规则）。</p><div class="chart"><canvas id="c-calib"></canvas></div></div>
+    <div class="card"><h3>换成板子真实线距后，acc 的布通网络数（个，共 617）</h3><p class="note">旧口径（0.4 mm）对 acc 严了一倍：它的真实线距是 0.19 mm。</p><div class="chart"><canvas id="c-pitch"></canvas></div></div>
+    <div class="card"><h3>失败或放弃的路线</h3>
+      <ul class="pts" style="font-size:14.5px">
+        <li><b>GPU 波前路由</b>：每轮约 38 s，CPU 只要 0.06 s，慢约 600 倍</li>
+        <li><b>Jacobi 并行协商</b>：会振荡，k60 只有 70–160 条，正常为 229–314</li>
+        <li><b>粗粒度全局路由</b>：在 ppc 上的排序和 HPWL 一样差</li>
+        <li><b>FreeRouting 2.5</b>：pico 要 200 s，k60 590 s 还没布完；我们的 pico 不到 1 s</li>
+        <li><b>warm 增量探针</b>：和完整评估无相关（Spearman −0.07）</li>
+      </ul></div>
+  </div>
+  <span class="pageno">14</span>
+</div></div>
+
+<!-- 15 Verifier noise -->
+<div class="frame"><div class="slide">
+  <div class="kicker">7 · 其他关键模块：评分器</div>
+  <h2>评分器降噪：同一个布局平移 0.01–0.1 mm，布通数能差 15 条</h2>
+  <div class="grid g2">
+    <div class="card"><h3>k60：同一布局只做微小扰动，布通数范围（个，共 318）</h3><p class="note">平移 / 抖动各 8 次；竖线两端 = 8 次中的最低 / 最高。人工 8 次都是 318。agent 布局的波动比人工大得多。</p><div class="chart"><canvas id="c-noise"></canvas></div></div>
+    <div class="card"><h3>布通数的标准差（个）：单次路由 vs 3 个网格相位取中位</h3><p class="note">8 个抖动副本（ppc 为 4 个）。</p><div class="chart"><canvas id="c-sd"></canvas></div></div>
+  </div>
+  <p class="foot">现在工具、人工目标和最终评估都用 evaluateRobust：在 worker 线程里布 5 个网格相位（超过 1000 件的板布 3 个），取中位数并报告范围。prompt v7 告诉 Agent：差值在 metrics.noise 以内就是噪声。</p>
+  <span class="pageno">15</span>
+</div></div>
+
+<!-- 16 Other modules -->
+<div class="frame"><div class="slide">
+  <div class="kicker">7 · 其他关键模块</div>
+  <h2>去耦电容规则、人机协同</h2>
+  <div class="grid g2">
+    <div class="card"><h3>去耦电容到 IC 电源引脚的中位距离（mm）</h3><p class="note">随机起点，4 个种子。规则：电源边权 1 + 不拉地 + 吸附到电源引脚。</p><div class="chart"><canvas id="c-decap"></canvas></div></div>
+    <div class="card"><h3>协同轨迹：鲁棒布通率随时间（%）</h3><p class="note">不用 Agent 的近实时流程：4 个 floorplan → 并行放置 → 连续改进。</p><div class="chart"><canvas id="c-codesign"></canvas></div>
+      <p class="foot">编辑器里：首批布局 24 s 出来；用户编辑后，20 s 内从 255 改进到 262。</p></div>
+  </div>
+  <span class="pageno">16</span>
+</div></div>
+
+<!-- 17 Summary charts -->
+<div class="frame"><div class="slide">
+  <div class="kicker">8 · 总结：人工 vs Agent</div>
+  <h2>13 块板：Agent（prompt v7，每板 3 个会话）对比人工布局</h2>
+  <p class="sub">旧数据：webgpu-layout 的 v7 sweep（2026-10-04/05），每个会话取最好布局，用同一个校准规则布线器单次路由。两层板用完整规则，nxp / rx / acc 只按线距。</p>
+  <div class="grid g3">
+    <div class="card"><h3>布通网络数：Agent − 人工（个）</h3><p class="note">≥ 0 表示不少于人工。</p><div class="chart"><canvas id="c-sum-clean"></canvas></div></div>
+    <div class="card"><h3>过孔：Agent ÷ 人工（倍）</h3><p class="note">1 = 持平。</p><div class="chart"><canvas id="c-sum-via"></canvas></div></div>
+    <div class="card"><h3>HPWL：Agent ÷ 人工（倍）</h3><p class="note">&lt; 1 表示线更短。</p><div class="chart"><canvas id="c-sum-hpwl"></canvas></div></div>
+  </div>
+  <p class="foot">布通数：12 块板至少有一个会话不少于人工（k60 例外：279–306，人工 308）。HPWL：8 块板有会话低于人工。过孔是剩下的主要差距（k60 +57–65%，acc +40–46%）。</p>
+  <span class="pageno">17</span>
+</div></div>
+
+<!-- 18 Summary: cypress harness latest -->
+<div class="frame"><div class="slide">
+  <div class="kicker">8 · 总结：人工 vs Agent</div>
+  <h2>当前工具（cypress-layout harness）在大板上的结果</h2>
+  <p class="sub">起点 → Cypress → 合法化 → 原生精确布线器，取多相位中位数；每板 3 个 dsh 会话。口径与上一页不同，不能混比。</p>
+  <div class="grid g3">
+    <div class="card"><h3>布通网络数：Agent ÷ 人工（%）</h3><div class="chart"><canvas id="c-cur-clean"></canvas></div></div>
+    <div class="card"><h3>过孔：Agent ÷ 人工（倍）</h3><div class="chart"><canvas id="c-cur-via"></canvas></div></div>
+    <div class="card"><h3>HPWL：Agent ÷ 人工（倍）</h3><div class="chart"><canvas id="c-cur-hpwl"></canvas></div></div>
+  </div>
+  <p class="foot">人工：k60 318 / 291 / 5799 mm，acc 617 / 2600 / 17115 mm，ppc-n3 1607 / 8729 / 54188 mm（布通网络 / 过孔 / HPWL）。ppc-n3 的过孔按层间切换计数。</p>
+  <span class="pageno">18</span>
+</div></div>
+
+<!-- 19-24 per-board image pairs (generated) -->
+<div id="pairs"></div>
+
+<!-- Last: conclusions -->
+<div class="frame"><div class="slide">
+  <div class="kicker">总结</div>
+  <h2>结论与下一步</h2>
+  <div class="grid g2" style="margin-top:10px">
+    <ul class="pts">
+      <li><b>RSI 循环有效，但瓶颈不在 prompt。</b>迭代 12 个 prompt 版本后，同一版本会话之间的差距仍然大于版本之间的差异。</li>
+      <li><b>起点是最关键的模块。</b>只用网表推导的起点，在 13 板上把过孔从 2.4–4.0 倍降到 1.3 倍。关键信息依次是：IC 的位置、面、旋转，然后是小件靠近引脚更少的伙伴。</li>
+      <li><b>工具速度决定 Agent 能试几次。</b>一个会话里放置调用占 76% 的时间；布线器在 ppc 上从 151 s 降到 6.9 s。</li>
+      <li><b>评分器也要被优化。</b>单次路由的噪声（±15 条网络）会把 prompt 之间的比较全部淹掉。</li>
+    </ul>
+    <ul class="pts">
+      <li><b>剩下的差距是过孔</b>（k60 557 vs 345，pic 492 vs 363），集中在 IC 周边小件的精确排布上。</li>
+      <li><b>下一步</b>：用当前工具在 13 板 + ppc 上重跑 agent sweep，统一口径；第 17 页用的是旧数据。</li>
+      <li>把 IC 邻居的排布交给路由器在环评估；前提是有一个和评估一致、且足够快的路由器。</li>
+      <li>编辑器默认使用新起点；edk 出现回退，原因未查。</li>
+    </ul>
+  </div>
+  <span class="pageno">∞</span>
+</div></div>
+
+<!-- Future: RSI frameworks -->
+<div class="frame"><div class="slide">
+  <div class="kicker">展望 · RSI 的将来演进</div>
+  <h2>被改进的对象逐层上移：产物持续改进 → 复杂问题规划 → 反思和策略探索</h2>
+  <p class="sub" style="margin-bottom:12px">三种常见 RSI 框架共享同一条纪律：Agent 只负责提议，Host 用预先固定的 verifier 在全新的工作树里验收；Agent 自己报告的结果不算证据。</p>
+  <div class="grid g3" style="gap:18px">
+    <div class="card fw" style="border-top:4px solid var(--s1)">
+      <h3 style="font-size:19px">VeriLoop：产物持续改进</h3>
+      <p class="note">清华 SIGS，VeriLoop E2 技术报告（2026）。核心是生成和验收分离，模型不能自证进步。</p>
+      <div class="flow"><span>从当前最优出发</span>→<span>提议一个候选</span>→<span>外部验证</span>→<span class="ok">不回退 + 至少一项严格变好：提交</span><span class="bad">否则回滚，并把拒绝原因反馈给下一轮</span></div>
+      <p class="fl"><b>结构</b>：单链爬山，每轮 1 个 Agent；成本随迭代数线性增长。</p>
+      <p class="fl"><b>适用场景</b>：有确定性 verifier 的单一产物，比如修代码、补推导、调一个配置。</p>
+      <p class="fl pcb"><b>在 PCB 上</b>：把 refine 链的接受规则改成“鲁棒评分下布通数不回退、过孔或 HPWL 严格变好”，并且由 Host 而不是 Agent 判定。现在的 refine 链是 Agent 自己挑。</p>
+    </div>
+    <div class="card fw" style="border-top:4px solid var(--s2)">
+      <h3 style="font-size:19px">Raven：复杂问题规划</h3>
+      <p class="note">EverMind AI，arXiv 2609.33439（2026-09），“Harness 的 Harness”。</p>
+      <div class="flow"><span>Planner 拆成 DAG</span>→<span>按能力派给不同 Agent 并行执行</span>→<span>集成</span>→<span>整体验收</span><span class="bad">失败：记入记忆，重新规划</span></div>
+      <p class="fl"><b>结构</b>：每轮一张图，没有改动的节点直接复用缓存；论文中还有 harness 自进化和技能库。</p>
+      <p class="fl"><b>适用场景</b>：需要多个专家协作的复合任务（研究、代码、设计、值班）；单个 Agent 做不完的任务。</p>
+      <p class="fl pcb"><b>在 PCB 上</b>：按模块拆（MCU、电源、接口、存储），由不同 profile 并行布局，再集成成全板做验收。在 ppc 这类 2000+ 件的板上，单个 Agent 只做了 4–8 次 place 就自行停止了（预算是 16 次）。</p>
+    </div>
+    <div class="card fw" style="border-top:4px solid var(--s3)">
+      <h3 style="font-size:19px">Dream-RSI：反思和策略探索</h3>
+      <p class="note">UMD · Google DeepMind · UVA，arXiv 2609.14858（2026-09）。关键洞察：已积累的发现历史本身就是一个回放模拟器。</p>
+      <div class="flow"><span>在线：策略驱动 Agent 扩展发现树（贵）</span>→<span>离线“做梦”：在历史树上回放，改写 policy（便宜）</span>→<span class="ok">回放分严格更高：换上新策略</span></div>
+      <p class="fl"><b>结构</b>：发现 Agent 和评估器都固定，只改“扩展哪个节点、并行几个、何时停”。论文在 Lasso 任务上把调用数从 550 降到 317。</p>
+      <p class="fl"><b>适用场景</b>：需要成千上万次“提议-评估”的长程发现任务，比如算法、数学优化、GPU kernel。</p>
+      <p class="fl pcb"><b>在 PCB 上</b>：会话 75–78% 的时间花在放置调用上。可以把 v1–v12 的轨迹和布局树当回放语料，离线优化“何时新开 floorplan、何时 refine、何时停”。</p>
+    </div>
+  </div>
+  <p class="foot">出处整理自 SilverRetort 仓库 doc/slides/rsi-algorithms.html（三个 recipe 的论文对照与 v9 实现）。“在 PCB 上”一栏是我们的设想，尚未实验。</p>
+  <span class="pageno">∞</span>
+</div></div>
+
+<script>
+const C={s1:'#2a78d6',s2:'#eb6834',s3:'#1baf7a',s4:'#eda100',s5:'#e87ba4',human:'#52514e',grid:'#ebe9e3',ink2:'#52514e',muted:'#b9b7b0'};
+Chart.defaults.font.family='"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif';
+Chart.defaults.font.size=12; Chart.defaults.color=C.ink2; Chart.defaults.animation=false;
+Chart.defaults.maintainAspectRatio=false; Chart.defaults.plugins.legend.labels.boxWidth=12; Chart.defaults.plugins.legend.labels.boxHeight=12;
+Chart.defaults.elements.bar.borderRadius=4; Chart.defaults.elements.line.borderWidth=2; Chart.defaults.elements.point.radius=4;
+const gridY={color:C.grid}, noGrid={display:false};
+function mk(id,cfg){const el=document.getElementById(id); if(el) new Chart(el,cfg);}
+function bars(id,labels,sets,o={}){mk(id,{type:'bar',data:{labels,datasets:sets.map((s,i)=>({backgroundColor:s.color||[C.s1,C.s2,C.s3,C.s4,C.s5][i],borderSkipped:false,...s}))},
+  options:{indexAxis:o.h?'y':'x',plugins:{legend:{display:sets.length>1&&!o.noLegend,position:'top',align:'start'},...(o.plugins||{})},
+  scales:{[o.h?'x':'y']:{type:o.log?'logarithmic':'linear',grid:gridY,min:o.min??(o.log?0.5:undefined),max:o.max,title:{display:!!o.yt,text:o.yt},ticks:o.log?{callback:v=>[0.5,1,2,3,5,10,20,50,100,200,500].includes(+v)?v:''}:{}},[o.h?'y':'x']:{grid:noGrid,ticks:{display:!o.hideX,autoSkip:false,maxRotation:o.rot??0,callback(v){const l=this.getLabelForValue(v);return typeof l==='string'?l.split('\n'):l}}}}}});}
+const splitLbl={callback(v){const l=this.getLabelForValue(v);return typeof l==='string'?l.split('\n'):l}};
+// Range plot: thin line = min..max over repeated runs, dots = each run (or the two ends when only the range is known).
+function rng(id,labels,rows,o={}){const col=i=>rows[i].color||o.color||C.s1;
+ mk(id,{type:'bar',data:{labels,datasets:[{data:rows.map(r=>{const v=r.runs||[r.min,r.max];return [Math.min(...v),Math.max(...v)]}),backgroundColor:rows.map((r,i)=>col(i)+'66'),barThickness:4,borderRadius:2,borderSkipped:false},
+  {type:'scatter',data:rows.flatMap((r,i)=>(r.runs||[r.min,r.max]).map(y=>({x:labels[i],y}))),backgroundColor:rows.flatMap((r,i)=>(r.runs||[0,0]).map(()=>col(i))),pointRadius:6,pointBorderColor:'#fff',pointBorderWidth:1.5}]},
+  options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.type==='scatter'?`${c.raw.y}`:`${c.raw[0]} – ${c.raw[1]}`}}},scales:{y:{min:o.min,max:o.max,grid:gridY,title:{display:!!o.yt,text:o.yt}},x:{type:'category',labels,offset:true,grid:noGrid,ticks:o.hideX?{display:false}:{...splitLbl,maxRotation:o.rot??0,autoSkip:false}}}},plugins:o.ref?[refLine(o.ref[0],o.ref[1])]:[]});}
+// Dot plot: one marker per value, no bars (used where the axis does not start at zero).
+function dots(id,labels,sets,o={}){mk(id,{type:'line',data:{labels,datasets:sets.map((s,i)=>({showLine:false,pointRadius:7,pointHoverRadius:8,pointStyle:s.style||'circle',backgroundColor:s.color||[C.s1,C.s2,C.s3,C.s4][i],borderColor:'#fff',borderWidth:1.5,...s}))},
+ options:{plugins:{legend:{display:sets.length>1,position:'top',align:'start'}},scales:{y:{type:o.log?'logarithmic':'linear',min:o.min,max:o.max,grid:gridY,title:{display:!!o.yt,text:o.yt},ticks:o.log?{callback:v=>[0.5,1,2,3,5,10,20,50,100,200,500].includes(+v)?v:''}:{}},x:{offset:true,grid:noGrid,ticks:{...splitLbl,maxRotation:o.rot??0,autoSkip:false}}}},plugins:o.ref?[refLine(o.ref[0],o.ref[1])]:[]});}
+// x-y scatter of two methods per board, labelled points, y = x diagonal.
+function xy(id,xs,ys,xt,yt,log,show){const pts=B.map((b,i)=>({x:xs[i],y:ys[i],b}));const lo=log?0.5:0,hi=log?15:100;
+ const lab={id:'lab'+id,afterDatasetsDraw(ch){const m=ch.getDatasetMeta(0),ctx=ch.ctx;ctx.save();ctx.font='10.5px sans-serif';ctx.fillStyle='#52514e';m.data.forEach((p,i)=>{if(!show||show(pts[i]))ctx.fillText(pts[i].b,p.x+6,p.y-5)});ctx.restore();}};
+ mk(id,{type:'scatter',data:{datasets:[{data:pts,backgroundColor:C.s1,pointRadius:5,borderColor:'#fff',borderWidth:1},{type:'line',data:[{x:lo,y:lo},{x:hi,y:hi}],borderColor:C.human,borderDash:[5,4],borderWidth:1.5,pointRadius:0}]},
+ options:{layout:{padding:{right:34,top:8}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.b?`${c.raw.b}: Cypress ${c.raw.x}, WebGPU ${c.raw.y}`:''}}},scales:{x:{type:log?'logarithmic':'linear',min:lo,max:hi,grid:gridY,title:{display:true,text:xt},ticks:log?{callback:v=>[0.5,1,2,5,10].includes(+v)?v:''}:{stepSize:20,callback:v=>v%20===0?v:''}},y:{type:log?'logarithmic':'linear',min:lo,max:hi,grid:gridY,title:{display:true,text:yt},ticks:log?{callback:v=>[0.5,1,2,5,10].includes(+v)?v:''}:{stepSize:20,callback:v=>v%20===0?v:''}}}},plugins:[lab]});}
+const refLine=(v,label,color=C.human)=>({id:'ref'+label,afterDatasetsDraw(ch){const y=ch.scales.y;if(!y)return;const py=y.getPixelForValue(v),{left,right}=ch.chartArea,ctx=ch.ctx;ctx.save();ctx.strokeStyle=color;ctx.setLineDash([5,4]);ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(left,py);ctx.lineTo(right,py);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=color;ctx.font='12px sans-serif';ctx.textAlign='right';ctx.fillText(label,right-4,py-5);ctx.restore();}});
+
+// ---- 3: versions
+(()=>{const labels=['Cypress 单独\n随机起点','工具起点 + Cypress\n无 Agent','加入 Agent','Agent +\nIC 放置规则','Agent +\n器件旋转'];
+ const clean=[[23,16,16],[207,209,217],[300,262,287],[299,315,283],[318,297,300]],vias=[[4351,4165,4200],[1137,1135,1036],[642,732,819],[678,604,774],[504,651,631]];
+ const series=(V,col)=>{const pts=[];V.forEach((v,i)=>v.forEach(y=>pts.push({x:labels[i],y})));return [{type:'scatter',label:'单个会话 / 种子',data:pts,backgroundColor:col+'99',pointRadius:5},{label:'均值',data:V.map(v=>Math.round(v.reduce((a,b)=>a+b)/v.length)),borderColor:col,backgroundColor:col,pointRadius:0,tension:0}]};
+ const x={type:'category',labels,offset:true,grid:noGrid,ticks:{callback(v){return this.getLabelForValue(v).split('\n')}}};
+ mk('c-versions',{type:'line',data:{labels,datasets:series(clean,C.s1)},options:{plugins:{legend:{position:'top',align:'start'}},scales:{y:{min:0,max:330,grid:gridY,title:{display:true,text:'布通网络（个，共 318）'}},x:{...x,ticks:{display:false}}}},plugins:[refLine(318,'人工 318')]});
+ mk('c-versions-via',{type:'line',data:{labels,datasets:series(vias,C.s2)},options:{plugins:{legend:{display:false}},scales:{y:{type:'logarithmic',min:200,max:6000,grid:gridY,ticks:{callback:v=>[200,500,1000,2000,5000].includes(+v)?v:''},title:{display:true,text:'过孔（个，对数轴）'}},x}},plugins:[refLine(291,'人工 291')]});})();
+
+// ---- 13-board data (medians of 3 seeds) from harness/results/webgpu-vs-cypress/summary.md
+const B=['z3r0','pico','edk','edu-fpga','fsl-mini','edu-k60','edu-nxp','safety','pic','nxp','rx','k60','acc'];
+const NETS=[46,86,124,108,162,157,163,186,310,370,400,318,617];
+const M={ // [clean,vias,hpwl,time]
+ human:[[46,33,722],[86,61,915],[124,63,3090],[108,75,2455],[162,316,6076],[157,189,5426],[163,204,5413],[186,251,5566],[310,363,6074],[370,601,8908],[400,650,8345],[318,345,5817],[617,2708,17559]],
+ webgpu:[[46,41,762,3],[86,116,1154,3],[124,123,3295,3],[108,201,2824,4],[156,541,8280,6],[157,351,6231,5],[163,433,7035,5],[172,939,8941,7],[199,1713,11907,10],[370,1239,15844,10],[400,1292,16794,11],[92,2489,15264,11],[529,4847,25255,15]],
+ cypress:[[46,55,851,35],[71,273,1890,29],[122,292,6297,33],[108,278,4286,42],[162,571,8868,65],[155,676,12147,84],[158,794,12126,55],[113,1483,11560,40],[35,3595,23430,129],[360,2154,26710,115],[392,2341,27093,137],[16,4245,27244,206],[431,5072,26980,390]],
+ init:[[46,32,680],[86,81,965],[124,112,3055],[108,268,2960],[162,307,6029],[151,418,5753],[163,328,5537],[186,367,5304],[213,896,6142],[370,780,8712],[400,803,8917],[305,697,6562],[617,3298,19590]],
+ initCyp:[[46,24,660],[86,77,974],[124,110,2860],[108,261,2970],[162,319,6006],[152,424,5760],[163,334,5530],[186,384,5268],[213,903,6004],[370,773,8645],[400,805,8793],[302,669,6495],[617,3366,19501]],
+ initWeb:[[46,34,669],[86,71,905],[124,101,3025],[108,152,2355],[162,291,5840],[157,227,4965],[163,243,4778],[186,338,5765],[308,492,5771],[370,752,9207],[400,782,8801],[318,557,6953],[617,3434,18006]]};
+const rate=(k)=>M[k].map((r,i)=>+(100*r[0]/NETS[i]).toFixed(1));
+const vr=(k)=>M[k].map((r,i)=>+(r[1]/M.human[i][1]).toFixed(2));
+const logOpts={log:true};
+
+bars('c-cyp-clean',B,[{label:'Cypress 单独（随机起点）',data:rate('cypress'),color:C.s2}],{min:0,max:100,rot:45});
+bars('c-cyp-via',B,[{label:'Cypress 单独（随机起点）',data:vr('cypress'),color:C.s2}],{min:0,rot:45});
+
+// ---- 6
+bars('c-first',['会话 1','会话 2','会话 3','人工'],[{label:'HPWL',data:[4751,4774,4605,5955],color:[C.s1,C.s1,C.s1,C.human]}],{min:0});
+mk('c-time',{type:'bar',data:{labels:['会话时间'],datasets:[{maxBarThickness:90,label:'放置 / 布线工具调用 75–78%',data:[76],backgroundColor:C.s1},{label:'模型推理 15%',data:[15],backgroundColor:C.s2},{label:'其他（约 9%）',data:[9],backgroundColor:C.muted}]},options:{indexAxis:'y',plugins:{legend:{position:'bottom',align:'start'}},scales:{x:{stacked:true,max:100,grid:gridY,title:{display:true,text:'占会话时间（%）'}},y:{stacked:true,grid:noGrid}}}});
+mk('c-chain',{type:'line',data:{labels:['首个 place','refine 1','refine 2','refine 3','refine 4'],datasets:[{label:'布通网络（个）',data:[237,272,281,284,309],borderColor:C.s1,backgroundColor:C.s1}]},options:{plugins:{legend:{display:false}},scales:{y:{min:220,max:320,grid:gridY,title:{display:true,text:'布通网络（个，共 318）'}},x:{grid:noGrid}}},plugins:[refLine(308,'人工 308')]});
+
+// ---- 7
+mk('c-pico-evo',{type:'line',data:{labels:['随机起点\n基线','+ modules','+ 间距 0.5','8 种子均值','+ 连接器\n贴边规则','连接器作为\n任务约束'],datasets:[{label:'pico 布通网络',data:[31.8,44.7,55.0,68.9,74.0,86],borderColor:C.s1,backgroundColor:C.s1,pointRadius:5}]},
+ options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:95,grid:gridY,title:{display:true,text:'布通网络（个，共 86）'}},x:{grid:noGrid,ticks:{callback(v){return this.getLabelForValue(v).split('\n')}}}}},plugins:[refLine(86,'人工 86')]});
+mk('c-goodstart',{type:'bar',data:{labels:['pico（86）','edk（124）'],datasets:[{label:'随机起点：最差种子',data:[60,103],backgroundColor:C.s2+'88'},{label:'随机起点：最好种子',data:[86,120],backgroundColor:C.s2},{label:'人工布局作起点',data:[86,124],backgroundColor:C.s1}]},options:{plugins:{legend:{position:'top',align:'start'}},scales:{y:{min:0,grid:gridY,title:{display:true,text:'布通网络（个）'}},x:{grid:noGrid}}}});
+
+// ---- 8
+dots('c-veo',['仅布局器\n对照','VeoPlace\n弱锚点','VeoPlace\n构造式通道','重启最好\n无 VLM'],[{label:'最好 HPWL',data:[929,931,870,856],backgroundColor:[C.muted,C.s2,C.s2,C.s1]}],{min:840,max:940,yt:'HPWL（mm）',ref:[915,'人工 915']});
+dots('c-constr',['默认流程','20 大件固定\n其余默认','20 大件定位\n其余放邻居中位'],[{label:'pico',data:[1017/915,1060/915,885/915].map(x=>+x.toFixed(3)),backgroundColor:C.s1},{label:'edk',data:[3097/3089,3123/3089,2969/3089].map(x=>+x.toFixed(3)),backgroundColor:C.s3,pointStyle:'rectRot'}],{min:0.9,max:1.2,yt:'HPWL ÷ 人工（倍）',ref:[1,'人工']});
+(()=>{const b=['z3r0','pico','edk','edu-fpga','fsl-mini','edu-k60','edu-nxp'],n=[46,86,124,108,162,157,163],r=[35.8,70.3,116,106,113,154.5,163],v=[37,52.8,114.5,97.5,156.3,152.8,163];
+})();
+
+// ---- 9 floating bars
+rng('c-oracle',['L0 关键件位置\n+ 模块中心','L0 + 关键件旋转','L0 + 关键件面','L0 + 面 + 旋转','L4 完整人工起点'],[{runs:[294,305,303,297],color:C.s2},{runs:[271,288,266,263],color:C.s2},{runs:[316,318,311,316]},{runs:[318,318,318,314]},{runs:[316,316,316,316],color:C.human}],{min:250,max:322,yt:'布通网络（个，共 318）',ref:[318,'人工 318']});
+const LAD=['IC x,y,旋转\n其余放中心','+ 引脚加权\n起点（pins）','+ pins-small','所有 ≥2 引脚件\n都给人工位置'];
+rng('c-ladder',LAD,[{min:188,max:217},{min:223,max:240},{min:302,max:316},{runs:[312]}],{min:150,max:330,yt:'布通网络（个）',ref:[318,'人工 318'],hideX:true});
+rng('c-ladder-via',LAD,[{min:997,max:1090},{min:830,max:922},{min:569,max:581},{runs:[459]}],{min:0,max:1150,yt:'过孔（个）',color:C.s2,ref:[323,'人工合法化 323']});
+
+// ---- 10
+dots('c-init-via',B,[{label:'Cypress 随机起点',data:vr('cypress'),backgroundColor:C.muted,pointStyle:'triangle'},{label:'WebGPU 随机起点',data:vr('webgpu'),backgroundColor:C.s2,pointStyle:'rect'},{label:'起点单独',data:vr('init'),backgroundColor:C.s4,pointStyle:'rectRot'},{label:'起点 + WebGPU 全局',data:vr('initWeb'),backgroundColor:C.s1}],{log:true,min:0.5,max:15,rot:45,yt:'过孔 ÷ 人工（倍）',ref:[1,'人工']});
+bars('c-init-clean',B,[{label:'Cypress 随机起点',data:rate('cypress'),color:C.muted},{label:'WebGPU 随机起点',data:rate('webgpu'),color:C.s2},{label:'起点单独',data:rate('init'),color:C.s4},{label:'起点 + WebGPU 全局',data:rate('initWeb'),color:C.s1}],{min:0,max:100,rot:45});
+
+// ---- 11
+dots('c-speed',B,[{label:'Cypress',data:M.cypress.map(r=>r[3]),backgroundColor:C.s2,pointStyle:'rect'},{label:'WebGPU',data:M.webgpu.map(r=>r[3]),backgroundColor:C.s1}],{log:true,min:1,max:500,rot:45,yt:'放置时间（s）'});
+bars('c-agg',B,[{label:'Cypress',data:vr('cypress'),color:C.s2},{label:'WebGPU',data:vr('webgpu'),color:C.s1}],{min:0,rot:0,yt:'过孔 ÷ 人工（倍）',hideX:true});bars('c-agg2',B,[{label:'Cypress',data:rate('cypress'),color:C.s2},{label:'WebGPU',data:rate('webgpu'),color:C.s1}],{min:0,max:100,rot:45,yt:'布通率（%）',noLegend:true});
+
+// ---- why WebGPU vs Cypress
+bars('c-why-via',['随机起点','工具起点'],[{label:'Cypress',data:[3.95,1.55],color:C.s2},{label:'WebGPU',data:[2.38,1.30],color:C.s1}],{min:0,yt:'过孔 ÷ 人工（倍）'});
+bars('c-why-clean',['随机起点','工具起点'],[{label:'Cypress',data:[78.4,97.0],color:C.s2},{label:'WebGPU',data:[89.8,100],color:C.s1}],{min:0,max:100,yt:'布通率（%）'});
+
+// ---- 12
+const OBJ=['只用 HPWL','+ 双面网络','+ 交叉代价','+ 接口件锚定','人工'];
+bars('c-obj-clean',OBJ,[{label:'布通网络',data:[219,260,230,293,308],color:[C.s1,C.s1,C.s1,C.s1,C.human]}],{min:0,max:320});
+bars('c-obj-via',OBJ,[{label:'交叉数',data:[1879,1635,1556,1343,1068],color:C.s2},{label:'只按线距布线的过孔',data:[688,592,592,535,298],color:C.s1}],{min:0});
+
+// ---- 13 router dumbbell as floating bars, log
+(()=>{const L=['① 去掉 A* 闭包\nacc','② worker 线程池\nacc 鲁棒检查','③ 缓存不可达目标\nedu-nxp 人工','③ 层启发 A*\nacc 人工','④ 原生 C++\nppc-n3','④ C++ + 层启发\n+ 增量 ppc-n3'],before=[18.2,111,41.7,29,151,151],after=[10.6,26,4.2,6.8,97,6.9];
+mk('c-router',{type:'bar',data:{labels:L,datasets:[{label:'',data:after.map((a,i)=>[a,before[i]]),backgroundColor:C.s1+'55',barThickness:4,borderSkipped:false},{type:'line',showLine:false,label:'改动前',data:before,backgroundColor:C.muted,borderColor:'#fff',pointRadius:7},{type:'line',showLine:false,label:'改动后',data:after,backgroundColor:C.s1,borderColor:'#fff',pointRadius:7}]},options:{indexAxis:'y',plugins:{legend:{position:'top',align:'start',labels:{filter:i=>i.text!==''}},tooltip:{callbacks:{label:c=>Array.isArray(c.raw)?`${c.raw[1]} → ${c.raw[0]} s`:`${c.dataset.label}: ${c.raw} s`}}},scales:{x:{type:'logarithmic',grid:gridY,ticks:{callback:v=>[1,2,5,10,20,50,100,200].includes(+v)?v:''},title:{display:true,text:'一次路由耗时（s，对数轴）'}},y:{grid:noGrid,ticks:{callback(v){return this.getLabelForValue(v).split('\n')}}}}}});})();
+mk('c-ppc',{type:'line',data:{labels:['JS 精确','C++ 精确','+ 层启发','+ 增量拆线'],datasets:[{label:'ppc-n3 一次路由（s）',data:[151,97,22.4,6.9],borderColor:C.s1,backgroundColor:C.s1,pointRadius:5}]},options:{plugins:{legend:{display:false}},scales:{y:{type:'logarithmic',grid:gridY,ticks:{callback:v=>[5,10,20,50,100,200].includes(+v)?v:''},title:{display:true,text:'秒（对数轴）'}},x:{grid:noGrid}}}});
+
+// ---- 14
+mk('c-calib',{type:'bar',data:{labels:['pic','k60'],datasets:[{label:'人工真实走线',data:[322,236],backgroundColor:C.human},{label:'校准前布线器',data:[354,346],backgroundColor:C.s2},{label:'校准后布线器',data:[322,303],backgroundColor:C.s1}]},options:{plugins:{legend:{position:'top',align:'start'}},scales:{y:{min:0,grid:gridY,title:{display:true,text:'过孔（个）'}},x:{grid:noGrid}}}});
+mk('c-pitch',{type:'bar',data:{labels:['人工','轨迹最好','首批布局 1','首批布局 3'],datasets:[{label:'旧口径（0.4 mm，12 轮）',data:[617,617,602,549],backgroundColor:C.muted},{label:'新口径（真实线距，40 轮）',data:[617,617,617,617],backgroundColor:C.s1}]},options:{plugins:{legend:{position:'top',align:'start'}},scales:{y:{min:0,max:650,grid:gridY,title:{display:true,text:'布通网络（个，共 617）'}},x:{grid:noGrid}}}});
+
+// ---- 15
+rng('c-noise',['人工：平移','人工：抖动','Agent v4：平移','Agent v4：抖动'],[{runs:[318],color:C.human},{runs:[318],color:C.human},{min:285,max:303,color:C.s2},{min:276,max:310,color:C.s2}],{min:260,max:322,yt:'布通网络（个，共 318）'});
+bars('c-sd',['k60 v4 会话 1','k60 v4 会话 2','k60 v4 会话 3','ppc-n3 v6 会话 1'],[{label:'单次路由',data:[2.0,9.7,2.7,1.7],color:C.muted},{label:'3 个相位取中位',data:[1.6,2.6,2.9,0.8],color:C.s1}],{min:0,yt:'布通数标准差（个）'});
+
+// ---- 16
+(()=>{const b=['z3r0','pico','edk','edu-fpga','fsl-mini','edu-k60','edu-nxp'];
+bars('c-decap',b,[{label:'基线设置',data:[4.5,8.7,12.7,16.3,51.9,48.2,25.7],color:C.muted},{label:'+ 去耦规则',data:[2.1,2.0,4.5,2.6,3.6,3.3,3.3],color:C.s1},{label:'人工',data:[4.9,1.6,3.4,5.8,5.7,7.0,5.0],color:C.human}],{min:0,rot:45,yt:'中位距离（mm）'});})();
+const pc=(a,n)=>a.map(([x,y])=>({x,y:+(100*y/n).toFixed(1)}));
+mk('c-codesign',{type:'line',data:{datasets:[{label:'k60',data:pc([[58,310],[165,312]],318),borderColor:C.s1,backgroundColor:C.s1,stepped:true},{label:'pic',data:pc([[34,306],[97,308]],310),borderColor:C.s3,backgroundColor:C.s3,stepped:true},{label:'acc',data:pc([[190,611],[208,615],[329,617]],617),borderColor:C.s2,backgroundColor:C.s2,stepped:true}]},options:{plugins:{legend:{position:'top',align:'start'}},scales:{x:{type:'linear',min:0,max:340,grid:gridY,title:{display:true,text:'墙钟时间（s）'}},y:{min:96,max:100.5,grid:gridY,title:{display:true,text:'鲁棒布通 ÷ 总网络（%）'}}}}});
+</script>
+<script>
+// ---- 17-18 summary + image pairs, data from agent-v7.json (inlined below)
+const A={"z3r0":{"nets":46,"human":{"clean":46,"vias":36,"hpwl":714},"reps":[{"rep":1,"clean":46,"vias":27,"hpwl":718,"min":2.6,"cost":0.03},{"rep":2,"clean":46,"vias":27,"hpwl":702,"min":3.2,"cost":0.05},{"rep":3,"clean":46,"vias":24,"hpwl":714,"min":3.6,"cost":0.16,"img":"z3r0-agent.png"}],"shown":3},"pico":{"nets":86,"human":{"clean":86,"vias":49,"hpwl":915},"reps":[{"rep":1,"clean":86,"vias":61,"hpwl":970,"min":4.1,"cost":0.38},{"rep":2,"clean":86,"vias":48,"hpwl":876,"min":4.5,"cost":0.38,"img":"pico-agent.png"},{"rep":3,"clean":86,"vias":63,"hpwl":957,"min":3.9,"cost":0.38}],"shown":2},"edk":{"nets":124,"human":{"clean":124,"vias":64,"hpwl":3089},"reps":[{"rep":1,"clean":124,"vias":72,"hpwl":2720,"min":5.4,"cost":0.45},{"rep":2,"clean":124,"vias":69,"hpwl":2809,"min":6.3,"cost":0.51},{"rep":3,"clean":124,"vias":50,"hpwl":2772,"min":7.1,"cost":0.58,"img":"edk-agent.png"}],"shown":3},"edu-fpga":{"nets":108,"human":{"clean":108,"vias":76,"hpwl":2461},"reps":[{"rep":1,"clean":108,"vias":99,"hpwl":2137,"min":6.3,"cost":1.04},{"rep":2,"clean":108,"vias":94,"hpwl":2094,"min":7.2,"cost":1.11,"img":"edu-fpga-agent.png"},{"rep":3,"clean":104,"vias":97,"hpwl":2176,"min":5.4,"cost":0.95}],"shown":2},"fsl-mini":{"nets":162,"human":{"clean":161,"vias":167,"hpwl":4868},"reps":[{"rep":1,"clean":159,"vias":241,"hpwl":5676,"min":6.8,"cost":0.64},{"rep":2,"clean":161,"vias":255,"hpwl":5839,"min":7.7,"cost":0.67,"img":"fsl-mini-agent.png"},{"rep":3,"clean":160,"vias":233,"hpwl":5752,"min":6.1,"cost":0.62}],"shown":2},"edu-k60":{"nets":157,"human":{"clean":156,"vias":191,"hpwl":5412},"reps":[{"rep":1,"clean":156,"vias":168,"hpwl":4764,"min":13.6,"cost":0.51},{"rep":2,"clean":156,"vias":167,"hpwl":4645,"min":11.9,"cost":0.49},{"rep":3,"clean":156,"vias":157,"hpwl":4585,"min":14.1,"cost":0.51,"img":"edu-k60-agent.png"}],"shown":3},"edu-nxp":{"nets":163,"human":{"clean":161,"vias":193,"hpwl":5399},"reps":[{"rep":1,"clean":162,"vias":275,"hpwl":5399,"min":14.3,"cost":0.5,"img":"edu-nxp-agent.png"},{"rep":2,"clean":161,"vias":196,"hpwl":4722,"min":13.6,"cost":0.5}],"shown":1},"safety":{"nets":186,"human":{"clean":184,"vias":239,"hpwl":5489},"reps":[{"rep":1,"clean":186,"vias":247,"hpwl":5470,"min":10.4,"cost":1.47,"img":"safety-agent.png"},{"rep":2,"clean":186,"vias":300,"hpwl":5954,"min":10.3,"cost":1.47},{"rep":3,"clean":184,"vias":323,"hpwl":5723,"min":7,"cost":1.04}],"shown":1},"pic":{"nets":310,"human":{"clean":303,"vias":322,"hpwl":5955},"reps":[{"rep":1,"clean":308,"vias":358,"hpwl":5472,"min":13.7,"cost":0.62,"img":"pic-agent.png"},{"rep":2,"clean":296,"vias":415,"hpwl":5796,"min":12.9,"cost":0.61},{"rep":3,"clean":307,"vias":396,"hpwl":5737,"min":11,"cost":0.57}],"shown":1},"nxp":{"nets":370,"human":{"clean":369,"vias":603,"hpwl":8759},"reps":[{"rep":1,"clean":370,"vias":715,"hpwl":8432,"min":11.9,"cost":0.45},{"rep":2,"clean":370,"vias":790,"hpwl":8499,"min":12.5,"cost":0.45},{"rep":3,"clean":370,"vias":711,"hpwl":8052,"min":12.7,"cost":0.45,"img":"nxp-agent.png"}],"shown":3},"rx":{"nets":400,"human":{"clean":399,"vias":638,"hpwl":8270},"reps":[{"rep":1,"clean":400,"vias":824,"hpwl":8501,"min":7.6,"cost":0.39,"img":"rx-agent.png"},{"rep":2,"clean":400,"vias":802,"hpwl":8404,"min":15.6,"cost":0.53},{"rep":3,"clean":400,"vias":841,"hpwl":9195,"min":9.2,"cost":0.43}],"shown":1},"k60":{"nets":318,"human":{"clean":308,"vias":303,"hpwl":5799},"reps":[{"rep":1,"clean":279,"vias":483,"hpwl":6581,"min":14.3,"cost":0.54},{"rep":2,"clean":288,"vias":501,"hpwl":7331,"min":14.3,"cost":0.54},{"rep":3,"clean":306,"vias":476,"hpwl":6858,"min":10,"cost":0.41,"img":"k60-agent.png"}],"shown":3},"acc":{"nets":617,"human":{"clean":617,"vias":1942,"hpwl":17115},"reps":[{"rep":1,"clean":617,"vias":2718,"hpwl":17682,"min":14.2,"cost":0.19},{"rep":2,"clean":617,"vias":2829,"hpwl":18206,"min":12.1,"cost":0.18},{"rep":3,"clean":617,"vias":2823,"hpwl":18902,"min":12.8,"cost":0.17}],"shown":null}};
+(()=>{const b=Object.keys(A);const pts=(f)=>{const o=[];b.forEach(k=>A[k].reps.forEach(r=>o.push({x:k,y:f(r,A[k])})));return o;};
+const sc=(id,f,title,ref)=>mk(id,{type:'scatter',data:{labels:b,datasets:[{label:'单个会话',data:pts(f),backgroundColor:C.s1+'aa',pointRadius:5}]},options:{plugins:{legend:{display:false}},scales:{x:{type:'category',labels:b,grid:noGrid,ticks:{autoSkip:false,maxRotation:60,minRotation:45}},y:{grid:gridY,title:{display:true,text:title}}}},plugins:[refLine(ref,'人工')]});
+sc('c-sum-clean',(r,a)=>r.clean-a.human.clean,'Agent − 人工（个）',0);
+sc('c-sum-via',(r,a)=>+(r.vias/a.human.vias).toFixed(2),'倍',1);
+sc('c-sum-hpwl',(r,a)=>+(r.hpwl/a.human.hpwl).toFixed(2),'倍',1);
+const cur={k60:{h:[318,291,5799],r:[[318,504,5572],[297,651,6036],[300,631,5754]]},acc:{h:[617,2600,17115],r:[[617,2801,16006],[617,2889,16158],[617,2895,16099]]},'ppc-n3':{h:[1607,8729,54188],r:[[1603,9541,60296],[1606,9790,52832],[1606,9753,54501]]}};
+const cb=Object.keys(cur);const cp=(j,f)=>{const o=[];cb.forEach(k=>cur[k].r.forEach(r=>o.push({x:k,y:f(r[j],cur[k].h[j])})));return o;};
+const sc2=(id,j,f,t,ref)=>mk(id,{type:'scatter',data:{labels:cb,datasets:[{data:cp(j,f),backgroundColor:C.s1+'aa',pointRadius:6}]},options:{plugins:{legend:{display:false}},scales:{x:{type:'category',labels:cb,grid:noGrid,offset:true},y:{grid:gridY,title:{display:true,text:t}}}},plugins:[refLine(ref,'人工')]});
+sc2('c-cur-clean',0,(a,h)=>+(100*a/h).toFixed(2),'%',100);
+sc2('c-cur-via',1,(a,h)=>+(a/h).toFixed(2),'倍',1);
+sc2('c-cur-hpwl',2,(a,h)=>+(a/h).toFixed(2),'倍',1);
+// image pairs, 2 boards per slide
+const withImg=b.filter(k=>A[k].shown);const host=document.getElementById('pairs');let page=19;
+for(let i=0;i<withImg.length;i+=2){const ks=withImg.slice(i,i+2);
+ const cell=k=>{const a=A[k],r=a.reps.find(x=>x.rep===a.shown);return `<div class="card"><h3 style="font-size:13.5px;line-height:1.4">${k}：人工 ${a.human.clean}/${a.nets} 布通 · ${a.human.vias} 过孔 · ${a.human.hpwl} mm　｜　Agent ${r.clean}/${a.nets} · ${r.vias} · ${r.hpwl} mm</h3><div class="pair" style="flex:1"><figure><img src="img/${k}-human.png"><figcaption>人工布局</figcaption></figure><figure><img src="img/${k}-agent.png"><figcaption>Agent（v7，会话 ${a.shown}）</figcaption></figure></div></div>`;};
+ host.insertAdjacentHTML('beforeend',`<div class="frame"><div class="slide"><div class="kicker">8 · 总结：人工 vs Agent，逐板</div><h2 style="font-size:24px">逐板对比（每板展示 3 个会话中最好的一个；v7 sweep 的旧数据，同一布线器）</h2><div class="grid g2">${ks.map(cell).join('')}</div><div class="legend-line">件：青 = 顶面，紫 = 底面，红 = 重叠；走线：红 = 顶层，蓝 = 底层，绿 = 内层，橙 = 冲突，红虚线 = 未布通。acc 的最好会话没有存图，只在第 17 页给数字。</div><span class="pageno">${page++}</span></div></div>`);}
+})();
+</script>
+<script>
+{const only=new URLSearchParams(location.search).get('s');if(only){document.querySelectorAll('.frame').forEach((f,i)=>{if(i+1!=only)f.style.display='none';else f.style.margin='0';});document.documentElement.style.overflow='hidden';}}
+function number(){const fr=[...document.querySelectorAll(".frame")];fr.forEach((f,i)=>{const s=f.querySelector(".slide");let p=s.querySelector(".pageno");if(!p){p=document.createElement("span");p.className="pageno";s.appendChild(p);}p.textContent=(i+1)+" / "+fr.length;});}
+number();
+function fit(){document.querySelectorAll('.frame').forEach(f=>{const s=f.clientWidth/1280;f.style.height=(720*s)+'px';f.querySelector('.slide').style.transform=`scale(${s})`;});}
+addEventListener('resize',fit);fit();
+addEventListener('keydown',e=>{const fr=[...document.querySelectorAll('.frame')];const y=scrollY;let i=fr.findIndex(f=>f.offsetTop>=y-5);if(i<0)i=0;
+ if(['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();(fr[i+1]||fr[i]).scrollIntoView();}
+ if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();(fr[i-1]||fr[0]).scrollIntoView();}});
+</script>
+</body>
+</html>
