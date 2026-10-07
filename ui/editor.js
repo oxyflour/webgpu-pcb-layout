@@ -770,12 +770,11 @@ async function onCypressInput(m) {
   job.timer = setInterval(() => { $('#cypressStatus').textContent = `Cypress CUDA 求解 ${job.selected.length} 个器件… ${((performance.now() - job.t0) / 1000).toFixed(0)} s`; }, 500);
   try {
     const r = await fetch('/api/cypress/place', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-      board: m.board, input: m.input, power: m.power, layout: m.layout, selected: job.selected,
-      allowRotation: $('#cypressRotate').checked, clearance: +$('#cypressClearance').value }) });
+      board: m.board, input: m.input, layout: m.layout, selected: job.selected, rotate: $('#cypressRotate').checked }) });
     const res = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
     if (!r.ok) throw new Error(res.error ?? `HTTP ${r.status}`);
     if (cypressJob !== job || vm?.name !== m.board) return;
-    const e = res.engine, x = res.metrics;
+    const c = res.cypress, g = res.legalize, x = res.metrics;
     if (layoutVersion !== job.version) $('#cypressStatus').innerHTML = `<span class="bad">求解期间布局被修改，结果未应用</span>（job ${esc(res.job)}）`;
     else { send('setLayout', { placements: res.placements }); $('#cypressStatus').textContent = `已应用（可撤销）· job ${res.job}`; }
     $('#cypressInfo').innerHTML = kv([
@@ -783,9 +782,9 @@ async function onCypressInput(m) {
       ['相关网络 HPWL (mm)', `${x.hpwlBeforeMm.toFixed(1)} → ${x.hpwlAfterMm.toFixed(1)}`],
       ['选中器件重叠对 (个)', `${x.overlapsBefore} → <span class="${x.overlapsAfter ? 'bad' : 'good'}">${x.overlapsAfter}</span>`],
       ['旋转的器件 (个)', x.rotated],
-      ['Cypress', `${e.status === 'complete' ? '<span class="good">收敛</span>' : '<span class="bad">未收敛</span>'}，${e.iterations} 次迭代，overflow ${(+e.finalOverflow).toFixed(3)}`],
-      ['合法化移动 / 失败 (个)', `${e.legalMoved} / <span class="${e.legalFailed ? 'bad' : ''}">${e.legalFailed}</span>`],
-      ['求解 / 总耗时 (s)', `${(+e.solveSeconds).toFixed(1)} / ${res.elapsedSeconds.toFixed(1)}`],
+      ['Cypress', `${c.status === 'converged' ? '<span class="good">收敛</span>' : '<span class="bad">未收敛</span>'}，${c.iterations} 次迭代，overflow ${(+c.finalOverflow).toFixed(3)}`],
+      ['合法化移动 / 失败 / 微推 (个)', `${g.moved} / <span class="${g.failed ? 'bad' : ''}">${g.failed}</span> / ${g.nudged}`],
+      ['求解 / 总耗时 (s)', `${(+c.solveS).toFixed(1)} / ${res.elapsedS.toFixed(1)}`],
     ]);
   } catch (err) {
     if (cypressJob === job) $('#cypressStatus').innerHTML = `<span class="bad">Cypress 布局失败：${esc(err.message)}</span>`;

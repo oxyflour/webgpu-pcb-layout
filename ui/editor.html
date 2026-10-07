@@ -116,10 +116,7 @@
     <section id="cypressSection" hidden>
       <h2>Cypress 后台布局</h2>
       <p class="sub" id="cypressBackend">检测后台…</p>
-      <div class="row">
-        <label><input type="checkbox" id="cypressRotate" checked> 允许 90° 旋转</label>
-        <span>间距</span><select id="cypressClearance"><option>0</option><option>0.05</option><option selected>0.1</option><option>0.2</option><option>0.35</option></select><span>mm</span>
-      </div>
+      <div class="row"><label title="打开 Cypress 交叉项以优化朝向，耗时约 3–4 倍；关闭时朝向保持当前值"><input type="checkbox" id="cypressRotate"> 允许 Cypress 调整朝向（慢 3–4 倍）</label></div>
       <div class="row"><button id="cypressRun" class="primary grow" disabled>Cypress 布局选中器件</button></div>
       <p class="sub" id="cypressStatus">选中未固定的器件后运行；其余器件按当前位置固定。</p>
       <dl class="kv" id="cypressInfo"></dl>

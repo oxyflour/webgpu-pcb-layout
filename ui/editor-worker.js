@@ -195,7 +195,7 @@ async function handle(msg) {
     }
     case 'cypressInput': {
       // For the Cypress backend (harness/ui-server.mjs): the problem and the layout after every queued edit.
-      return post('cypressInput', { seq: msg.seq, board: board.name, input: board.adapted.input, power: board.adapted.power ?? [], layout: session.layout });
+      return post('cypressInput', { seq: msg.seq, board: board.name, input: board.adapted.input, layout: session.layout });
     }
     case 'export': {
       const layout = session.layout;

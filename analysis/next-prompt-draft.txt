@@ -1,7 +1,0 @@
-Candidate v2 changes, pending the complete three-repetition comparison:
-
-The inspect result has exactly parts[], topology.nets[] and physical.pads[]. topology.nets entries expose net and pins[], not a refs array. Each topology pin includes ref, local{x,y}, world[x,y], pose, fixed and allowedSides. Derive unique peer refs from pins[].ref. physical.pads entries expose ref, key, net, local, world, sizeMm and worldBox. Up to32 incident signal nets are returned; use topology.omittedSmallNets to detect truncation. Do not spend several calls guessing field names; extract only the nets/physical pads relevant to your stated hypothesis from saved JSON.
-
-Before the first global solve, explicitly decide the two main IC centres/orientations from their GPIO and debug fanout to fixed connectors. If teacher poses are supplied, hold them. If absent, derive a floorplan from the fixed connector world pins and the IC local pad edges, then hold the decided main ICs during Cypress's small-part placement. A seeded random IC pose is not a good floorplan. Preserve these targets in a named local repair; changing an unrelated large IC after a poor global solve can consume the entire budget without fixing the structural error. Use return diagnostics as measured observations, not as a guarantee that the suggested network causes all congestion.
-
-Provide specific target poses or preserveRotation only after real pad correspondence supports the hypothesis. No human coordinate, relative offset or numeric motif answer is embedded in this policy. Cypress remains the only optimizer.
