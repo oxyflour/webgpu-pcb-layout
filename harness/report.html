@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cypress 布局 Harness 报告</title>
+<style>
+:root { --bg:#ffffff; --fg:#1d1f23; --muted:#5d6470; --line:#dde1e6; --head:#f3f5f8; --good:#1a7f37; --bad:#b42318; --accent:#2557c7; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#15171b; --fg:#e6e8eb; --muted:#9aa3ad; --line:#2d323a; --head:#1e2228; --good:#4cc26a; --bad:#f47066; --accent:#7aa2ff; } }
+:root[data-theme="dark"] { --bg:#15171b; --fg:#e6e8eb; --muted:#9aa3ad; --line:#2d323a; --head:#1e2228; --good:#4cc26a; --bad:#f47066; --accent:#7aa2ff; }
+body { background:var(--bg); color:var(--fg); font:15px/1.6 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; margin:0; padding:24px 16px 64px; }
+main { max-width:1080px; margin:0 auto; }
+h1 { font-size:26px; margin:0 0 4px; } h2 { font-size:20px; margin:36px 0 10px; border-bottom:1px solid var(--line); padding-bottom:6px; } h3 { font-size:16px; margin:22px 0 8px; }
+.sub { color:var(--muted); margin:0 0 20px; }
+.wrap { overflow-x:auto; margin:10px 0 6px; }
+table { border-collapse:collapse; width:100%; font-size:13.5px; font-variant-numeric:tabular-nums; }
+th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+th { background:var(--head); font-weight:600; }
+td.n { text-align:right; white-space:nowrap; }
+.good { color:var(--good); font-weight:600; } .bad { color:var(--bad); font-weight:600; }
+.note { color:var(--muted); font-size:13px; }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin:14px 0; }
+.kpi { border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+.kpi b { display:block; font-size:13px; color:var(--muted); font-weight:500; } .kpi span { font-size:18px; font-weight:600; }
+code { font-family:Consolas,Menlo,monospace; font-size:12.5px; background:var(--head); padding:1px 4px; border-radius:3px; }
+ul { padding-left:22px; } li { margin:3px 0; }
+.viz-root { --surface-1:#fcfcfb; --text-primary:#0b0b0b; --text-secondary:#52514e; --grid:#e4e3df; --ref:#0b0b0b; --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) .viz-root, :root:where(:not([data-theme="light"])) .legend { --surface-1:#1a1a19; --text-primary:#ffffff; --text-secondary:#c3c2b7; --grid:#33332f; --ref:#ffffff; --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; } }
+:root[data-theme="dark"] .viz-root, :root[data-theme="dark"] .legend { --surface-1:#1a1a19; --text-primary:#ffffff; --text-secondary:#c3c2b7; --grid:#33332f; --ref:#ffffff; --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; }
+.legend { --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; margin:6px 0 10px; }
+.legend i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+.legend .lg1 { background:var(--series-1); } .legend .lg2 { background:var(--series-2); } .legend .lg3 { background:var(--series-3); }
+.legend .ref { width:18px; height:0; border-top:2px dashed var(--fg); border-radius:0; vertical-align:3px; }
+.viz-root { background:var(--surface-1); border:1px solid var(--line); border-radius:8px; padding:12px 12px 6px; margin:12px 0; }
+.viz-root h4 { margin:0 0 2px; font-size:14px; color:var(--text-primary); } .viz-root .cap { font-size:12px; color:var(--text-secondary); margin:0 0 6px; }
+.viz-root svg { display:block; width:100%; height:auto; }
+.viz-root text { fill:var(--text-secondary); font-size:11px; } .viz-root .gridl { stroke:var(--grid); stroke-width:1; } .viz-root .refl { stroke:var(--ref); stroke-width:1.5; stroke-dasharray:5 4; }
+.viz-root .whisk { stroke:var(--text-primary); stroke-width:1.2; } .viz-root .s1 { fill:var(--series-1); } .viz-root .s2 { fill:var(--series-2); } .viz-root .s3 { fill:var(--series-3); }
+.viz-root rect.hit { fill:transparent; }
+#tip { position:fixed; pointer-events:none; background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:12px; box-shadow:0 2px 8px rgba(0,0,0,.15); display:none; z-index:10; max-width:300px; }
+
+</style>
+</head>
+<body>
+<main>
+<h1>Cypress 布局 Harness 报告</h1>
+<p class="sub">2026-10-05 · 目标（AGENTS.md）：设计 harness，使 dsh agent 调用工具得到的 PCB 布局指标（布通网络数、过孔数、HPWL）接近人工水平。布局器只用 NVIDIA Cypress。</p>
+
+<div class="kpis">
+  <div class="kpi"><b>布通网络数</b><span>6 块板均有运行达到人工</span></div>
+  <div class="kpi"><b>HPWL</b><span>pico、edk、acc 全部低于人工；k60、ppc-n3 最好一次低于人工；ppc-n1 高 12–15%</span></div>
+  <div class="kpi"><b>过孔数（主要差距）</b><span>pico 已持平人工；acc 高 8–11%，edk 高 33–44%，k60 约 2 倍</span></div>
+  <div class="kpi"><b>相对单独 Cypress</b><span>所有板、三项指标全部更好；主要来自工具，agent 在 acc、k60 上再明显提升</span></div>
+</div>
+
+<h2>1. 方法</h2>
+<ul>
+  <li><b>布局器</b>：只用 Cypress（镜像 <code>cypress:20261004</code>，RTX 3090 Ti），不使用 WebGPU 布局器或 LNS。每个候选的流程：起始布局 → Cypress → 共享 0.1 mm 合法化器 → benchmark 路由评估（板子实际层数，0.4 mm 网格）。</li>
+  <li><b>agent</b>：dsh headless（DeepSeek Flash），通过 <code>pcb</code> 命令行工具操作。命令有 <code>info</code>（含 <code>--section ics</code>）、<code>map</code>（ASCII 布局图）、<code>check</code>（检查位置是否被占用、给出最佳旋转）、<code>place</code>（运行 Cypress 并评估）、<code>inspect</code>、<code>submit</code>。agent 只决定 IC 的位置和旋转。</li>
+  <li><b>评估</b>：每次评估都跑 3 个 dsh，并行执行；每次工具调用都限制在 3 分钟内。最终提交的布局用完整路由重新评估，并做严格几何检查（无重叠、不越界、不进禁布区、固定器件和所在面不变）。</li>
+  <li><b>可复现性</b>：同一评估协议下，harness 的 Cypress 调用复现了历史 benchmark 中 pico seed 1000 那一行（71/86 布通、273 过孔、HPWL 1861 mm），结果完全一致。</li>
+</ul>
+
+<h2>2. 主要结果：harness 与单独 Cypress、人工对比</h2>
+<p class="note">每格三个数分别是 3 次运行（单独 Cypress 为 3 个种子）的结果；所有 agent 最终布局几何合法。</p>
+<div class="wrap"><table>
+<thead><tr>
+<th>板子（信号网络数，个）</th>
+<th>单独 Cypress（benchmark 配置，随机初始）：布通网络数（个）</th>
+<th>单独 Cypress：过孔数（个）</th>
+<th>单独 Cypress：HPWL（mm）</th>
+<th>harness dsh agent：布通网络数（个）</th>
+<th>harness dsh agent：过孔数（个）</th>
+<th>harness dsh agent：HPWL（mm）</th>
+<th>人工：布通 / 过孔 / HPWL（mm）</th>
+</tr></thead>
+<tbody>
+<tr><td>pico（86）</td><td class="n">71 / 76 / 19</td><td class="n">273 / 254 / 422</td><td class="n">1861 / 1890 / 2907</td><td class="n good">86 / 86 / 86</td><td class="n good">60 / 60 / 56</td><td class="n good">832 / 824 / 826</td><td class="n">86 / 59 / 915</td></tr>
+<tr><td>edk（124）</td><td class="n">119 / 124 / 122</td><td class="n">381 / 148 / 328</td><td class="n">6297 / 3439 / 6369</td><td class="n good">124 / 124 / 124</td><td class="n">88 / 92 / 85</td><td class="n good">2977 / 2893 / 2981</td><td class="n">124 / 64 / 3089</td></tr>
+<tr><td>k60（318）</td><td class="n">23 / 16 / 16</td><td class="n">4351 / 4165 / 4200</td><td class="n">27244 / 27196 / 27916</td><td class="n">318 / 297 / 300</td><td class="n">504 / 651 / 631</td><td class="n">5572 / 6036 / 5754</td><td class="n">318 / 291 / 5799</td></tr>
+<tr><td>acc（617）</td><td class="n">615 / 483 / 444</td><td class="n">3647 / 5163 / 5939</td><td class="n">20491 / 26979 / 35169</td><td class="n good">617 / 617 / 617</td><td class="n">2801 / 2889 / 2895</td><td class="n good">16006 / 16158 / 16099</td><td class="n">617 / 2600 / 17115</td></tr>
+<tr><td>ppc-n3（1607）</td><td class="n">818 / 1328 / 1070 *</td><td class="n">27263 / 27360 / 28631 *</td><td class="n">255184 / 223643 / 248563</td><td class="n">1606 / 1606 / 1607</td><td class="n">9506 / 10112 / 9542</td><td class="n">58684 / 56837 / 54075</td><td class="n">1607 / 8729 / 54188</td></tr>
+<tr><td>ppc-n1（1669）</td><td class="n">未测</td><td class="n">未测</td><td class="n">未测</td><td class="n good">1669 / 1669 / 1669</td><td class="n">10350 / 10222 / 10677</td><td class="n">60524 / 61143 / 61816</td><td class="n">1669 / 8977 / 53985</td></tr>
+</tbody></table></div>
+<ul class="note">
+  <li>pico、edk、k60 的单独 Cypress 数据来自历史 benchmark（<code>cypress-official-refresh-cd3978f</code>，种子 1000 / 8919 / 16838），其中 pico 种子 1000、8919 与 k60 种子 8919、16838 的 Cypress 未收敛，按诊断行列出。acc、ppc-n3 的单独 Cypress 数据是本次新测：acc 用完整路由，ppc-n3 用增量路由（≤20 轮）。* ppc-n3 的单独 Cypress 按与 agent 工具相同的口径 (a) 评估（增量路由 ≤20 轮 + 加权 A* 1.5）；这些布局质量很差，3 个种子的路由都在 60 分钟上限处停止，未收敛（分别跑了 9 / 15 / 12 轮），布通数是停止时的状态。同口径下的完整对比见下表。</li>
+  <li>agent 结果所用版本：pico、edk、ppc-n3、ppc-n1 为 v6（当前工具），k60、acc 为 v4。</li>
+  <li>人工布局本身有包围盒重叠（k60 有 55 对）。经同一合法化器加 Cypress 处理后的人工参考值：k60 318 / 323 / 5814，acc 617 / 2620 / 17295。</li>
+</ul>
+
+
+
+<h3>ppc 同口径对比（口径 (a)：增量路由 ≤20 轮 + 加权 A* 1.5，即 agent 工具内的评分方式）</h3>
+<div class="wrap"><table>
+<thead><tr><th>板子</th><th>方法</th><th>布通网络数（个，3 次）</th><th>过孔数（个，3 次）</th><th>HPWL（mm，3 次）</th><th>路由是否收敛</th></tr></thead>
+<tbody>
+<tr><td>ppc-n3（1607）</td><td>单独 Cypress</td><td class="n">818 / 1328 / 1070</td><td class="n">27263 / 27360 / 28631</td><td class="n">255184 / 223643 / 248563</td><td>否，均在 60 分钟上限停止（9 / 15 / 12 轮）</td></tr>
+<tr><td>ppc-n3（1607）</td><td>harness dsh agent</td><td class="n good">1606 / 1606 / 1607</td><td class="n">10704 / 11166 / 10638</td><td class="n">58684 / 56837 / 54075</td><td>是（11 / 14 / 11 轮，22–42 s）</td></tr>
+<tr><td>ppc-n3（1607）</td><td>人工</td><td class="n">1607</td><td class="n">9687</td><td class="n">54188</td><td>是（12 轮）</td></tr>
+<tr><td>ppc-n1（1669）</td><td>harness dsh agent</td><td class="n good">1669 / 1669 / 1667</td><td class="n">11561 / 11316 / 11692</td><td class="n">60524 / 61143 / 61816</td><td>2 次是；rep3 达到 20 轮上限</td></tr>
+<tr><td>ppc-n1（1669）</td><td>人工</td><td class="n">1669</td><td class="n">10071</td><td class="n">53985</td><td>是（14 轮）</td></tr>
+</tbody></table></div>
+<p class="note">同口径下 agent 的过孔比人工多 10–16%（ppc-n3 +10–15%，ppc-n1 +12–16%）；单独 Cypress 的过孔约为人工的 2.8–3.0 倍，HPWL 约 4.1–4.7 倍。加权 A* 使所有方法的过孔都偏高约 10%，所以同口径内的比值才有意义，不能和上表的完整路由数值直接比较。ppc-n1 未测单独 Cypress。</p>
+<h3>性能比较图（相对人工指数化，3 次运行的均值，误差线为最小–最大值）</h3>
+<div class="legend" aria-label="图例">
+  <span><i class="lg1"></i>单独 Cypress（benchmark 配置，随机初始）</span>
+  <span><i class="lg2"></i>工具初始化 + Cypress，无 agent（当前工具）</span>
+  <span><i class="lg3"></i>harness dsh agent</span>
+  <span><i class="ref"></i>人工 = 基准</span>
+</div>
+<div class="viz-root" id="chart-clean"></div>
+<div class="viz-root" id="chart-vias"></div>
+<div class="viz-root" id="chart-hpwl"></div>
+<p class="note">ppc-n3、ppc-n1 的柱子全部用同口径 (a) 的数值（人工基准也按 (a) 计）；其他板用完整路由。ppc-n3 单独 Cypress 的路由在 60 分钟上限处停止。ppc-n1 未测单独 Cypress。"无 agent"用当前工具在 6 块板上补测（每次运行 ≤3 分钟，全部收敛，k60 除外：路由跑满 40 轮）。鼠标悬停可看每次运行的数值。</p>
+<div id="tip" role="tooltip"></div>
+<script>
+const D = {
+  boards: ['pico','edk','k60','acc','ppc-n3','ppc-n1'],
+  human: { pico:[86,59,915.2], edk:[124,64,3088.7], k60:[318,291,5799.3], acc:[617,2600,17115], 'ppc-n3':[1607,9687,54187.6], 'ppc-n1':[1669,10071,53985] },
+  nets: { pico:86, edk:124, k60:318, acc:617, 'ppc-n3':1607, 'ppc-n1':1669 },
+  methods: [
+    { name:'单独 Cypress', cls:'s1', data: {
+      pico:{c:[71,76,19],v:[273,254,422],h:[1861,1890,2907]}, edk:{c:[119,124,122],v:[381,148,328],h:[6297,3439,6369]},
+      k60:{c:[23,16,16],v:[4351,4165,4200],h:[27244,27196,27916]}, acc:{c:[615,483,444],v:[3647,5163,5939],h:[20491,26979,35169]},
+      'ppc-n3':{c:[818,1328,1070],v:[27263,27360,28631],h:[255184,223643,248563]} } },
+    { name:'工具初始化 + Cypress，无 agent（当前工具）', cls:'s2', data: {
+      pico:{c:[86,86,86],v:[72,86,62],h:[933.8,971.1,835.5]}, edk:{c:[124,124,124],v:[99,93,108],h:[2844.9,2850.7,3036.4]},
+      k60:{c:[297,298,297],v:[711,682,685],h:[6568.6,6425.2,6500.6]}, acc:{c:[617,617,617],v:[3434,3481,3303],h:[19508.2,19248.4,19461.7]},
+      'ppc-n3':{c:[1602,1606,1603],v:[11234,11487,11180],h:[56690.9,57737.5,56810.1]}, 'ppc-n1':{c:[1668,1669,1669],v:[12012,11958,11750],h:[61852.1,61769.2,61593.7]} } },
+    { name:'harness dsh agent', cls:'s3', data: {
+      pico:{c:[86,86,86],v:[60,60,56],h:[831.8,823.5,826.1]}, edk:{c:[124,124,124],v:[88,92,85],h:[2977.1,2893.2,2981.2]},
+      k60:{c:[318,297,300],v:[504,651,631],h:[5572,6036,5754]}, acc:{c:[617,617,617],v:[2801,2889,2895],h:[16006,16158,16099]},
+      'ppc-n3':{c:[1606,1606,1607],v:[10704,11166,10638],h:[58684,56837,54075]}, 'ppc-n1':{c:[1669,1669,1667],v:[11561,11316,11692],h:[60524,61143,61816]} } },
+  ],
+};
+const NS = 'http://www.w3.org/2000/svg';
+const el = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const tip = document.getElementById('tip');
+function chart(id, title, cap, field, toValue, opt) {
+  const root = document.getElementById(id);
+  root.innerHTML = '<h4>' + title + '</h4><p class="cap">' + cap + '</p>';
+  const W = 760, H = 260, L = 56, R = 36, T = 10, B = 34, pw = W - L - R, ph = H - T - B;
+  const svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': title }, root);
+  const f = (v) => opt.log ? Math.log10(v) : v, lo = f(opt.ticks[0]), hi = f(opt.ticks[opt.ticks.length - 1]);
+  const y = (v) => T + ph - (f(Math.min(Math.max(v, opt.ticks[0]), opt.ticks[opt.ticks.length - 1])) - lo) / (hi - lo) * ph;
+  for (const t of opt.ticks) { el('line', { x1: L, x2: W - R, y1: y(t), y2: y(t), class: 'gridl' }, svg); el('text', { x: L - 6, y: y(t) + 4, 'text-anchor': 'end' }, svg).textContent = opt.fmt(t); }
+  const gw = pw / D.boards.length, bw = Math.min(26, (gw - 18) / 3);
+  D.boards.forEach((b, bi) => {
+    const gx = L + bi * gw + gw / 2, present = D.methods.filter((m) => m.data[b]);
+    el('text', { x: gx, y: H - 12, 'text-anchor': 'middle' }, svg).textContent = b;
+    present.forEach((m, k) => {
+      const vals = m.data[b][field].map((v) => toValue(b, v));
+      const mean = vals.reduce((a, c) => a + c, 0) / vals.length, mn = Math.min(...vals), mx = Math.max(...vals);
+      const x = gx + (k - (present.length - 1) / 2) * (bw + 2) - bw / 2;   // 2px gap between adjacent bars
+      const base = y(opt.ticks[0]), top = y(mean), r = Math.min(4, bw / 2);
+      el('path', { d: 'M' + x + ',' + base + ' V' + (top + r) + ' Q' + x + ',' + top + ' ' + (x + r) + ',' + top + ' H' + (x + bw - r) + ' Q' + (x + bw) + ',' + top + ' ' + (x + bw) + ',' + (top + r) + ' V' + base + ' Z', class: m.cls }, svg);
+      el('line', { x1: x + bw / 2, x2: x + bw / 2, y1: y(mn), y2: y(mx), class: 'whisk' }, svg);
+      for (const v of [mn, mx]) el('line', { x1: x + bw / 2 - 4, x2: x + bw / 2 + 4, y1: y(v), y2: y(v), class: 'whisk' }, svg);
+      const hit = el('rect', { x: x - 1, y: T, width: bw + 2, height: ph, class: 'hit' }, svg);
+      hit.addEventListener('mousemove', (e) => {
+        tip.style.display = 'block';
+        tip.innerHTML = '<b>' + b + ' · ' + m.name + '</b><br>均值 ' + opt.fmt(mean, true) + '（' + vals.length + ' 次：' + vals.map((v) => opt.fmt(v, true)).join(' / ') + '）';
+        tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px';
+      });
+      hit.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    });
+  });
+  el('line', { x1: L, x2: W - R, y1: y(opt.ref), y2: y(opt.ref), class: 'refl' }, svg);
+  el("text", { x: W - R + 4, y: y(opt.ref) + 4, "text-anchor": "start" }, svg).textContent = "人工";
+}
+const pct = (b, c) => c / D.nets[b] * 100;
+const rel = (i) => (b, v) => v / D.human[b][i];
+const times = (v, p) => p ? v.toFixed(2) + '×' : v + '×';
+chart('chart-clean', '布通率（%，布通网络数 ÷ 信号网络数）', '越高越好；人工在所有板上均为 100%。', 'c', pct, { fmt: (v, p) => p ? v.toFixed(1) + '%' : v + '%', ref: 100, ticks: [0, 25, 50, 75, 100] });
+chart('chart-vias', '过孔数（相对人工的倍数，对数坐标）', '越低越好；1× = 人工的过孔数。', 'v', rel(1), { log: true, fmt: times, ref: 1, ticks: [0.5, 1, 2, 4, 8, 16] });
+chart('chart-hpwl', 'HPWL（相对人工的倍数，对数坐标）', '越低越好；1× = 人工的 HPWL。', 'h', rel(2), { log: true, fmt: times, ref: 1, ticks: [0.5, 1, 2, 4, 8] });
+</script>
+<h3>分层贡献：工具 vs agent（无 agent 的消融用当前工具，不给任何人工信息，3 个种子）</h3>
+<div class="wrap"><table>
+<thead><tr><th>板子</th><th>工具初始化 + Cypress，无 agent：布通网络数（个）</th><th>同：过孔数（个）</th><th>同：HPWL（mm）</th><th>harness dsh agent：布通网络数（个）</th><th>同：过孔数（个）</th><th>同：HPWL（mm）</th><th>agent 相对无 agent：过孔均值变化（%）</th><th>agent 相对无 agent：HPWL 均值变化（%）</th></tr></thead>
+<tbody>
+<tr><td>pico</td><td class="n">86 / 86 / 86</td><td class="n">72 / 86 / 62</td><td class="n">934 / 971 / 836</td><td class="n good">86 / 86 / 86</td><td class="n good">60 / 60 / 56</td><td class="n good">832 / 824 / 826</td><td class="n good">−20</td><td class="n good">−9</td></tr>
+<tr><td>edk</td><td class="n">124 / 124 / 124</td><td class="n">99 / 93 / 108</td><td class="n">2845 / 2851 / 3036</td><td class="n">124 / 124 / 124</td><td class="n">88 / 92 / 85</td><td class="n">2977 / 2893 / 2981</td><td class="n good">−12</td><td class="n">+1</td></tr>
+<tr><td>k60</td><td class="n">297 / 298 / 297</td><td class="n">711 / 682 / 685</td><td class="n">6569 / 6425 / 6501</td><td class="n good">318 / 297 / 300</td><td class="n">504 / 651 / 631</td><td class="n">5572 / 6036 / 5754</td><td class="n good">−14</td><td class="n good">−11</td></tr>
+<tr><td>acc</td><td class="n">617 / 617 / 617</td><td class="n">3434 / 3481 / 3303</td><td class="n">19508 / 19248 / 19462</td><td class="n">617 / 617 / 617</td><td class="n">2801 / 2889 / 2895</td><td class="n">16006 / 16158 / 16099</td><td class="n good">−16</td><td class="n good">−17</td></tr>
+<tr><td>ppc-n3 (a)</td><td class="n">1602 / 1606 / 1603</td><td class="n">11234 / 11487 / 11180</td><td class="n">56691 / 57738 / 56810</td><td class="n">1606 / 1606 / 1607</td><td class="n">10704 / 11166 / 10638</td><td class="n">58684 / 56837 / 54075</td><td class="n">−4</td><td class="n">−1</td></tr>
+<tr><td>ppc-n1 (a)</td><td class="n">1668 / 1669 / 1669</td><td class="n">12012 / 11958 / 11750</td><td class="n">61852 / 61769 / 61594</td><td class="n">1669 / 1669 / 1667</td><td class="n">11561 / 11316 / 11692</td><td class="n">60524 / 61143 / 61816</td><td class="n">−3</td><td class="n">−1</td></tr>
+</tbody></table></div>
+<ul class="note">
+<li><b>工具贡献最大</b>：仅凭网表推导的初始化加 Cypress，就把所有板子从单独 Cypress 的水平拉到接近 agent 的水平（例如 k60 布通 16–23 → 297–298，ppc-n3 过孔约为人工的 2.9 倍 → 1.2 倍）。</li>
+<li><b>agent 的增益随板子而异</b>：pico、edk、acc、k60 明显（过孔 −12% 至 −20%；HPWL 在 pico、acc、k60 上 −9% 至 −17%，edk 持平；k60 有一次 318/318）；ppc 很小（过孔 −3% 至 −4%，HPWL −1%，接近路由噪声）。</li>
+<li>pico 用当前工具已达到人工水平：布通 86/86，过孔 56–60（人工 59），HPWL 比人工低 10%。</li>
+</ul>
+
+<h2>3. 关键信息实验（按 AGENTS.md：先给人工信息验证，再让工具和 agent 自己推导）</h2>
+<div class="wrap"><table>
+<thead><tr><th>板子</th><th>交给 Cypress 的人工信息</th><th>布通网络数（个）</th><th>过孔数（个）</th><th>HPWL（mm）</th></tr></thead>
+<tbody>
+<tr><td>pico</td><td>无</td><td class="n">75–82</td><td class="n">184–211</td><td class="n">1435–1448</td></tr>
+<tr><td>pico</td><td>2 个 IC 的位置（不含旋转）</td><td class="n">80–81</td><td class="n">132–142</td><td class="n">1378–1384</td></tr>
+<tr><td>pico</td><td>2 个 IC 的位置 + 旋转</td><td class="n">86</td><td class="n">91–94</td><td class="n">928–930</td></tr>
+<tr><td>k60</td><td>8 个 IC 的位姿，小器件取连接器件中心的均值</td><td class="n">188–217</td><td class="n">997–1090</td><td class="n">6659–6712</td></tr>
+<tr><td>k60</td><td>同上，小器件按"靠近引脚较少的伙伴"规则放置</td><td class="n">302–316</td><td class="n">569–581</td><td class="n">5782–5873</td></tr>
+<tr><td>k60</td><td>完整人工布局（检验工具是否保留关键信息）</td><td class="n">318</td><td class="n">341</td><td class="n">5814</td></tr>
+<tr><td>acc</td><td>5 个 IC 的位姿</td><td class="n">617</td><td class="n">2884</td><td class="n">17282</td></tr>
+<tr><td>acc</td><td>所有 ≥2 信号脚器件的位姿</td><td class="n">617</td><td class="n">2840</td><td class="n">17344</td></tr>
+<tr><td>acc</td><td>所有 ≥1 信号脚器件的位姿</td><td class="n">617</td><td class="n">2613</td><td class="n">17281</td></tr>
+</tbody></table></div>
+<ul>
+  <li><b>IC 的位置和旋转是关键</b>，只给位置不给旋转不够。<code>check</code> 的旋转建议在人工位置上能还原 20 个 IC 中 16 个的人工旋转。</li>
+  <li><b>由人工统计得出的工具规则</b>：两脚器件放在引脚较少的伙伴旁边（k60 人工中位距离 4.3 mm，对比较大伙伴的 15.8 mm）；去耦电容放在同电源的 IC 旁；小器件朝向对准其连接的引脚。这些规则都由网表推导，不使用人工坐标。</li>
+  <li><b>acc 的过孔差距全部来自 297 个单信号脚器件</b>（+1.5V、+1.0V 等电源轨上的去耦电容）。人工把它们放在距 IC 电源引脚约 1 mm 处（中位数）。目前还没有找到能推导出来的规则。</li>
+</ul>
+
+<h2>4. 实测后否决的做法</h2>
+<div class="wrap"><table>
+<thead><tr><th>做法</th><th>否决依据</th></tr></thead>
+<tbody>
+<tr><td>prompt 规则"大 IC 背面不放器件"</td><td>人工 k60 在 U201 背面放了 21 个器件，包括 SPI flash</td></tr>
+<tr><td>电源轨去耦电容放在其 IC 引脚处</td><td>acc 过孔 2884 → 2999–3093；k60 布通 305 → 214–222</td></tr>
+<tr><td>降低电源轨网络在 Cypress 中的权重</td><td>acc 过孔 2919–2942，无收益</td></tr>
+<tr><td>按连通性质心给出 IC 位置建议</td><td>距人工 IC 位置 3–50 mm，会误导 agent</td></tr>
+<tr><td>Cypress 原生默认参数（1000 轮，lr 0.01）</td><td>会重新做全局布局，把规划冲掉，结果明显变差</td></tr>
+<tr><td>关闭交叉项后，按线长接受旋转采样</td><td>破坏热启动：k60 人工布局 318/346 → 265/755。现改为冻结旋转，由规划和初始化给出</td></tr>
+</tbody></table></div>
+
+<h2>5. 速度与正确性修复</h2>
+<ul>
+  <li><b>Cypress 每轮迭代都为日志计算一次交叉数</b>：跳过之后，acc 优化器时间 122 s → 6.5 s，结果完全相同。</li>
+  <li><b>关闭交叉项、冻结旋转</b>：k60 单次 Cypress 59 s → 16 s，质量相当。</li>
+  <li><b>并发控制</b>：最多 3 个 Cypress 任务，每个 6 线程（12 核机器）。<code>place</code> 超时不计入 agent 的预算。<code>check</code> 每次会话限 60 次（曾有 agent 用脚本循环调用约 250 次）。</li>
+  <li><b>ppc（约 2000 器件、10 层）</b>：工具内用增量路由（146 s → 44 s，过孔 +0.8%）并设截止时间。单次 <code>place</code> 约 80–120 s，不超过 3 分钟。</li>
+  <li><b>合法化器网格取整</b>在 ppc 上留下 3–16 µm 的微小重叠，已加后处理推开，最终布局全部合法。</li>
+</ul>
+
+<h2>6. CPU 路由加速：试了哪些、结论如何</h2>
+<p class="note">在 ppc-n3 上测量，信号网络 1607 个，网格 738×375×10 层。最慢的 100 个网络（多为跨板的两脚长线）占 66% 的时间。</p>
+<div class="wrap"><table>
+<thead><tr><th>方案</th><th>布通网络数（个，共 1607）</th><th>与顺序路由的一致性</th><th>耗时</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>增量路由（现用）</td><td class="n">1607</td><td>过孔 +0.8%</td><td class="n">146 s → 44 s</td><td class="good">采用</td></tr>
+<tr><td>Jacobi 并行（一轮内网络互不可见）</td><td class="n">979</td><td>不收敛</td><td class="n">336 s</td><td class="bad">否决</td></tr>
+<tr><td>粗网格 0.6 mm</td><td class="n">1587</td><td>过孔 +7%</td><td class="n">130 s</td><td class="bad">否决</td></tr>
+<tr><td>精确并行（只并行窗口不重叠的网络，12 线程）</td><td class="n">1607</td><td>逐位一致（pico、k60、ppc 均已验证）</td><td class="n">无加速</td><td>正确但在 ppc 上无效：约 75% 的网络集中在 896 球 BGA 周围</td></tr>
+<tr><td>近似块并行（每 8 个一批）</td><td class="n">1507–1535</td><td>不收敛</td><td class="n">29–51 s</td><td class="bad">否决</td></tr>
+<tr><td>加权 A*（w = 1.5），只用于 agent 循环内</td><td class="n">与精确路由逐个相同（33/33 个候选）</td><td>过孔 ×1.08–1.13（中位 1.10）；按"布通优先、再看过孔"排序的 Spearman 相关 0.998；6 次会话中 5 次选出的最佳候选相同，另 1 次过孔只差 0.5%</td><td class="n">单独运行 46 s → 20 s</td><td class="good">已采用（&gt;1000 器件的板），最终评估仍用精确路由</td></tr>
+</tbody></table></div>
+<p><b>GPU 路由</b>：仓库里的 <code>src/gpu/grid-router.js</code> 只是单层、单网络的距离场原型，不能直接替代评估路由器。根本问题是：GPU 只有在很多网络同时布线时才快，而上表说明这样做在 ppc 上不收敛，或者因为网络都挤在 BGA 周围而无法并行。另外路由器是混沌的，只改一处浮点加法顺序，ppc 的过孔数就从 8802 变成 8739，所以最终评估必须用 CPU 精确路由。可行的用法是做粗网格的 GPU 排序代理；在这之前，加权 A* 已经能提供类似的加速。</p>
+
+<h2>7. 剩余差距与下一步</h2>
+<ul>
+  <li><b>过孔是主要差距</b>：pico 已持平人工（56–60 vs 59），edk 比人工高 33–44%，k60 约 1.7–2.2 倍，acc 高 8–11%，ppc 高 9–19%。acc 的差距完全来自电源轨去耦电容的摆放；k60 的差距来自小器件链和各次运行之间的波动（IC 规划不稳定）。</li>
+  <li><b>k60 运行间波动</b>：最好一次 318/318，另外两次约 300。最好的那次 U302（以太网 PHY）的位置和旋转都对了。</li>
+  <li><b>下一步</b>：
+    <ol>
+      <li>加权 A* 已在 ppc 的工具内启用（评估 44 s → 20 s），下一轮用它重跑 ppc，预计每次会话的 <code>place</code> 次数大约翻倍。</li>
+      <li>研究电源轨去耦电容和小器件链的可推导规则，降低过孔。</li>
+      <li>分析 ppc 上 agent 增益很小的原因（36 个 IC 规划不过来，还是 <code>place</code> 次数太少）。</li>
+      <li>补测 ppc-n1 的单独 Cypress 基线。</li>
+    </ol>
+  </li>
+</ul>
+
+<h2>8. 文件</h2>
+<ul>
+  <li>代码与用法：<code>harness/README.md</code>；详细数据：<code>harness/RESULTS.md</code>；技能入口：<code>skills/cypress-layout/references/harness.md</code>。</li>
+  <li>每次运行的完整轨迹在 <code>harness/results/&lt;run&gt;/rep*/</code>（<code>events.jsonl</code>、<code>session/tools.jsonl</code>、<code>summary.json</code>），可用 <code>node harness/agent/trace.mjs &lt;dir&gt;</code> 查看。</li>
+</ul>
+</main>
+</body>
+</html>

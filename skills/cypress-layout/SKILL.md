@@ -12,6 +12,7 @@ description: 调用 NVIDIA NVlabs Cypress CUDA 布局器，在 webgpu-layout-cod
 - 启动现有镜像、检查 CUDA，或确实需要重新编译时，读 [references/runtime.md](references/runtime.md)。
 - 布局单块板、导出 Bookshelf、回读坐标或接入布局管线时，读 [references/layout.md](references/layout.md)。
 - 跑仓库三板三种子、官方 20 例、生成报告或刷新对照时，读 [references/benchmark.md](references/benchmark.md)。
+- 用 dsh agent + `pcb` 工具做布局、跑 3 次重复评估或迭代 prompt/工具时，读 [references/harness.md](references/harness.md)。
 
 ## 定位环境
 
