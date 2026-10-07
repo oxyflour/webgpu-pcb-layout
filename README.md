@@ -31,3 +31,18 @@ K60's current direct comparison is `node harness/compare-cypress.mjs --out resul
 `place` now saves CUDA output and independent geometric metrics before returning an unscored candidate. Explicit `score` does the full routing in a separate <=165-second call, updates eligibility/ranking and leaves poses, sides, constraints and engine evidence exact. A scoring timeout preserves the candidate. `evaluate` remains read only. Unscored candidates and c000 cannot be submitted. `preview.targetCompatibility` checks held targets against immutable anchors separately from unrelated random-body conflicts, preventing temporary fixed targets from hiding behind the source fixed-fixed exemption.
 
 Each evaluation requires all three repetitions. Report failures and unconverged outputs; do not compute a winning median from only successful runs or call three pairs statistically significant. After testing whether explicit key information helps, remove its numeric answers and make the model infer the corresponding decisions from netlist/pad/anchor context.
+
+## Interactive editor with Cypress selection layout
+
+`ui/` is the interactive placement editor from `C:/Projects/webgpu-layout` `web/` (`editor.html`, `editor.js`, `editor-worker.js`, `route-worker.js`; last web change `03ab224`): Board IR / KiCad loading, module-aware drag relayout, lock/rotate/flip, undo, and live routing. `harness/ui-server.mjs` serves it and serves its `../src` and `../bench` imports from the same runtime snapshot the harness uses, so the editor and Cypress share one problem model (`irToProblem`). The `/agent/*` copilot panel of the original page is replaced by a **Cypress 后台布局** panel.
+
+```powershell
+docker start codex-cypress-harness-20261005   # container with the recorded crossing-flag/FLUTE patches
+node harness/ui-server.mjs --runtime C:/Projects/cypress-layout/results/runtime-cypress-v1 --container codex-cypress-harness-20261005
+```
+
+Open `http://localhost:8173/` in Chrome/Edge. `--boards` sets the sample-board directory (default `C:/Projects/webgpu-layout/web/boards`).
+
+- Select parts (box, Shift, double-click a part or click a module row), then run Cypress. The worker sends the adapted problem, power rails and its layout after every queued edit. `harness/ui-cypress.mjs` fixes every unselected part at its current pose, keeps the selection on its current side, restores power/ground pads to the objective as the harness does, and keeps only nets touching the selection. `solve()` then runs the CUDA engine and the shared legalizer with the panel's clearance (default 0.1 mm; harness experiments use 0.35 mm).
+- The result is applied with the editor's `setLayout`, so `撤销` / `Ctrl+Z` reverts it and auto-routing re-evaluates it. If the layout changed during the solve, the result is not applied. The panel reports incident-net HPWL (signal + power) before/after, selected-part overlaps, rotations, convergence, legalizer moves/failures and timing.
+- Each job writes the request, Bookshelf export, engine logs and result to `results/ui-jobs/<job>/`. Jobs run one at a time in a worker thread (409 while busy).

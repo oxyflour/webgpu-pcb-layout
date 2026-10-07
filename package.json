@@ -2,6 +2,7 @@
   "name": "cypress-agent-harness",
   "private": true,
   "type": "module",
-  "scripts": {"test": "node --test test/*.test.mjs"},
+  "scripts": {"test": "node --test test/*.test.mjs",
+    "ui": "node harness/ui-server.mjs"},
   "engines": {"node": ">=22"}
 }

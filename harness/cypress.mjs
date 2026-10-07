@@ -13,8 +13,8 @@ function docker(argv, {log,check=true,timeout=15000}={}) {
   if(check&&(r.error||r.status!==0))throw Error(`Docker failed (${r.status}): ${r.error?.message??r.stderr??log}`);
   return r;
 }
-export function solve(adapted,initial,{seed,dir,preserve=[]}) {
-  const began=performance.now(), container=process.env.CYPRESS_CONTAINER??'codex-cypress-official-20261004';
+export function solve(adapted,initial,{seed,dir,preserve=[],clearance=.35,container=process.env.CYPRESS_CONTAINER??'codex-cypress-official-20261004'}) {
+  const began=performance.now();
   const job='/work/harness-'+crypto.randomUUID();
   const baked=exportIncremental(adapted,initial,dir,preserve);
   const config={gpu:1,gpu_id:0,num_threads:8,dtype:'float32',num_bins_x:128,num_bins_y:128,
@@ -37,7 +37,7 @@ export function solve(adapted,initial,{seed,dir,preserve=[]}) {
   for(const file of ['output.json','engine-metrics.json','engine.log'])docker(['cp',`${container}:${job}/${file}`,path.join(dir,file)]);
   const output=readJson(path.join(dir,'output.json')), imported=importIncremental(adapted,baked,output);
   writeJson(path.join(dir,'raw-layout.json'),imported.layout);
-  const p=normalizeProblem(adapted.input),legal=legalizeLayout(p,imported.layout,{clearance:.35,deadline:performance.now()+8000});
+  const p=normalizeProblem(adapted.input),legal=legalizeLayout(p,imported.layout,{clearance,deadline:performance.now()+8000});
   const status={engine:'NVIDIA Cypress',pipeline:'cypress+shared-legalize',preset:'hpwl-density-rotation; crossing disabled, all electrical input retained',engineConverged:output.engine_converged,finalOverflow:output.final_overflow,iterations:output.iterations,
     status:output.engine_converged?'complete':'unconverged',solveSeconds:output.solve_s,processSeconds,totalSeconds:(performance.now()-began)/1000,budgetSeconds:SOLVE_SECONDS,
     engineSourceHash:output.engine_source_sha256,basicSourceHash:output.basic_source_sha256,rsmtDiagnosticExcludesDegreeGe:output.rsmt_diagnostic_excludes_degree_ge,inputPinErrorMm:baked.inputPinErrorMm,wrapperPinErrorMm:output.pin_roundtrip_max_error_mm,finalPinErrorMm:imported.finalPinErrorMm,legalFailed:legal.failed,legalMoved:legal.moved,seed,job};
