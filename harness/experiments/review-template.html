@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layout Review</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #dcdcd6; --board: #f1efe6; --boardEdge: #9b9585;
+  --top: #3a3a36; --bottom: #8f8f88; --pad: #c9a227; --padB: #b77f4a; --via: #222;
+  --g1: #c2410c; --g2: #d97706; --g3: #2563eb; --g4: #16a34a; --hl: #e11d48; --accent: #2563eb;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #161614; --panel: #1f1f1d; --ink: #ecebe6; --muted: #a3a29b; --line: #34342f; --board: #24231f; --boardEdge: #6f6a5c;
+  --top: #d6d5cf; --bottom: #7d7c76; --pad: #d4b13c; --padB: #c48b57; --via: #f2f2ef;
+  --g1: #fb923c; --g2: #fbbf24; --g3: #60a5fa; --g4: #4ade80; --hl: #fb7185; --accent: #60a5fa;
+} }
+:root[data-theme="dark"] {
+  --bg: #161614; --panel: #1f1f1d; --ink: #ecebe6; --muted: #a3a29b; --line: #34342f; --board: #24231f; --boardEdge: #6f6a5c;
+  --top: #d6d5cf; --bottom: #7d7c76; --pad: #d4b13c; --padB: #c48b57; --via: #f2f2ef;
+  --g1: #fb923c; --g2: #fbbf24; --g3: #60a5fa; --g4: #4ade80; --hl: #fb7185; --accent: #60a5fa;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 16px 16px 8px; }
+h1 { font-size: 18px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0; }
+.wrap { padding: 0 16px 24px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 12px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+.tablewrap { overflow-x: auto; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.controls label { display: inline-flex; gap: 4px; align-items: center; color: var(--ink); }
+select, input[type=search], button { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+@media (max-width: 900px) { .panes { grid-template-columns: 1fr; } }
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.pane .bar { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.pane .bar .m { color: var(--muted); font-variant-numeric: tabular-nums; }
+canvas { display: block; width: 100%; height: 560px; cursor: grab; touch-action: none; }
+canvas.drag { cursor: grabbing; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 12px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
+.tip { position: fixed; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; display: none; z-index: 5; }
+#nets tbody tr { cursor: pointer; }
+#nets tbody tr.sel { background: color-mix(in srgb, var(--hl) 16%, transparent); }
+.pos { color: var(--g1); } .neg { color: var(--g4); }
+.scroll { max-height: 420px; overflow: auto; }
+.note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Layout review</h1>
+  <p class="sub" id="subtitle"></p>
+</header>
+<div class="wrap">
+  <!--__NOTES__-->
+  <div class="card tablewrap"><table id="metrics"></table>
+    <p class="note">Routing: exact PathFinder of the harness (native build, 0.4 mm grid, grid phase 0, board copper layers). Vias, layer steps = every adjacent-layer change; vias, physical = one per stack of layer changes. Routes are grid approximations for review, not DRC-clean copper.</p></div>
+  <div class="card">
+    <div class="controls">
+      <label>Left <select id="selA"></select></label>
+      <label>Right <select id="selB"></select></label>
+      <label><input type="checkbox" id="showTop" checked> top parts</label>
+      <label><input type="checkbox" id="showBottom" checked> bottom parts</label>
+      <label><input type="checkbox" id="showPads" checked> pads</label>
+      <label><input type="checkbox" id="showRoutes" checked> routes</label>
+      <label><input type="checkbox" id="showVias" checked> vias</label>
+      <span id="layerBoxes" class="controls"></span>
+      <button id="fit">Fit to window</button>
+      <button id="theme">Theme</button>
+    </div>
+    <div class="legend" id="legend" style="margin-top:8px"></div>
+  </div>
+  <div class="panes">
+    <div class="pane"><div class="bar"><strong id="nameA"></strong><span class="m" id="mA"></span></div><canvas id="cA"></canvas></div>
+    <div class="pane"><div class="bar"><strong id="nameB"></strong><span class="m" id="mB"></span></div><canvas id="cB"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="controls"><strong>Nets around the IC</strong><input type="search" id="q" placeholder="Filter net or part"><span class="sub" id="netCount"></span></div>
+    <div class="scroll tablewrap" style="margin-top:8px"><table id="nets"></table></div>
+    <p class="note">Click a net to highlight its routes and pins in both panes. Sorted by the via difference (right minus left).</p>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const D = /*__DATA__*/null;
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const LAYER_COLORS = ['#dc2626', '#ea580c', '#ca8a04', '#65a30d', '#059669', '#0891b2', '#2563eb', '#7c3aed', '#c026d3', '#0f766e', '#be123c', '#4d7c0f'];
+const layerColor = (l) => l === 0 ? LAYER_COLORS[0] : l === D.layerNames.length - 1 ? '#2563eb' : LAYER_COLORS[(l + 1) % LAYER_COLORS.length];
+const state = { a: 0, b: Math.min(1, D.layouts.length - 1), layers: D.layerNames.map(() => true), net: -1, view: null };
+
+$('title').textContent = `${D.board}: placement and routing around ${D.ic}`;
+$('subtitle').textContent = `${D.layouts.length} layouts. Drag to pan, wheel to zoom (both panes follow). Window ${(D.window[2] - D.window[0]).toFixed(0)} x ${(D.window[3] - D.window[1]).toFixed(0)} mm around ${D.ic}; routes and pads outside it are not included.`;
+
+// Metrics table.
+{
+  const head = ['Layout', 'Clean nets (count, of total)', 'Vias, layer steps (count)', 'Vias, physical (count)', 'HPWL (mm)', 'Legal geometry'];
+  const rows = D.layouts.map((L) => [L.name, `${L.metrics.clean} / ${L.metrics.nets}`, L.metrics.vias, L.metrics.viaSites, Math.round(L.metrics.hpwlMm), L.metrics.legal ? 'yes' : 'no']);
+  $('metrics').innerHTML = `<thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>`;
+}
+for (const s of ['selA', 'selB']) $(s).innerHTML = D.layouts.map((L, i) => `<option value="${i}">${L.name}</option>`).join('');
+$('selA').value = state.a; $('selB').value = state.b;
+$('layerBoxes').innerHTML = D.layerNames.map((n, l) => `<label><input type="checkbox" data-l="${l}" checked><span class="sw" style="background:${layerColor(l)}"></span>${n}</label>`).join('');
+const groupVar = ['', '--g1', '--g2', '--g3', '--g4'];
+function legend() {
+  $('legend').innerHTML = D.groups.slice(1).map((g, k) => `<span><span class="sw" style="background:${css(groupVar[k + 1])}"></span>${g}</span>`).join('') +
+    `<span><span class="sw" style="background:${css('--top')}"></span>other top part (outline)</span><span><span class="sw" style="background:${css('--bottom')}"></span>other bottom part (dashed)</span><span><span class="sw" style="background:${css('--hl')}"></span>selected net</span>`;
+}
+legend();
+
+// View: mm -> px, shared by both panes.
+const canvases = [$('cA'), $('cB')];
+function fit() {
+  const c = canvases[0], w = c.clientWidth, h = c.clientHeight, [x0, y0, x1, y1] = D.window;
+  const s = Math.min(w / (x1 - x0), h / (y1 - y0));
+  state.view = { s, ox: (w - s * (x1 - x0)) / 2 - s * x0, oy: (h - s * (y1 - y0)) / 2 - s * y0 };
+}
+function draw() {
+  canvases.forEach((c, k) => drawPane(c, D.layouts[k ? state.b : state.a]));
+  for (const [k, id] of [[0, 'A'], [1, 'B']]) { const L = D.layouts[k ? state.b : state.a]; $('name' + id).textContent = L.name; $('m' + id).textContent = `clean ${L.metrics.clean}/${L.metrics.nets} · vias ${L.metrics.vias} (layer steps) · ${L.metrics.viaSites} physical · HPWL ${Math.round(L.metrics.hpwlMm)} mm`; }
+}
+function drawPane(c, L) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== w * dpr || c.height !== h * dpr) { c.width = w * dpr; c.height = h * dpr; }
+  const g = c.getContext('2d'), { s, ox, oy } = state.view;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = css('--panel'); g.fillRect(0, 0, w, h);
+  g.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
+  const px = 1 / s;
+  // Board outline.
+  g.fillStyle = css('--board'); g.strokeStyle = css('--boardEdge'); g.lineWidth = px;
+  for (const rings of D.outline) { g.beginPath(); for (const ring of rings) { ring.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); } g.fill('evenodd'); g.stroke(); }
+  const showTop = $('showTop').checked, showBottom = $('showBottom').checked;
+  const partsOf = (side) => L.parts.forEach((p, i) => {
+    if (p[4] !== side || (side ? !showBottom : !showTop)) return;
+    const grp = D.group[i];
+    g.setLineDash(side ? [3 * px, 2 * px] : []);
+    if (grp) { g.fillStyle = css(groupVar[grp]); g.globalAlpha = side ? 0.28 : 0.4; g.fillRect(p[0], p[1], p[2], p[3]); g.globalAlpha = 1; g.strokeStyle = css(groupVar[grp]); g.lineWidth = (grp === 1 ? 2.5 : 1.2) * px; }
+    else { g.strokeStyle = css(side ? '--bottom' : '--top'); g.lineWidth = px; }
+    g.strokeRect(p[0], p[1], p[2], p[3]);
+  });
+  g.setLineDash([]);
+  partsOf(1);
+  // Routes, bottom layer first.
+  if ($('showRoutes').checked) {
+    const order = D.layerNames.map((_, l) => l).reverse();
+    for (const l of order) {
+      if (!state.layers[l]) continue;
+      g.strokeStyle = layerColor(l); g.lineWidth = Math.max(0.16, 1.2 * px); g.globalAlpha = state.net >= 0 ? 0.25 : 0.85; g.lineCap = 'round'; g.lineJoin = 'round';
+      g.beginPath();
+      for (const r of L.routes) { if (r[1] !== l) continue; g.moveTo(r[2], r[3]); for (let k = 4; k < r.length; k += 2) g.lineTo(r[k], r[k + 1]); }
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+  partsOf(0);
+  if ($('showPads').checked) {
+    for (const p of L.pads) {
+      if ((p[4] === 0 && !showTop) || (p[4] === 1 && !showBottom)) continue;
+      g.fillStyle = css(p[4] === 1 ? '--padB' : '--pad'); g.globalAlpha = p[4] === 1 ? 0.55 : 0.9; g.fillRect(p[0], p[1], p[2], p[3]);
+    }
+    g.globalAlpha = 1;
+  }
+  if ($('showVias').checked) {
+    g.fillStyle = css('--via');
+    for (const v of L.vias) { if (!state.layers[v[3]] && !state.layers[v[4]]) continue; g.beginPath(); g.arc(v[1], v[2], Math.max(0.12, 1.6 * px), 0, 7); g.fill(); }
+  }
+  // Selected net on top.
+  if (state.net >= 0) {
+    g.strokeStyle = css('--hl'); g.lineWidth = Math.max(0.25, 2.5 * px); g.lineCap = 'round';
+    g.beginPath(); for (const r of L.routes) { if (r[0] !== state.net) continue; g.moveTo(r[2], r[3]); for (let k = 4; k < r.length; k += 2) g.lineTo(r[k], r[k + 1]); } g.stroke();
+    g.fillStyle = css('--hl');
+    for (const p of L.pads) if (p[5] === state.net) g.fillRect(p[0] - 0.1, p[1] - 0.1, p[2] + 0.2, p[3] + 0.2);
+    for (const v of L.vias) if (v[0] === state.net) { g.beginPath(); g.arc(v[1], v[2], Math.max(0.2, 3 * px), 0, 7); g.fill(); }
+  }
+  // IC label.
+  const u = D.refs.indexOf(D.ic), p = L.parts[u];
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = css('--g1'); g.font = '600 12px system-ui';
+  g.fillText(D.ic, (p[0]) * s + ox + 4, (p[1]) * s + oy + 14);
+}
+
+// Pan / zoom (shared), hover.
+let drag = null;
+for (const c of canvases) {
+  c.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, ox: state.view.ox, oy: state.view.oy }; c.setPointerCapture(e.pointerId); c.classList.add('drag'); });
+  c.addEventListener('pointermove', (e) => {
+    if (drag) { state.view.ox = drag.ox + e.clientX - drag.x; state.view.oy = drag.oy + e.clientY - drag.y; schedule(); return; }
+    const r = c.getBoundingClientRect(), x = (e.clientX - r.left - state.view.ox) / state.view.s, y = (e.clientY - r.top - state.view.oy) / state.view.s;
+    const L = D.layouts[c === canvases[0] ? state.a : state.b];
+    let hit = -1;
+    L.parts.forEach((p, i) => { if (x >= p[0] && x <= p[0] + p[2] && y >= p[1] && y <= p[1] + p[3] && ((p[4] ? $('showBottom') : $('showTop')).checked)) { if (hit < 0 || p[2] * p[3] < L.parts[hit][2] * L.parts[hit][3]) hit = i; } });
+    const tip = $('tip');
+    if (hit >= 0) { tip.style.display = 'block'; tip.style.left = `${e.clientX + 12}px`; tip.style.top = `${e.clientY + 12}px`; tip.textContent = `${D.refs[hit]} · ${L.parts[hit][4] ? 'bottom' : 'top'}${D.fixed[hit] ? ' · fixed' : ''}${D.group[hit] ? ' · ' + D.groups[D.group[hit]] : ''}`; }
+    else tip.style.display = 'none';
+  });
+  c.addEventListener('pointerup', () => { drag = null; c.classList.remove('drag'); });
+  c.addEventListener('pointerleave', () => { $('tip').style.display = 'none'; });
+  c.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = c.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, f = Math.exp(-e.deltaY * 0.0015);
+    state.view.ox = mx - (mx - state.view.ox) * f; state.view.oy = my - (my - state.view.oy) * f; state.view.s *= f; schedule();
+  }, { passive: false });
+}
+let pending = false;
+const schedule = () => { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; draw(); }); } };
+
+// Net table.
+function netTable() {
+  const A = D.layouts[state.a], B = D.layouts[state.b], q = $('q').value.trim().toLowerCase();
+  const st = ['', 'clean', 'overflow', 'open'];
+  const rows = D.tableNets.filter((n) => !q || D.nets[n].id.toLowerCase().includes(q) || D.nets[n].parts.some((p) => p.toLowerCase().includes(q)))
+    .map((n) => ({ n, d: B.netVias[n] - A.netVias[n] })).sort((x, y) => y.d - x.d || D.nets[x.n].id.localeCompare(D.nets[y.n].id));
+  $('netCount').textContent = `${rows.length} nets`;
+  $('nets').innerHTML = `<thead><tr><th>Net</th><th>Parts on net</th><th>${A.name}: vias, layer steps (count)</th><th>${B.name}: vias, layer steps (count)</th><th>Difference, right - left (count)</th><th>${A.name}: vias, physical (count)</th><th>${B.name}: vias, physical (count)</th><th>${A.name}: status</th><th>${B.name}: status</th></tr></thead><tbody>` +
+    rows.map(({ n, d }) => `<tr data-n="${n}" class="${n === state.net ? 'sel' : ''}"><td>${D.nets[n].id}</td><td>${D.nets[n].parts.slice(0, 6).join(' ')}${D.nets[n].parts.length > 6 ? ' …' : ''}</td><td>${A.netVias[n]}</td><td>${B.netVias[n]}</td><td class="${d > 0 ? 'pos' : d < 0 ? 'neg' : ''}">${d > 0 ? '+' : ''}${d}</td><td>${A.netSites[n]}</td><td>${B.netSites[n]}</td><td>${st[A.netStatus[n]]}</td><td>${st[B.netStatus[n]]}</td></tr>`).join('') + '</tbody>';
+}
+$('nets').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-n]'); if (!tr) return; const n = Number(tr.dataset.n); state.net = state.net === n ? -1 : n; netTable(); draw(); });
+$('q').addEventListener('input', netTable);
+$('selA').addEventListener('change', (e) => { state.a = Number(e.target.value); netTable(); draw(); });
+$('selB').addEventListener('change', (e) => { state.b = Number(e.target.value); netTable(); draw(); });
+for (const id of ['showTop', 'showBottom', 'showPads', 'showRoutes', 'showVias']) $(id).addEventListener('change', draw);
+$('layerBoxes').addEventListener('change', (e) => { const l = Number(e.target.dataset.l); state.layers[l] = e.target.checked; draw(); });
+$('fit').addEventListener('click', () => { fit(); draw(); });
+$('theme').addEventListener('click', () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme = dark ? 'light' : 'dark'; legend(); draw(); });
+window.addEventListener('resize', () => { fit(); draw(); });
+fit(); netTable(); draw();
+</script>
+</body>
+</html>

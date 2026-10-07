@@ -10,7 +10,8 @@ function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = Math.imul(s ^ (
 // positioned parts (a series resistor lands next to the IC pin, not between part centres);
 // mode 'pins-small': same, weighted by 1/pin count of the neighbour;
 // mode 'centres': mean of neighbour part centres (first version, kept for comparison).
-export function startLayout(b, plan = {}, { seed = 1, base = null, sweeps = 8, jitterMm = 1, mode = 'pins-small' } = {}) {
+// largeIc: small parts around ICs with >= 100 pins start by the human rules of placeNearLargeICs.
+export function startLayout(b, plan = {}, { seed = 1, base = null, sweeps = 8, jitterMm = 1, mode = 'pins-small', largeIc = false } = {}) {
   const p = b.p, n = p.components.length, rnd = rng(seed), W = p.canvas.width, H = p.canvas.height;
   const idx = new Map(p.components.map((c, i) => [c.id, i]));
   const L = p.components.map((c, i) => c.fixed ? { ...c.fixed } : base ? { ...base[i] } : { x: W / 2, y: H / 2, rotation: 0, side: c.sides === 'bottom' ? 1 : 0 });
@@ -59,6 +60,7 @@ export function startLayout(b, plan = {}, { seed = 1, base = null, sweeps = 8, j
     } else for (const [j, w] of nbr[i]) if (placed[j]) { sx += w * L[j].x; sy += w * L[j].y; sw += w; }
     if (sw > 0) { L[i].x = sx / sw; L[i].y = sy / sw; placed[i] = 1; }
   }
+  if (largeIc) placeNearLargeICs(b, L, new Set(free.filter((i) => placed[i])));
   // Rotation of free parts: Cypress runs with frozen orientations (see cypress.mjs), so pick
   // the quarter turn whose pins are closest to the pins they connect to (fixed, planned, or
   // the current estimate of other free parts).
@@ -101,6 +103,60 @@ export function startLayout(b, plan = {}, { seed = 1, base = null, sweeps = 8, j
   }
   for (const i of free) { L[i].x += (rnd() - 0.5) * 2 * jitterMm; L[i].y += (rnd() - 0.5) * 2 * jitterMm; }
   return clampAll(p, L);
+}
+
+// Small parts around a large IC (>= minPins signal pins, already positioned), measured on the human
+// ppc-n3/n1 layouts (results/bigic-stats.mjs; U1 462 pins):
+//   series parts (also linked to another IC or a fixed part) on the IC's side: outside the outline,
+//     median 5 mm from it, mostly on the side of the IC pin they connect to. On the other side they
+//     sit near the other partner (median 50 mm from U1): left to the pins-small start.
+//   parts linked only to the IC: outside the outline on their pin's side (median 5-8 mm); on the
+//     other board side only those on deep pins (median 6.8 mm inside the outline) sit under the IC.
+// The start layout pulled all of them to their pins (under the BGA on the bottom, 53 of 71 vs 21 in
+// the human layout) or, for series parts, toward the partner with fewer pins (median 38 mm from U1).
+// Here each such part goes to the outline side nearest its IC pin, at the pin's position along the
+// side, packed in rows just outside the outline.
+export function placeNearLargeICs(b, L, free, { minPins = 100, deepMm = 5, gapMm = 1, rowGapMm = 0.3, maxNetParts = 30 } = {}) {
+  const p = b.p, C = p.components, side = (i) => L[i].side ?? (C[i].sides === 'bottom' ? 1 : 0);
+  const netsOf = C.map(() => []);
+  for (const net of p.nets) { const cs = new Set(net.pins.map((pi) => p.pins[pi].componentIndex)); if (cs.size >= 2 && cs.size <= maxNetParts) for (const c of cs) netsOf[c].push({ net, cs }); }
+  let moved = 0;
+  for (let k = 0; k < C.length; k++) {
+    if (free.has(k) || C[k].pins.length < minPins) continue;
+    const [w, h] = rotatedSize(C[k], L[k].rotation), x0 = L[k].x - w / 2, x1 = L[k].x + w / 2, y0 = L[k].y - h / 2, y1 = L[k].y + h / 2;
+    const want = [];
+    for (const i of free) {
+      if (C[i].pins.length >= 8 || !C[i].pins.length) continue;
+      const shared = netsOf[i].filter((e) => e.cs.has(k));
+      if (!shared.length) continue;
+      const series = netsOf[i].some((e) => [...e.cs].some((j) => j !== k && j !== i && (C[j].fixed || C[j].pins.length >= 8)));
+      const same = side(i) === side(k);
+      if (series && !same) continue;
+      const pin = shared[0].net.pins.find((pi) => p.pins[pi].componentIndex === k), [px, py] = worldPin(p, L, pin);
+      const d = [px - x0, x1 - px, py - y0, y1 - py], depth = Math.min(...d), s = d.indexOf(depth); // 0 left, 1 right, 2 top, 3 bottom
+      if (!series && !same && depth > deepMm) continue;
+      want.push({ i, s, t: s < 2 ? py : px, layer: side(i) });
+    }
+    // Pack per (outline side, board side) in rows outside the outline, in order along the side.
+    for (const s of [0, 1, 2, 3]) for (const layer of [0, 1]) {
+      const group = want.filter((u) => u.s === s && u.layer === layer).sort((a, c) => a.t - c.t);
+      const rows = [];
+      for (const u of group) {
+        const [pw, ph] = rotatedSize(C[u.i], L[u.i].rotation), along = s < 2 ? ph : pw, normal = s < 2 ? pw : ph;
+        let r = 0, t = u.t;
+        for (;; r++) {
+          rows[r] ??= { used: [], depth: 0 };
+          if (!rows[r].used.some(([a, c]) => t + along / 2 > a && t - along / 2 < c)) break;
+        }
+        rows[r].used.push([t - along / 2, t + along / 2]); rows[r].depth = Math.max(rows[r].depth, normal);
+        let off = gapMm; for (let q = 0; q < r; q++) off += rows[q].depth + rowGapMm;
+        const n = off + normal / 2;
+        L[u.i].x = s === 0 ? x0 - n : s === 1 ? x1 + n : t; L[u.i].y = s === 2 ? y0 - n : s === 3 ? y1 + n : t;
+        moved++;
+      }
+    }
+  }
+  return moved;
 }
 
 const GROUND = /^(GND|AGND|DGND|PGND|VSS|GNDA|GNDD|EARTH|CHASSIS)/i;

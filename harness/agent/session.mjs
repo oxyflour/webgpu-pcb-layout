@@ -3,7 +3,7 @@
 // router evaluate it. State lives in the session dir, outside the agent's workspace.
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadBoard, legalize, evaluate, legalOk, rotatedSize, worldPin, needsFastRouting } from '../lib/board.mjs';
+import { loadBoard, legalize, evaluateRobust, legalOk, rotatedSize, worldPin, needsFastRouting, toolRouting } from '../lib/board.mjs';
 import { runCypress, KNOBS } from '../lib/cypress.mjs';
 import { startLayout } from '../lib/init.mjs';
 import { lib } from '../lib/env.mjs';
@@ -14,11 +14,11 @@ const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'));
 const writeJson = (f, v) => { fs.writeFileSync(`${f}.tmp`, JSON.stringify(v, null, 1)); fs.renameSync(`${f}.tmp`, f); };
 const r2 = (v) => Math.round(v * 100) / 100;
 
-export function initSession(dir, { board, seed = 1, reference = null }) {
+export async function initSession(dir, { board, seed = 1, reference = null }) {
   fs.mkdirSync(path.join(dir, 'candidates'), { recursive: true });
-  const b = loadBoard(board), human = evaluate(b, b.a.originalLayout, { fast: needsFastRouting(b) });
+  const b = loadBoard(board), human = await evaluateRobust(b, b.a.originalLayout, toolRouting(b));
   writeJson(path.join(dir, 'session.json'), { board, seed, next: 0, candidates: {}, best: null, submitted: null, placeCalls: 0, reference,
-    target: { clean: human.clean, nets: human.nets, vias: human.vias, hpwlMm: human.hpwlMm } });
+    target: { clean: human.clean, nets: human.nets, vias: human.vias, viaSites: human.viaSites, hpwlMm: human.hpwlMm, noise: human.noise } });
 }
 
 // Lexicographic: geometry legal, clean nets, then vias + HPWL relative to the human target.
@@ -164,7 +164,7 @@ export function createSession(dir) {
       const s2 = state(); s2.next++; s2.placeCalls++;
       if (!r.layout) { writeJson(file, s2); return { candidate: null, status: r.status, error: r.error, wallS: r2(r.wallS) }; }
       const leg = legalize(b, r.layout);
-      const m = evaluate(b, leg.layout, { detail: true, fast: big, deadlineS: Math.max(15, 125 - (performance.now() - t0) / 1000) });
+      const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), deadlineS: Math.max(15, 125 - (performance.now() - t0) / 1000) });
       const moved = comps.map((c, i) => [c.id, Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y)]).filter(([ref, d]) => !comps[idx.get(ref)].fixed && d > 0).sort((x, y) => y[1] - x[1]);
       const { perNet, ...metrics } = m;
       writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, knobs, netWeights, seed: runSeed, cypress: { status: r.status, wallS: r.wallS, finalOverflow: r.finalOverflow }, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, metrics, perNet, layout: leg.layout, start: init });
@@ -173,7 +173,7 @@ export function createSession(dir) {
       const accepted = !prev || better(rank(metrics, s2.target), rank(prev.metrics, s2.target));
       if (accepted) s2.best = id;
       writeJson(file, s2);
-      return { candidate: id, best: s2.best, newBest: accepted, ...(m.routeConverged ? {} : { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` }), cypress: r.status, cypressSeconds: r2(r.wallS), metrics, humanTarget: s2.target,
+      return { candidate: id, best: s2.best, newBest: accepted, scoringNote: `clean/vias are medians over ${m.noise.shifts} routing-grid phases; metrics.noise gives their min-max. Two candidates whose clean/vias differ by less than that spread are equal within measurement noise.`, ...(m.routeConverged ? {} : { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` }), cypress: r.status, cypressSeconds: r2(r.wallS), metrics, humanTarget: s2.target,
         failedNets: perNet.filter((n) => n.status !== 'clean').slice(0, 20).map((n) => n.net),
         mostViaNets: perNet.filter((n) => n.vias > 0).sort((x, y) => y.vias - x.vias).slice(0, 8).map((n) => `${n.net}:${n.vias}`),
         plannedDriftMm: Object.fromEntries(Object.keys(plan).map((ref) => { const i = idx.get(ref); return [ref, r2(Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y))]; })),

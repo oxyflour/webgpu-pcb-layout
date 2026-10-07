@@ -6,10 +6,20 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { lib, PLACER_ROOT } from './env.mjs';
 
-const { parseKicadBoard, designToProblem } = await lib('src/kicad/adapter.js');
+const { parseKicadBoard, designToProblem, kicadToIR } = await lib('src/kicad/adapter.js');
+const { irToProblem } = await lib('src/ir/to-problem.js');
 const P = await lib('src/problem.js');
 // Adapter router with harness hooks (deadline, weighted A*, ...): see router-gen.mjs.
 const { routeBoard, evaluationRouting } = await import('./router-gen.mjs');
+const { routeBoardNative, nativeAvailable } = await import('./native-router.mjs');
+
+// Routing used inside agent tool calls and for the human target. Native router (native/build.cmd);
+// boards > 1000 parts add the layer-aware A* heuristic and incremental rip-up: on 16 ppc-n3 layouts
+// identical clean counts and Spearman 0.974 of vias against exact routing, ~10x faster
+// (experiments/rank-check.mjs). Smaller boards: exact routing (native = bit-identical to JS).
+export const toolRouting = (b) => !nativeAvailable() ? (needsFastRouting(b) ? { fast: 'weighted' } : {}) : needsFastRouting(b) ? { router: 'native', layerHeuristic: true, incremental: true } : { router: 'native' };
+// Final evaluation: exact routing (native build when available, same result as JS).
+export const exactRouting = () => nativeAvailable() ? { router: 'native' } : {};
 const { repositoryMetrics } = await lib('bench/cypress/repository-metrics.mjs');
 const { legalizeLayout } = await lib('src/optimizer/legalizer.js');
 const { KICAD_CASES } = await lib('bench/kicad-cases.mjs');
@@ -18,10 +28,15 @@ export const { normalizeProblem, rotatedSize, worldPin } = P;
 export const BOARDS = Object.fromEntries(KICAD_CASES);
 
 // locks: {ref: {x,y,rotation,side}} extra components held fixed (exported as Cypress terminals).
-export function loadBoard(name, { locks = {} } = {}) {
+// only: Set of refs -> sub-board with just these footprints (same outline, rules and adapter path;
+// nets keep only the pins of these parts), e.g. one module for a module-internal Cypress job.
+const parsed = new Map();
+export function loadBoard(name, { locks = {}, only = null } = {}) {
   if (!BOARDS[name]) throw new Error(`Unknown board ${name}; known: ${Object.keys(BOARDS).join(', ')}`);
-  const file = path.join(PLACER_ROOT, BOARDS[name]), text = fs.readFileSync(file, 'utf8');
-  const a = designToProblem(parseKicadBoard(text, name), { preplace: true, sides: 'original' });
+  const file = path.join(PLACER_ROOT, BOARDS[name]);
+  if (!parsed.has(name)) { const text = fs.readFileSync(file, 'utf8'); parsed.set(name, { text, sha256: crypto.createHash('sha256').update(text).digest('hex'), ir: kicadToIR(parseKicadBoard(text, name)) }); }
+  const { text, sha256, ir } = parsed.get(name);
+  const a = only ? irToProblem({ ...ir, footprints: ir.footprints.filter((f) => only.has(f.id)) }, { preplace: true, sides: 'original' }) : designToProblem(parseKicadBoard(text, name), { preplace: true, sides: 'original' });
   // Through-hole parts stay at their input pose (benchmark protocol: mechanical + THT fixed).
   a.input.components.forEach((c, i) => { if (c.twoSided && !c.fixed) c.fixed = { ...a.originalLayout[i] }; });
   const fixedByInput = new Set(a.input.components.filter((c) => c.fixed).map((c) => c.id));
@@ -32,7 +47,7 @@ export function loadBoard(name, { locks = {} } = {}) {
     c.fixed = { x: pose.x, y: pose.y, rotation: pose.rotation ?? 0, side: c.sides === 'bottom' ? 1 : 0 };
   }
   const p = normalizeProblem(a.input);
-  return { name, file, sha256: crypto.createHash('sha256').update(text).digest('hex'), a, p, fixedByInput };
+  return { name, file, sha256, a, p, fixedByInput, ...(only ? { only } : {}) };
 }
 
 export function legalize(b, layout) {
@@ -68,15 +83,36 @@ function nudgeTinyOverlaps(b, L, limit = 0.2) {
 export const needsFastRouting = (b) => b.p.components.length > 1000;
 // deadlineS: stop routing after the round that passes it (partial negotiation, reported).
 // onRound({round, overflow}): per-round progress (e.g. to log long evaluations to disk).
-export function evaluate(b, layout, { detail = false, fast = false, deadlineS = null, onRound = null } = {}) {
-  const rm = repositoryMetrics(b.p, layout);
-  const board = { ...b.a.routing, pitch: 0.4 }, t = performance.now();
-  const r = routeBoard(board, layout, b.a.sides, { ...evaluationRouting(board), diagnostics: detail, ...(fast ? { incremental: true, maxRounds: 20, astarWeight: 1.5 } : {}), ...(deadlineS ? { deadline: t + deadlineS * 1000 } : {}), ...(onRound ? { onRound } : {}) });
-  const g = rm.geometry;
+// shift k: route with the 0.4 mm grid's phase moved by k/3 cell in x and y (board outline and every
+// part translated together; the layout is physically unchanged). See evaluateRobust.
+export const SHIFT_MM = 0.4 / 3;
+export function shiftedRouting(b, layout, k) {
+  const r = b.a.routing;
+  if (!k) return { board: { ...r, pitch: 0.4 }, layout };
+  const d = k * SHIFT_MM, mv = (pts) => pts.map(([x, y]) => [x + d, y + d]);
+  if (r.blocked?.length) throw new Error('shiftedRouting: blocked areas not handled');
+  return {
+    board: { ...r, pitch: 0.4, canvas: { ...r.canvas, width: r.canvas.width + d, height: r.canvas.height + d }, outline: r.outline?.map((o) => ({ ...o, outer: mv(o.outer), ...(o.holes ? { holes: o.holes.map(mv) } : {}) })) },
+    layout: layout.map((l) => ({ ...l, x: l.x + d, y: l.y + d })),
+  };
+}
+// router 'native': native/router.cpp (bit-identical to the JS router unless layerHeuristic);
+// layerHeuristic: A* also counts the layer changes still needed (native only); incremental: rip-up
+// only nets on overflowing cells after the first round.
+// Geometry and HPWL only (no routing).
+export function placementMetrics(b, layout) {
+  const rm = repositoryMetrics(b.p, layout), g = rm.geometry;
+  return { hpwlMm: Math.round(rm.metrics.hpwl_mm * 10) / 10, geometry: { overlaps: g.movableOverlapPairs, clearance: g.movableClearancePairs, outside: g.movableOutside, keepout: g.movableMaskViolations, fixedChanged: g.fixed_changed, sideChanged: g.side_changed } };
+}
+export function evaluate(b, layout, { detail = false, fast = false, deadlineS = null, onRound = null, shift = 0, router = 'js', layerHeuristic = false, incremental = false } = {}) {
+  const pm = placementMetrics(b, layout);
+  const sr = shiftedRouting(b, layout, shift), board = sr.board, t = performance.now();
+  const route = router === 'native' ? routeBoardNative : routeBoard;
+  if (layerHeuristic && router !== 'native') throw new Error('layerHeuristic needs router native');
+  const r = route(board, sr.layout, b.a.sides, { ...evaluationRouting(board), diagnostics: detail, ...(fast === 'weighted' ? { incremental: true, maxRounds: 20, astarWeight: 1.5 } : fast || incremental ? { incremental: true } : {}), ...(layerHeuristic ? { layerHeuristic } : {}), ...(deadlineS ? { deadline: t + deadlineS * 1000 } : {}), ...(onRound ? { onRound } : {}) });
   const m = {
-    clean: r.clean, nets: r.nets, vias: r.vias, routedLengthMm: Math.round(r.length), hpwlMm: Math.round(rm.metrics.hpwl_mm * 10) / 10,
-    geometry: { overlaps: g.movableOverlapPairs, clearance: g.movableClearancePairs, outside: g.movableOutside, keepout: g.movableMaskViolations, fixedChanged: g.fixed_changed, sideChanged: g.side_changed },
-    routeMs: Math.round(performance.now() - t), routing: fast ? 'incremental-20-astar1.5' : 'full-40', routeRounds: r.rounds, routeConverged: r.overflow === 0,
+    clean: r.clean, nets: r.nets, vias: r.vias, viaSites: r.viaSites, routedLengthMm: Math.round(r.length), hpwlMm: pm.hpwlMm, geometry: pm.geometry,
+    routeMs: Math.round(performance.now() - t), routing: `${router}${layerHeuristic ? '-layerh' : ''}-${fast === 'weighted' ? 'incremental-20-astar1.5' : fast || incremental ? 'incremental-40' : 'full-40'}`, ...(shift ? { shift } : {}), routeRounds: r.rounds, routeConverged: r.overflow === 0,
   };
   if (detail) {
     if (board.netCount !== b.p.nets.length) throw new Error('router net indexing differs from problem nets');
@@ -86,3 +122,25 @@ export function evaluate(b, layout, { detail = false, fast = false, deadlineS = 
 }
 
 export const legalOk = (m) => m.geometry.overlaps === 0 && m.geometry.outside === 0 && m.geometry.keepout === 0 && m.geometry.fixedChanged === 0 && m.geometry.sideChanged === 0;
+
+// Router noise (experiments/router-noise.mjs): the same layout routed with another grid phase or
+// 0.01 mm jitter changes ppc-n3 by +-150 vias and up to 7 clean nets, congested k60 layouts by up to
+// 30 clean nets. evaluateRobust routes `shifts` grid phases in parallel worker threads and reports
+// the median of each routing metric (clean, vias, viaSites, length) and their spread (min-max).
+// perNet (detail) comes from the run whose via count is the median.
+export const defaultShifts = (b) => needsFastRouting(b) ? 3 : 5;
+export async function evaluateRobust(b, layout, { shifts = defaultShifts(b), ...opts } = {}) {
+  const { Worker } = await import('node:worker_threads');
+  const { onRound, ...plain } = opts;
+  const runs = await Promise.all(Array.from({ length: shifts }, (_, k) => new Promise((resolve, reject) => {
+    const w = new Worker(new URL('./eval-worker.mjs', import.meta.url), { execArgv: [], workerData: { name: b.name, layout, opts: { ...plain, shift: k } } });
+    w.once('message', resolve); w.once('error', reject);
+    w.once('exit', (c) => { if (c) reject(new Error(`eval worker exit ${c}`)); });
+  })));
+  const med = (k) => { const v = runs.map((m) => m[k]).sort((x, y) => x - y); return v[(v.length - 1) >> 1]; };
+  const span = (k) => [Math.min(...runs.map((m) => m[k])), Math.max(...runs.map((m) => m[k]))];
+  const { shift, ...byVias } = [...runs].sort((x, y) => x.vias - y.vias)[(runs.length - 1) >> 1];
+  return { ...byVias, clean: med('clean'), vias: med('vias'), viaSites: med('viaSites'), routedLengthMm: med('routedLengthMm'),
+    routeConverged: runs.every((m) => m.routeConverged), routeMs: Math.max(...runs.map((m) => m.routeMs)),
+    noise: { shifts, clean: span('clean'), vias: span('vias'), viaSites: span('viaSites') } };
+}

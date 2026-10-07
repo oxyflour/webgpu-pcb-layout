@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
 import { initSession, callTool } from './session.mjs';
-import { loadBoard, evaluate, legalOk } from '../lib/board.mjs';
+import { loadBoard, evaluateRobust, legalOk, exactRouting } from '../lib/board.mjs';
 import { HARNESS_ROOT } from '../lib/env.mjs';
 
 const args = process.argv.slice(2), arg = (n, d) => { const i = args.indexOf(`--${n}`); return i < 0 ? d : args[i + 1]; };
@@ -20,7 +20,7 @@ const dsh = process.env.DSH_EXE ?? path.join(os.homedir(), 'AppData/Local/Progra
 fs.mkdirSync(out, { recursive: true });
 if (fs.existsSync(path.join(out, 'events.jsonl'))) throw new Error('Output already has a run; choose a new --out');
 const sessionDir = path.join(out, 'session');
-initSession(sessionDir, { board, seed });
+await initSession(sessionDir, { board, seed });
 // Agent workspace outside the repo so it cannot read the harness, boards or human layout.
 const ws = path.join(os.homedir(), 'agent-ws', `cypress-${board}-${crypto.randomUUID()}`);
 fs.mkdirSync(ws, { recursive: true });
@@ -95,13 +95,13 @@ const chosen = state.submitted ?? state.best;
 let final = null;
 if (chosen) {
   // Independent re-evaluation of the chosen layout on a fresh problem (no agent locks).
-  // The layout is written first so a killed evaluation can be redone from disk; routing logs
-  // every round and stops at a 60 min cap (reported as routeConverged=false).
+  // The layout is written first so a killed evaluation can be redone from disk; routing stops
+  // at a 60 min cap (reported as routeConverged=false).
   const b = loadBoard(board), saved = JSON.parse(fs.readFileSync(path.join(sessionDir, 'candidates', `${chosen}.json`), 'utf8'));
   fs.writeFileSync(path.join(out, 'final-layout.json'), JSON.stringify(saved.layout));
-  const t0 = performance.now(), progress = path.join(out, 'final-route-progress.jsonl');
-  fs.writeFileSync(progress, '');
-  const m = evaluate(b, saved.layout, { deadlineS: 3600, onRound: ({ round, overflow }) => fs.appendFileSync(progress, JSON.stringify({ round, overflow, s: +((performance.now() - t0) / 1000).toFixed(1) }) + '\n') });
+  const t0 = performance.now();
+  // Median over grid phases (evaluateRobust): exact routing per phase, phases in parallel workers.
+  const m = await evaluateRobust(b, saved.layout, { deadlineS: 3600, ...exactRouting() });
   final = { candidate: chosen, viaSubmit: !!state.submitted, legal: legalOk(m), routeSeconds: (performance.now() - t0) / 1000, ...m };
   fs.writeFileSync(path.join(out, 'final-eval.json'), JSON.stringify(final, null, 1));
 }

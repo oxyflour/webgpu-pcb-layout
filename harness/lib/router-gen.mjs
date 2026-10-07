@@ -30,6 +30,11 @@ export function generateRouter() {
   t = patch(t, '  const heap = new MinHeap(1 << 16);\n', '  const heap = new MinHeap(1 << 16);\n  const AW = options.astarWeight ?? 1;\n');
   t = patch(t, '  const routes = new Array(board.netCount).fill(null);\n',
     '  if (options.exposeRouter) return { routeNet, usage, history, setPres: (v) => { pres = v; }, pres, presentGrowth, historyGain, grid: { W, H, L, P, N, cell }, netPads, padCenter, netBlock, netVia, margin };\n  const routes = new Array(board.netCount).fill(null);\n');
+  // viaSites: physical vias (a run of consecutive layer changes at one cell = one via); `vias` keeps
+  // counting every adjacent-layer step (on 10-layer ppc a through via counts up to 9).
+  t = patch(t, '  let clean = 0, complete = 0, vias = 0, length = 0;\n', '  let clean = 0, complete = 0, vias = 0, length = 0, viaSites = 0;\n');
+  t = patch(t, '        vias++;\n', '        vias++;\n        if (!(k > 1 && Math.abs(path[k - 1] - path[k - 2]) === P)) viaSites++;\n');
+  t = patch(t, 'nets: order.length, complete, clean, vias, length, status,', 'nets: order.length, complete, clean, vias, viaSites, length, status,');
   const out = path.join(HARNESS_ROOT, 'results', '.cache', 'board-router-hooks.mjs');
   fs.mkdirSync(path.dirname(out), { recursive: true });
   if (!fs.existsSync(out) || fs.readFileSync(out, 'utf8') !== t) fs.writeFileSync(out, t);

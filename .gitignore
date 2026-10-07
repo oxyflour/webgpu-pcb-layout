@@ -1,2 +1,5 @@
 .vscode/
 harness/results/
+harness/native/*.exe
+harness/native/*.obj
+harness/native/build.log
