@@ -462,7 +462,7 @@ svg text{font-family:inherit}
     </ul>
     <ul class="pts">
       <li><b>剩下的差距是过孔</b>（k60 557 vs 345，pic 492 vs 363），集中在 IC 周边小件的精确排布上。</li>
-      <li><b>下一步</b>：用当前工具在 13 板 + ppc 上重跑 agent sweep，统一口径；第 17 页用的是旧数据。</li>
+      <li><b>下一步</b>：用当前工具在 13 板 + ppc 上重跑 agent sweep，统一口径；第 19 页用的是旧数据。</li>
       <li>把 IC 邻居的排布交给路由器在环评估；前提是有一个和评估一致、且足够快的路由器。</li>
       <li>编辑器默认使用新起点；edk 出现回退，原因未查。</li>
     </ul>
@@ -633,7 +633,7 @@ sc2('c-cur-hpwl',2,(a,h)=>+(a/h).toFixed(2),'倍',1);
 const withImg=b.filter(k=>A[k].shown);const host=document.getElementById('pairs');let page=19;
 for(let i=0;i<withImg.length;i+=2){const ks=withImg.slice(i,i+2);
  const cell=k=>{const a=A[k],r=a.reps.find(x=>x.rep===a.shown);return `<div class="card"><h3 style="font-size:13.5px;line-height:1.4">${k}：人工 ${a.human.clean}/${a.nets} 布通 · ${a.human.vias} 过孔 · ${a.human.hpwl} mm　｜　Agent ${r.clean}/${a.nets} · ${r.vias} · ${r.hpwl} mm</h3><div class="pair" style="flex:1"><figure><img src="img/${k}-human.png"><figcaption>人工布局</figcaption></figure><figure><img src="img/${k}-agent.png"><figcaption>Agent（v7，会话 ${a.shown}）</figcaption></figure></div></div>`;};
- host.insertAdjacentHTML('beforeend',`<div class="frame"><div class="slide"><div class="kicker">8 · 总结：人工 vs Agent，逐板</div><h2 style="font-size:24px">逐板对比（每板展示 3 个会话中最好的一个；v7 sweep 的旧数据，同一布线器）</h2><div class="grid g2">${ks.map(cell).join('')}</div><div class="legend-line">件：青 = 顶面，紫 = 底面，红 = 重叠；走线：红 = 顶层，蓝 = 底层，绿 = 内层，橙 = 冲突，红虚线 = 未布通。acc 的最好会话没有存图，只在第 17 页给数字。</div><span class="pageno">${page++}</span></div></div>`);}
+ host.insertAdjacentHTML('beforeend',`<div class="frame"><div class="slide"><div class="kicker">8 · 总结：人工 vs Agent，逐板</div><h2 style="font-size:24px">逐板对比（每板展示 3 个会话中最好的一个；v7 sweep 的旧数据，同一布线器）</h2><div class="grid g2">${ks.map(cell).join('')}</div><div class="legend-line">件：青 = 顶面，紫 = 底面，红 = 重叠；走线：红 = 顶层，蓝 = 底层，绿 = 内层，橙 = 冲突，红虚线 = 未布通。acc 的最好会话没有存图，只在第 19 页给数字。</div><span class="pageno">${page++}</span></div></div>`);}
 })();
 </script>
 <script>
