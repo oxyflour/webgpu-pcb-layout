@@ -28,7 +28,7 @@ export function routeBoardNative(board, layout, sides, options = {}) {
   const f64 = (a) => { const b = Buffer.alloc(a.length * 8); for (let k = 0; k < a.length; k++) b.writeDoubleLE(a[k], k * 8); parts.push(b); };
   i32([W, H, L, board.netCount, order.length, options.maxRounds ?? 12, options.incremental ? 1 : 0, (options.windowMargin ?? 12)]);
   f64([cell, options.viaCost ?? 6, options.presentFactor ?? 0.6, options.presentGrowth ?? 1.6, options.historyGain ?? 0.4, deadlineS > 0 ? deadlineS : 0, options.astarWeight ?? 1]);
-  i32([options.layerHeuristic ? 1 : 0, options.emitPaths ? 1 : 0]);
+  i32([options.layerHeuristic ? 1 : 0, options.emitPaths ? 1 : 0, options.emitOverflow ? 1 : 0, options.cleanup ?? 0]);
   parts.push(Buffer.from(Int32Array.from(owner).buffer));
   i32(order);
   i32([padCells.length]);
@@ -43,7 +43,7 @@ export function routeBoardNative(board, layout, sides, options = {}) {
     for (const x of o.roundLog) options.onRound?.({ round: x.round, maxRounds: options.maxRounds ?? 12, overflow: x.overflow });
     return {
       grid: { W, H, cell, layers: L }, rounds: o.rounds, overflow: o.overflow, nets: o.nets, complete: o.complete, clean: o.clean, vias: o.vias, viaSites: o.viaSites, length: o.length,
-      status: Uint8Array.from(o.status), nativeSeconds: o.seconds, ...(o.paths ? { paths: o.paths } : {}),
+      status: Uint8Array.from(o.status), nativeSeconds: o.seconds, ...(options.cleanup ? { cleanup: o.cleanup } : {}), roundOverflow: o.roundLog.map((x) => x.overflow), ...(o.ovf1 ? { overflowCells: { round1: o.ovf1, end: o.ovfEnd, P } } : {}), ...(o.paths ? { paths: o.paths } : {}),
       ...(options.diagnostics ? { netStats: o.netVias.map((v, n) => ({ vias: v, lengthMm: o.netLen[n], viaPoints: [] })) } : {}),
     };
   } finally { fs.rmSync(file, { force: true }); }

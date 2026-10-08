@@ -9,6 +9,9 @@
 //   double cell, viaCost, presentFactor, presentGrowth, historyGain, deadlineS (<= 0: none), astarWeight
 //   int32  layerHeuristic (1: A* adds viaCost x layers to the target pad's layer range; not bit-identical to JS)
 //   int32  emitPaths (1: output "paths": per routed connection [net, [cell ids in the JS numbering l * P + q]])
+//   int32  emitOverflow (1: output "ovf1" / "ovfEnd": overflowing cells (JS numbering) after round 1 / at the end)
+//   int32  cleanup (0: off; k > 0: after negotiation, rip up every net that is not clean and reroute
+//          them one by one with the clean nets as hard obstacles, trying k net orders; see below)
 //   int32  owner[W*H*L]
 //   int32  order[orderCount]
 //   int32  padCount; per pad: double cx, cy; int32 n; int32 cells[n]
@@ -49,7 +52,9 @@ struct MinHeap {
   }
 };
 
-struct Route { bool complete = true; bool has = false; vector<int32_t> cells; vector<vector<int32_t>> paths; };
+// bad: cleanup could not route this net without conflicts; its paths (soft route) count for vias and
+// length, but its cells are not committed, so it never makes another net unclean.
+struct Route { bool complete = true; bool has = false; bool bad = false; vector<int32_t> cells; vector<vector<int32_t>> paths; };
 
 static FILE* in;
 template <class T> T rd() { T x; if (fread(&x, sizeof(T), 1, in) != 1) { fprintf(stderr, "short input\n"); exit(2); } return x; }
@@ -61,7 +66,7 @@ int main(int argc, char** argv) {
   const int W = rd<int32_t>(), H = rd<int32_t>(), L = rd<int32_t>(), netCount = rd<int32_t>(), orderCount = rd<int32_t>();
   const int maxRounds = rd<int32_t>(), incremental = rd<int32_t>(), margin = rd<int32_t>();
   const double cell = rd<double>(), viaCost = rd<double>(), presentFactor = rd<double>(), presentGrowth = rd<double>(), historyGain = rd<double>(), deadlineS = rd<double>(), AW = rd<double>();
-  const int layerH = rd<int32_t>(), emitPaths = rd<int32_t>();
+  const int layerH = rd<int32_t>(), emitPaths = rd<int32_t>(), emitOverflow = rd<int32_t>(), cleanup = rd<int32_t>();
   const int P = W * H, N = L * P, BOTTOM = L - 1, WL = W * L;
   vector<int32_t> ownerJs, order; rdv(ownerJs, N); rdv(order, orderCount);
   // Internal cell index q * L + l (JS: l * P + q): the layers of one grid position are adjacent in
@@ -86,6 +91,7 @@ int main(int argc, char** argv) {
   MinHeap heap;
   double pres = presentFactor;
   const double tb = 1.0; // track block size (rules: null)
+  bool hard = false; // cleanup: cells used by another net are blocked
 
   int tl0 = 0, tl1 = 0; // target pad layer range (layerHeuristic)
   // Layer term of the heuristic: every layer change costs >= viaCost, so it stays admissible and consistent.
@@ -110,6 +116,7 @@ int main(int argc, char** argv) {
       for (int j = 0; j < k; j++) {
         const int32_t n = nb[j]; const CellS& cn = cs[n];
         if (cn.owner != -1 && cn.owner != net) continue;
+        if (hard && cn.usage) continue;
         const double use = cn.usage, hist = cn.hist;
         const double ng = gc + nbase[j] * (1 + hist) * (1 + pres * use);
         SearchS& sn = ss[n];
@@ -162,6 +169,9 @@ int main(int argc, char** argv) {
   vector<Route> routes(netCount);
   int rounds = 0, overflow = 0; double prevOverflow = INFINITY; bool fullRound = true;
   std::string roundLog = "[";
+  auto toJs = [&](int c) { int q = c / L, l = c - q * L; return l * P + q; };
+  auto overflowCells = [&]() { std::string o = "["; bool f = true; for (int c = 0; c < N; c++) if (cs[c].usage > 1) { o += (f ? "" : ",") + std::to_string(toJs(c)); f = false; } return o + "]"; };
+  std::string ovf1 = "[]";
   for (int round = 0; round < maxRounds; round++) {
     rounds = round + 1;
     for (int n : order) {
@@ -174,6 +184,7 @@ int main(int argc, char** argv) {
       routes[n] = routeNet(n);
       for (int32_t c : routes[n].cells) cs[c].usage++;
     }
+    if (round == 0 && emitOverflow) ovf1 = overflowCells();
     overflow = 0;
     for (int c = 0; c < N; c++) if (cs[c].usage > 1) { overflow++; cs[c].hist = (float)(cs[c].hist + historyGain * (cs[c].usage - 1)); }
     double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
@@ -184,12 +195,56 @@ int main(int argc, char** argv) {
     pres *= presentGrowth;
   }
   roundLog += "]";
+  const std::string ovfEnd = emitOverflow ? overflowCells() : "[]";
+
+  // Cleanup. Negotiation ends with a few overflowing cells, and every net crossing one counts as not
+  // clean; which nets lose depends on grid phase and order (router noise). Rip up all nets that are
+  // not clean (overflow or open), keep the clean ones as hard obstacles and route the ripped nets
+  // one at a time on free cells only, in `cleanup` orders (span ascending, descending, then seeded
+  // shuffles); keep the order with most nets routed (then fewest vias). A net that still fails gets
+  // a soft route (negotiated costs) for its vias / length, marked bad and not committed.
+  int cleanupNets = 0, cleanupRecovered = 0, cleanupOrder = -1;
+  if (cleanup > 0) {
+    vector<int> badNets;
+    for (int n : order) {
+      Route& r = routes[n];
+      bool ok = r.complete; if (ok) for (int32_t c : r.cells) if (cs[c].usage > 1) { ok = false; break; }
+      if (!ok) badNets.push_back(n);
+    }
+    cleanupNets = (int)badNets.size();
+    if (!badNets.empty()) {
+      for (int n : badNets) { for (int32_t c : routes[n].cells) cs[c].usage--; routes[n] = Route(); }
+      vector<uint16_t> base(N); for (int c = 0; c < N; c++) base[c] = cs[c].usage;
+      vector<Route> best; int bestOk = -1; long bestVias = 0;
+      uint32_t rs = 12345;
+      auto rnd = [&]() { rs ^= rs << 13; rs ^= rs >> 17; rs ^= rs << 5; return rs; };
+      auto viasOf = [&](const Route& r) { long v = 0; for (const auto& p : r.paths) for (size_t k = 1; k < p.size(); k++) if (std::abs(p[k] - p[k - 1]) == 1) v++; return v; };
+      for (int k = 0; k < cleanup; k++) {
+        vector<int> ord = badNets;
+        if (k == 1) std::reverse(ord.begin(), ord.end());
+        else if (k > 1) for (size_t i = ord.size() - 1; i > 0; i--) std::swap(ord[i], ord[rnd() % (i + 1)]);
+        for (int c = 0; c < N; c++) cs[c].usage = base[c];
+        vector<Route> cur(netCount); int ok = 0; long vias = 0;
+        hard = true;
+        for (int n : ord) { Route r = routeNet(n); if (r.complete) { ok++; vias += viasOf(r); for (int32_t c : r.cells) cs[c].usage++; } else r.bad = true; cur[n] = std::move(r); }
+        hard = false;
+        if (ok > bestOk || (ok == bestOk && vias < bestVias)) { bestOk = ok; bestVias = vias; best = std::move(cur); cleanupOrder = k; }
+      }
+      for (int c = 0; c < N; c++) cs[c].usage = base[c];
+      for (int n : badNets) if (!best[n].bad) for (int32_t c : best[n].cells) cs[c].usage++;
+      for (int n : badNets) {
+        if (best[n].bad) { Route r = routeNet(n); r.bad = true; routes[n] = std::move(r); }
+        else routes[n] = std::move(best[n]);
+      }
+      cleanupRecovered = bestOk;
+    }
+  }
 
   int clean = 0, complete = 0; long vias = 0, viaSites = 0; double length = 0;
   vector<int> status(netCount, 0), netVias(netCount, 0); vector<double> netLen(netCount, 0);
   for (int n : order) {
     const Route& r = routes[n];
-    bool isClean = r.complete; if (isClean) for (int32_t c : r.cells) if (cs[c].usage > 1) { isClean = false; break; }
+    bool isClean = r.complete && !r.bad; if (isClean) for (int32_t c : r.cells) if (cs[c].usage > 1) { isClean = false; break; }
     status[n] = isClean ? 1 : r.complete ? 2 : 3;
     if (r.complete) complete++;
     if (isClean) clean++;
@@ -199,8 +254,9 @@ int main(int argc, char** argv) {
     }
   }
   double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-  printf("{\"rounds\":%d,\"overflow\":%d,\"nets\":%d,\"complete\":%d,\"clean\":%d,\"vias\":%ld,\"viaSites\":%ld,\"length\":%.10g,\"seconds\":%.3f,\"roundLog\":%s,\"status\":[", rounds, overflow, orderCount, complete, clean, vias, viaSites, length, secs, roundLog.c_str());
+  printf("{\"rounds\":%d,\"overflow\":%d,\"nets\":%d,\"complete\":%d,\"clean\":%d,\"vias\":%ld,\"viaSites\":%ld,\"length\":%.10g,\"seconds\":%.3f,\"roundLog\":%s,\"cleanup\":{\"nets\":%d,\"recovered\":%d,\"order\":%d},\"status\":[", rounds, overflow, orderCount, complete, clean, vias, viaSites, length, secs, roundLog.c_str(), cleanupNets, cleanupRecovered, cleanupOrder);
   for (int i = 0; i < netCount; i++) printf(i ? ",%d" : "%d", status[i]);
+  if (emitOverflow) printf("],\"ovf1\":%s,\"ovfEnd\":%s,\"netVias\":[", ovf1.c_str(), ovfEnd.c_str()); else
   printf("],\"netVias\":[");
   for (int i = 0; i < netCount; i++) printf(i ? ",%d" : "%d", netVias[i]);
   printf("],\"netLen\":[");

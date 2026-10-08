@@ -26,3 +26,23 @@ export function buildModules(b, { minPins = 8, maxNetParts = 30 } = {}) {
   comps.forEach((c, i) => { if (owner[i] >= 0 && owner[i] !== i) modules.get(owner[i]).push(i); });
   return { owner, modules, isIc };
 }
+
+// Passive arrays from the netlist: >= minSize movable 2-pin parts of the same size whose two pins
+// each reach exactly one big part (>= minPins pins: IC or connector) over a small signal net
+// (<= maxNetParts parts), the same pair for all, e.g. bus series resistors. Human layouts put
+// them in rows: ppc-n3 25 arrays / 157 parts, 93 % share a row or column with an array mate.
+export function findArrays(b, { minSize = 3, minPins = 8, maxNetParts = 6 } = {}) {
+  const p = b.p, C = p.components;
+  const netParts = p.nets.map((n) => [...new Set(n.pins.map((pi) => p.pins[pi].componentIndex))]);
+  const pinNet = new Map(); p.nets.forEach((n, k) => n.pins.forEach((pi) => pinNet.set(pi, k)));
+  const groups = new Map();
+  C.forEach((c, i) => {
+    if (c.fixed || c.pins.length !== 2) return;
+    const ends = c.pins.map((pi) => { const n = pinNet.get(pi); if (n == null || netParts[n].length > maxNetParts) return null; const bs = netParts[n].filter((j) => j !== i && C[j].pins.length >= minPins); return bs.length === 1 ? bs[0] : null; });
+    if (ends.some((e) => e == null) || ends[0] === ends[1]) return;
+    const k = `${Math.min(...ends)}-${Math.max(...ends)}|${c.width}x${c.height}`;
+    if (!groups.has(k)) groups.set(k, { ics: [Math.min(...ends), Math.max(...ends)], members: [] });
+    groups.get(k).members.push(i);
+  });
+  return [...groups.values()].filter((g) => g.members.length >= minSize);
+}

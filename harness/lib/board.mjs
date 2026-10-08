@@ -86,14 +86,15 @@ export const needsFastRouting = (b) => b.p.components.length > 1000;
 // shift k: route with the 0.4 mm grid's phase moved by k/3 cell in x and y (board outline and every
 // part translated together; the layout is physically unchanged). See evaluateRobust.
 export const SHIFT_MM = 0.4 / 3;
-export function shiftedRouting(b, layout, k) {
+// offset [dx, dy] (mm) instead of k: any grid phase (experiments).
+export function shiftedRouting(b, layout, k, offset = null) {
   const r = b.a.routing;
-  if (!k) return { board: { ...r, pitch: 0.4 }, layout };
-  const d = k * SHIFT_MM, mv = (pts) => pts.map(([x, y]) => [x + d, y + d]);
+  if (!k && !offset) return { board: { ...r, pitch: 0.4 }, layout };
+  const [dx, dy] = offset ?? [k * SHIFT_MM, k * SHIFT_MM], d = Math.max(dx, dy), mv = (pts) => pts.map(([x, y]) => [x + dx, y + dy]);
   if (r.blocked?.length) throw new Error('shiftedRouting: blocked areas not handled');
   return {
     board: { ...r, pitch: 0.4, canvas: { ...r.canvas, width: r.canvas.width + d, height: r.canvas.height + d }, outline: r.outline?.map((o) => ({ ...o, outer: mv(o.outer), ...(o.holes ? { holes: o.holes.map(mv) } : {}) })) },
-    layout: layout.map((l) => ({ ...l, x: l.x + d, y: l.y + d })),
+    layout: layout.map((l) => ({ ...l, x: l.x + dx, y: l.y + dy })),
   };
 }
 // router 'native': native/router.cpp (bit-identical to the JS router unless layerHeuristic);
@@ -104,16 +105,23 @@ export function placementMetrics(b, layout) {
   const rm = repositoryMetrics(b.p, layout), g = rm.geometry;
   return { hpwlMm: Math.round(rm.metrics.hpwl_mm * 10) / 10, geometry: { overlaps: g.movableOverlapPairs, clearance: g.movableClearancePairs, outside: g.movableOutside, keepout: g.movableMaskViolations, fixedChanged: g.fixed_changed, sideChanged: g.side_changed } };
 }
-export function evaluate(b, layout, { detail = false, fast = false, deadlineS = null, onRound = null, shift = 0, router = 'js', layerHeuristic = false, incremental = false } = {}) {
+export function evaluate(b, layout, { detail = false, fast = false, deadlineS = null, onRound = null, shift = 0, router = 'js', layerHeuristic = false, incremental = false, cleanup = 0, offset = null } = {}) {
   const pm = placementMetrics(b, layout);
-  const sr = shiftedRouting(b, layout, shift), board = sr.board, t = performance.now();
+  const sr = shiftedRouting(b, layout, shift, offset), board = sr.board, t = performance.now();
   const route = router === 'native' ? routeBoardNative : routeBoard;
-  if (layerHeuristic && router !== 'native') throw new Error('layerHeuristic needs router native');
-  const r = route(board, sr.layout, b.a.sides, { ...evaluationRouting(board), diagnostics: detail, ...(fast === 'weighted' ? { incremental: true, maxRounds: 20, astarWeight: 1.5 } : fast || incremental ? { incremental: true } : {}), ...(layerHeuristic ? { layerHeuristic } : {}), ...(deadlineS ? { deadline: t + deadlineS * 1000 } : {}), ...(onRound ? { onRound } : {}) });
+  if ((layerHeuristic || cleanup) && router !== 'native') throw new Error('layerHeuristic / cleanup need router native');
+  const r = route(board, sr.layout, b.a.sides, { ...evaluationRouting(board), diagnostics: detail, ...(fast === 'weighted' ? { incremental: true, maxRounds: 20, astarWeight: 1.5 } : fast || incremental ? { incremental: true } : {}), ...(layerHeuristic ? { layerHeuristic } : {}), ...(cleanup ? { cleanup } : {}), ...(detail && router === 'native' ? { emitOverflow: true } : {}), ...(deadlineS ? { deadline: t + deadlineS * 1000 } : {}), ...(onRound ? { onRound } : {}) });
   const m = {
     clean: r.clean, nets: r.nets, vias: r.vias, viaSites: r.viaSites, routedLengthMm: Math.round(r.length), hpwlMm: pm.hpwlMm, geometry: pm.geometry,
-    routeMs: Math.round(performance.now() - t), routing: `${router}${layerHeuristic ? '-layerh' : ''}-${fast === 'weighted' ? 'incremental-20-astar1.5' : fast || incremental ? 'incremental-40' : 'full-40'}`, ...(shift ? { shift } : {}), routeRounds: r.rounds, routeConverged: r.overflow === 0,
+    routeMs: Math.round(performance.now() - t), routing: `${router}${layerHeuristic ? '-layerh' : ''}-${fast === 'weighted' ? 'incremental-20-astar1.5' : fast || incremental ? 'incremental-40' : 'full-40'}${cleanup ? `-cleanup${cleanup}` : ''}`, ...(shift ? { shift } : {}), routeRounds: r.rounds, routeConverged: r.overflow === 0, ...(r.cleanup ? { cleanup: r.cleanup } : {}),
   };
+  // Routing margin (experiments/why-stable.mjs): overflow 0 at the end <=> clean nets do not depend on
+  // the grid phase. overflowRound1 = cells claimed by > 1 net when every net takes its shortest path.
+  if (r.roundOverflow) {
+    const ro = r.roundOverflow, z = ro.indexOf(0);
+    m.margin = { overflowRound1: ro[0], overflowRound5: ro[Math.min(4, ro.length - 1)], roundsToZero: z < 0 ? null : z + 1, timeLimited: z < 0 && r.rounds < (evaluationRouting(board).maxRounds ?? 40) && !!deadlineS };
+  }
+  if (r.overflowCells) m.overflowBins = overflowBins(b, r, offset ?? [shift * SHIFT_MM, shift * SHIFT_MM]);
   if (detail) {
     if (board.netCount !== b.p.nets.length) throw new Error('router net indexing differs from problem nets');
     m.perNet = b.p.nets.map((n, i) => ({ net: n.id, status: ['?', 'clean', 'overflow', 'open'][r.status[i]], vias: r.netStats[i].vias, lengthMm: Math.round(r.netStats[i].lengthMm * 10) / 10 }));
@@ -121,26 +129,45 @@ export function evaluate(b, layout, { detail = false, fast = false, deadlineS = 
   return m;
 }
 
+// Overflowing cells binned on the board (mm, grid offset removed): {binMm, round1: {"i,j": n}, end}.
+export const binMm = (b) => Math.max(4, Math.round(Math.min(b.p.canvas.width, b.p.canvas.height) / 10));
+function overflowBins(b, r, [dx, dy]) {
+  const { W, cell } = r.grid, P = r.overflowCells.P, B = binMm(b);
+  const bin = (cells) => { const o = {}; for (const c of cells) { const q = c % P, x = (q % W + 0.5) * cell - dx, y = Math.floor(q / W + 1e-9) * cell + cell / 2 - dy; const k = `${Math.floor(x / B)},${Math.floor(y / B)}`; o[k] = (o[k] ?? 0) + 1; } return o; };
+  return { binMm: B, round1: bin(r.overflowCells.round1), end: bin(r.overflowCells.end) };
+}
+
 export const legalOk = (m) => m.geometry.overlaps === 0 && m.geometry.outside === 0 && m.geometry.keepout === 0 && m.geometry.fixedChanged === 0 && m.geometry.sideChanged === 0;
 
 // Router noise (experiments/router-noise.mjs): the same layout routed with another grid phase or
 // 0.01 mm jitter changes ppc-n3 by +-150 vias and up to 7 clean nets, congested k60 layouts by up to
 // 30 clean nets. evaluateRobust routes `shifts` grid phases in parallel worker threads and reports
+// Phase k moves the grid by k/shifts cell (k/3 before 2026-10-08: with 5 shifts, 4 repeated 1).
 // the median of each routing metric (clean, vias, viaSites, length) and their spread (min-max).
 // perNet (detail) comes from the run whose via count is the median.
+const sumBins = (list) => { const o = {}; for (const x of list) for (const [k, v] of Object.entries(x)) o[k] = (o[k] ?? 0) + v; return o; };
 export const defaultShifts = (b) => needsFastRouting(b) ? 3 : 5;
 export async function evaluateRobust(b, layout, { shifts = defaultShifts(b), ...opts } = {}) {
   const { Worker } = await import('node:worker_threads');
   const { onRound, ...plain } = opts;
   const runs = await Promise.all(Array.from({ length: shifts }, (_, k) => new Promise((resolve, reject) => {
-    const w = new Worker(new URL('./eval-worker.mjs', import.meta.url), { execArgv: [], workerData: { name: b.name, layout, opts: { ...plain, shift: k } } });
+    const w = new Worker(new URL('./eval-worker.mjs', import.meta.url), { execArgv: [], workerData: { name: b.name, layout, opts: { ...plain, shift: k, ...(k ? { offset: [k * 0.4 / shifts, k * 0.4 / shifts] } : {}) } } });
     w.once('message', resolve); w.once('error', reject);
     w.once('exit', (c) => { if (c) reject(new Error(`eval worker exit ${c}`)); });
   })));
   const med = (k) => { const v = runs.map((m) => m[k]).sort((x, y) => x - y); return v[(v.length - 1) >> 1]; };
   const span = (k) => [Math.min(...runs.map((m) => m[k])), Math.max(...runs.map((m) => m[k]))];
   const { shift, ...byVias } = [...runs].sort((x, y) => x.vias - y.vias)[(runs.length - 1) >> 1];
-  return { ...byVias, clean: med('clean'), vias: med('vias'), viaSites: med('viaSites'), routedLengthMm: med('routedLengthMm'),
+  const out = { ...byVias, clean: med('clean'), vias: med('vias'), viaSites: med('viaSites'), routedLengthMm: med('routedLengthMm'),
     routeConverged: runs.every((m) => m.routeConverged), routeMs: Math.max(...runs.map((m) => m.routeMs)),
     noise: { shifts, clean: span('clean'), vias: span('vias'), viaSites: span('viaSites') } };
+  delete out.overflowBins;
+  if (runs.every((m) => m.margin)) {
+    const mm = (f) => { const v = runs.map(f).sort((x, y) => x - y); return v[(v.length - 1) >> 1]; }, z = runs.filter((m) => m.margin.roundsToZero);
+    out.margin = { overflowRound1: mm((m) => m.margin.overflowRound1), overflowRound5: mm((m) => m.margin.overflowRound5), phasesConverged: `${z.length}/${runs.length}`,
+      roundsToZero: z.length ? z.map((m) => m.margin.roundsToZero).sort((x, y) => x - y)[(z.length - 1) >> 1] : null, timeLimited: runs.some((m) => m.margin.timeLimited) };
+  }
+  if (runs.every((m) => m.overflowBins)) out.overflowBins = { binMm: runs[0].overflowBins.binMm, runs: runs.length, round1: sumBins(runs.map((m) => m.overflowBins.round1)), end: sumBins(runs.map((m) => m.overflowBins.end)) };
+  if (runs.every((m) => m.perNet)) out.fragileNets = runs[0].perNet.map((n, i) => { const c = runs.filter((m) => m.perNet[i].status === 'clean').length; return c > 0 && c < runs.length ? n.net : null; }).filter(Boolean);
+  return out;
 }

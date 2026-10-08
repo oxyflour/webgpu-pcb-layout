@@ -303,3 +303,265 @@ routing evaluation; seeds 1 / 2 / 3; now the editor default.
 Placement time unchanged (1.5-2.9 s). Regression: edk is worse on every seed (vias 140 -> 167 / 207 /
 209, clean 124 -> 122 / 122 / 120) although HPWL drops 7-15 %; with the benchmark options the same start
 layout improved edk (vias 123 -> 101), so it interacts with the editor's module / free-side setup. Open.
+
+## Router cleanup stage and passive-array key information (2026-10-07)
+
+### Cleanup after negotiation (native/router.cpp `cleanup`, default off)
+
+After the 40 PathFinder rounds every net that is not clean is ripped up; the clean nets become
+hard obstacles and the ripped nets are rerouted one by one on free cells only, in 4 orders (span
+ascending, descending, 2 shuffles), keeping the order with most nets routed. Nets that still fail
+keep a soft route for vias / length and count as not clean. With cleanup 0 the router is still
+bit-identical to the JS router (native-check, k60). `experiments/cleanup-check.mjs`: each layout
+routed at 8 random sub-cell grid offsets (4 on ppc-n3; independent phases, unlike evaluateRobust's
+shifts, where shift 4 repeats shift 1 exactly: k60 290 / 980 both), exact native router (ppc-n3:
+tool routing), legalized layouts. Values: median (min-max) over the offsets.
+
+| Board | Layout | No cleanup: clean nets (count) | Cleanup ×4: clean nets (count) | No cleanup: vias, layer steps (count) | Cleanup ×4: vias, layer steps (count) | Nets ripped up by cleanup (count, median) | Of those rerouted clean (count, median) |
+|---|---|---|---|---|---|---|---|
+| k60 | human | 318 (318-318) | 318 (318-318) | 303 (291-328) | 303 (291-328) | 0 | 0 |
+| k60 | editor+init 1 | 286 (270-294) | 309 (305-311) | 991 (956-1037) | 1103 (1033-1156) | 31 | 23 |
+| k60 | editor+init 2 | 308 (299-311) | 316 (314-317) | 897 (852-916) | 897 (865-941) | 9 | 7 |
+| k60 | editor+init 3 | 307 (300-314) | 315 (313-317) | 885 (838-924) | 906 (845-955) | 8 | 6 |
+| k60 | editor (no init) 1 / 2 / 3 | 203 / 218 / 205 (spread 8-11) | 264 / 272 / 269 (spread 6-15) | 1277 / 1277 / 1325 | 1369 / 1394 / 1442 | 114 / 99 / 111 | 61 / 52 / 64 |
+| pic | human, editor+init 1-3 | 310 everywhere (min 308) | 310 (310-310) | unchanged | unchanged | 0 | 0 |
+| acc | editor+init 1 / 2 / 3 | 617 / 612 (606-617) / 617 | 617 / 615 (613-617) / 617 | unchanged (±4) | unchanged (±4) | 0 / 4 / 0 | 0 / 2 / 0 |
+| ppc-n3 | human, v7 rep1-3 | 1607 / 1604 / 1606 / 1606 | same | unchanged (±12) | unchanged (±12) | 0-3 (opens) | 0 |
+
+On congested layouts (k60) cleanup recovers most nets lost to the last overflow cells and shrinks
+the clean-net spread over grid phases from 14-24 to 4-6 nets; the ranking of the layouts stays.
+Vias rise 0-11 % (recovered nets detour). Boards that already route clean are unchanged; route time
++5-40 %. Not yet the default: switching changes the metric (human targets unchanged).
+
+### Human passive arrays: injection and reverse ablation
+
+`lib/modules.mjs findArrays`: >= 3 same-size 2-pin parts bridging the same pair of big parts over
+small signal nets. `experiments/array-inject.mjs` copies the human arrangement (arrays, or whole
+buildModules modules) into an agent layout relative to the anchor IC (mirrored when the IC is on
+the other side), then the legalizer; `experiments/array-shuffle.mjs` permutes array parts over
+their own slots in the HUMAN layout (geometry and legality unchanged, only the order). No cleanup.
+
+| Board | Layout | Original: vias, layer steps (count, median (min-max) of 4 offsets) | + human arrays: vias (count) | + human modules: vias (count) | Original / + arrays / + modules: HPWL (mm) |
+|---|---|---|---|---|---|
+| ppc-n3 | v7 rep1 (clean 1604 / 1602 / 1604) | 9656 (9628-9680) | 9625 (9623-9632) | 9602 (9597-9649) | 60320 / 63549 / 64042 |
+| ppc-n3 | v7 rep2 (clean 1606 / 1606 / 1607) | 9814 (9790-9837) | 9756 (9698-9825) | 9716 (9714-9838) | 52854 / 56065 / 56602 |
+| ppc-n3 | v7 rep3 (clean 1606 / 1606 / 1606) | 9804 (9799-9903) | 9707 (9705-9865) | 9737 (9729-9776) | 54560 / 57077 / 57956 |
+
+Arrays: 24 groups, 154 parts, mean move 29-38 mm; legalizer then moves 400-500 parts.
+
+| Board | Arrays (count) / parts (count) | Human, legalized: vias (count, median (min-max), 8 offsets; ppc 4) | Human, array order shuffled, seed 1 / 2 / 3: vias (count, median) | Shuffled - human: vias (count) |
+|---|---|---|---|---|
+| ppc-n3 | 24 / 154 | 8798 (8718-8953) | 8879 / 8947 / 8905 | +81 to +149 (+0.9-1.7 %) |
+| pic | 2 / 12 | 353 (341-368) | 376 / 381 / 383 | +23 to +30 (+7-8 %) |
+| k60 | 2 / 8 | 330 (321-346) | 341 / 334 / 338 | +4 to +11 (within noise) |
+
+Clean nets unchanged in all shuffles (k60 one offset 316). Array order is real key information
+(about +0.5-2.5 vias per scrambled part) but small: on ppc-n3 it accounts for ~100 of the ~1000
+via gap, consistent with the injection (-30 to -100). Human relative poses again transfer poorly
+(HPWL +4-6 %), as in the U1 transplant above.
+
+### Why the human layout routes the same at every grid phase (k60)
+
+`experiments/why-stable.mjs`: 8 grid offsets per layout, routing capacity changed through the grid
+pitch (0.45 mm = 21 % fewer cells than 0.4 mm, 0.3 mm = 78 % more). Native exact router, 40 rounds.
+
+| Layout | Grid pitch (mm) | Clean nets (median, min-max of 8 offsets) | Offsets reaching overflow 0 (count of 8) | Round reaching overflow 0 (median) | Overflow cells after round 1 (median) | Overflow cells after round 40 (median) |
+|---|---|---|---|---|---|---|
+| human | 0.4 | 318 (318-318) | 8 | 11 | 432 | 0 |
+| human | 0.45 | 318 (318-318) | 8 | 16 | 477 | 0 |
+| human | 0.5 | 318 (314-318) | 5 | 27 | 527 | 0 |
+| human | 0.55 | 310 (306-315) | 3 | 27 | 547 | 1 |
+| editor+init 1 / 2 / 3 | 0.3 | 318 / 318 / 318 (min 316) | 5 / 7 / 8 | 29 / 14 / 15 | 1546 / 1448 / 1324 | 0 |
+| editor+init 1 / 2 / 3 | 0.35 | 311 / 318 / 315 (min 309 / 314 / 314) | 0 / 5 / 4 | - / 22 / 33 | 1645 / 1489 / 1430 | 3 / 0 / 0 |
+| editor+init 1 / 2 / 3 | 0.4 | 288 / 307 / 308 (min 269 / 298 / 293) | 0 / 0 / 0 | - | 1713 / 1576 / 1501 | 22 / 6 / 5 |
+
+Stability is margin, not a property of human layouts: clean nets are phase-independent exactly when
+negotiation reaches overflow 0. The human layout keeps that with 21 % less capacity and becomes
+noisy like the agent layouts at 0.55 mm; the agent layouts become stable with 30-78 % more capacity.
+First-round overflow (shortest routes, no negotiation) is 3.5-4x the human's: the agent layouts
+demand more of the same cells. Pads enclosed by other owners in the rasterization: 476 in both
+(not a cause). Vias stay phase-dependent even for the human layout (291-319).
+
+### Routing-margin feedback to the agent (prompt v8, k60, 3 dsh sessions each, 2026-10-08)
+
+Tool output gained `routingMargin` (overflowRound1 / overflowRound5 / phasesConverged / roundsToZero,
+with the human values), `congestion` (top areas by round-1 overflow, averaged over grid phases,
+with the ICs touching them and the small parts inside), `fragileNets`, and `inspect --congestion 1`.
+Prompt v8 = v7 + a routing-margin section. Baseline: prompt v7 with that output hidden
+(PCB_MARGIN_FEEDBACK=0). 20 min, 12 place calls. Why use it: on 15 good k60 layouts overflowRound1
+ranks clean / vias at Spearman 0.65 / 0.74, HPWL at -0.04 / 0.19 (overflowRound5 vs vias 0.93).
+Submitted layouts re-routed at 8 independent grid offsets (exact native router):
+
+| Configuration, session | Clean nets (count, median (min-max) of 8 offsets) | Vias, layer steps (count, median) | Overflow cells after round 1 (count, median) | Offsets converged (count of 8) | HPWL (mm) | Place calls used (count of 12) |
+|---|---|---|---|---|---|---|
+| v7, no margin output, rep1 | 307 (299-312) | 573 | 923 | 0 | 5596 | 9 |
+| v7, no margin output, rep2 | 291 (276-308) | 692 | 974 | 0 | 5831 | 7 |
+| v7, no margin output, rep3 | 299 (284-304) | 611 | 877 | 0 | 5551 | 10 |
+| v8 + margin output, rep1 | 284 (274-291) | 636 | 1002 | 0 | 5638 | 6 |
+| v8 + margin output, rep2 | 310 (305-318) | 491 | 749 | 2 | 5548 | 12 |
+| v8 + margin output, rep3 | 294 (284-304) | 621 | 891 | 0 | 5619 | 8 |
+| Tool, no agent, human IC poses (seed 1 / 2 / 3; 5 phases) | 297 / 306 / 304 | 559 / 546 / 556 | 842 / 811 / 857 | 0 | 5574 / 5593 / 5592 | - |
+| Human | 318 (318-318) | 310 | 468 | 8 | 5799 | - |
+
+No significant difference over 3 sessions (mean clean 296 vs 299, vias 583 vs 625); v8 rep2 is the
+best agent layout so far (only one converging in some phases). The agents read the feedback and
+reason with it (rep1: U201's east pin row squeezed into a 2.5 mm channel to J601; rep2 tuned U201's
+y by overflowRound1), but their lever is the IC floorplan, and even the HUMAN IC poses give
+overflowRound1 811-857 with this tool: the remaining gap to 468 is in the tool's small-part
+placement (Cypress + legalizer around the IC), which the agent does not control. 5 of 6 sessions
+also stopped after 8-10 of 20 minutes believing time was up.
+
+### Small parts in the congested areas: key information, start-layout fix, relieve (k60 / 13 boards)
+
+`experiments/hotspot-inject.mjs`: tool layouts with the HUMAN IC poses (place with the human IC
+plan, 3 seeds), then human poses for chosen small parts, legalized, 5 grid phases:
+
+| Small parts given their human pose | Parts (count) | Clean nets (count, seed 1 / 2 / 3) | Vias (count) | Overflow cells after round 1 (count) | Phases converged (count of 5) |
+|---|---|---|---|---|---|
+| none | 0 | 297 / 301 / 295 | 553 / 542 / 567 | 846 / 830 / 862 | 0 |
+| in the 4 most congested areas | 36-38 | 318 / 318 / 318 | 492 / 503 / 527 | 752 / 741 / 731 | 3 |
+| in the 8 most congested areas | 66-76 | 318 / 318 / 318 | 472 / 473 / 463 | 678 / 673 / 650 | 3-4 |
+| all linked to U201 | 199 | 318 | 468 / 428 / 444 | 669-675 | 4-5 |
+| all | 396 | 318 | 327 / 339 / 345 | 498-505 | 4-5 |
+
+Of the 38 tool parts in the 4 areas only 11 are there in the human layout (median 9.5 mm from
+their human pose, 29 with another rotation); decaps 37-71 mm off. Cause in lib/start-layout.mjs:
+parts left without a usable net stayed at the board centre (= on the MCU): decaps whose supply has
+no IC (k60: 13 on +5V) and capacitors whose only signal net is a > 30-part net (+3.3V routed as a
+signal, ~15 on k60). Fix: fallback anchor = other positioned parts on the same supply; > 30-part
+signal nets count as supplies; spread over ICs by pads on the supply. k60 decaps within 20 mm of
+U201: 18 -> 13 -> (human 1). Human IC poses + tool after the fix: clean 312 / 308 / 311, vias 524 /
+532 / 490, overflow round 1 769 / 795 / 732 (1/5 phases converged once).
+
+Regression (`experiments/start-regression.mjs`; old start + Cypress = webgpu-vs-cypress tool layouts,
+new start + Cypress, same seeds 1000 / 8919 / 16838, both scored with the current evaluateRobust):
+
+| Board | Old start + Cypress: clean nets (count, mean of 3) | New start + Cypress: clean nets (count, mean) | Old: vias (count, mean) | New: vias (count, mean) | Old: HPWL (mm) | New: HPWL (mm) |
+|---|---|---|---|---|---|---|
+| acc | 617.0 | 617.0 | 3286 | 3169 | 19400 | 19538 |
+| edk | 124.0 | 124.0 | 111 | 111 | 2916 | 2910 |
+| edu-fpga | 106.3 | 106.0 | 213 | 217 | 2569 | 2503 |
+| edu-k60 | 150.3 | 154.3 | 423 | 392 | 5729 | 5721 |
+| edu-nxp | 163.0 | 163.0 | 341 | 336 | 5555 | 5619 |
+| fsl-mini | 162.0 | 162.0 | 316 | 314 | 6097 | 6123 |
+| k60 | 301.3 | 309.7 | 672 | 608 | 6482 | 6560 |
+| nxp | 370.0 | 370.0 | 782 | 787 | 8661 | 8888 |
+| pic | 217.7 | 253.3 | 900 | 757 | 6005 | 6151 |
+| pico | 86.0 | 86.0 | 76 | 76 | 971 | 972 |
+| rx | 400.0 | 400.0 | 801 | 809 | 8823 | 8856 |
+| safety | 186.0 | 185.3 | 379 | 410 | 5268 | 5372 |
+| z3r0 | 46.0 | 46.0 | 26 | 24 | 663 | 663 |
+
+Sum of clean nets 2929.7 -> 2976.7; vias x0.972, HPWL x1.006 (geometric means). Only safety loses
+(vias +8 %).
+
+`lib/relieve.mjs` (agent command `relieve`): local search over the small parts in the N most
+congested areas, moves rotate / swap / nudge toward partners / evict past the area edge, each
+legalized, objective = overflowing cells after 5 rounds at 2 grid phases, 10 worker threads,
+~7 evaluations/s on k60. `experiments/relieve-check.mjs`, 90-100 s, robust scoring before / after:
+
+| Layout | Small parts searched (count) | Clean nets before -> after (count, median of 5 phases) | Vias before -> after (count) | Overflow after round 5 before -> after (count) |
+|---|---|---|---|---|
+| k60, human IC poses + old start (seed 1) | 38 | 297 -> 304 | 553 -> 551 | 258 -> 244 |
+| k60, human IC poses + new start (seed 1) | 36 | 309 -> 310 | 517 -> 527 | 212 -> 211 |
+| pic, new start + Cypress (seed 1000) | 25 | 240 -> 273 | 734 -> 740 | 445 -> 381 |
+
+Relief helps where congestion sits in a few areas (pic), not where it is spread (k60 after the fix);
+on k60 the 2-phase objective improves (211 -> 186) without a robust change (phase overfitting).
+
+### Prompt v9 (margin feedback + relieve + budget field) vs v7 on pic (new start layout, 3 dsh each)
+
+Both with the decap-fixed start layout; v7 with the margin output hidden (no relieve). 20 min, 12
+place calls (relieve counts as one). Submitted layouts re-routed at 8 independent grid offsets:
+
+| Configuration, session | Clean nets (count of 310, median (min-max)) | Vias, layer steps (count, median) | Overflow cells after round 1 (count, median) | Offsets converged (count of 8) | HPWL (mm) | Minutes used (of 20) | relieve calls (count) |
+|---|---|---|---|---|---|---|---|
+| v7, rep1 | 304 (298-308) | 552 | 849 | 0 | 5698 | 12.4 | - |
+| v7, rep2 | 308 (306-310) | 529 | 806 | 2 | 5666 | 9.7 | - |
+| v7, rep3 | 310 (310-310) | 430 | 657 | 8 | 5402 | 11.8 | - |
+| v9, rep1 | 308 (306-310) | 528 | 752 | 4 | 5688 | 16.2 | 4 |
+| v9, rep2 | 308 (306-310) | 533 | 837 | 4 | 5854 | 14.9 | 3 |
+| v9, rep3 | 308 (308-310) | 527 | 809 | 3 | 6068 | 18.2 | 4 |
+| Human | 310 | 342 | 475 | 8 | 5955 | - | - |
+
+v9 is more uniform (every session 308, 3-4 of 8 offsets converged) but not better on average
+(vias 529 vs 504); relieve calls gained a few nets / vias each. The best session (v7 rep3, 430 vias,
+converged at every offset) found that the 24 V input parts (C16, ZA1, TH1) sat in the board centre
+and moved them to J2 (502 -> 465 vias). Cause: chains of free parts linked only to each other
+(and ground bridges GND-GNDA / GNDPWR) never got a positioned neighbour or a supply anchor, so the
+start layout left them at the centre (1-6 parts per board, ppc 70-102). Fixed in lib/start-layout.mjs
+(repeat neighbour sweep + supply anchoring for unplaced parts; minor ground nets count as supplies);
+left at the centre now: 0 on 12 boards, 1 on rx, 13-15 net-less '#' parts on ppc.
+
+Regression of the second start-layout fix (variant new2 = repeat sweeps + ground-bridge anchors, same
+protocol as above): sum of clean nets old 2929.7 / first fix 2976.7 / new2 2993.3; vias x1 / x0.972 /
+x0.968; HPWL x1 / x1.006 / x1.002. pic clean 217.7 / 253.3 / 271.3, vias 900 / 757 / 727; k60 301.3 /
+309.7 / 310.7; edu-fpga 106.3 / 106.0 / 104.3 (only loss); others within ±1 net.
+
+relieve with 3 grid phases in the objective (0, 1/3, 2/3 cell), new2 start + Cypress (seed 1000), 110 s:
+
+| Board | Small parts searched (count) | Clean nets before -> after (count, median of 5 phases) | Vias before -> after (count) | Overflow after round 5 before -> after (count, robust) | Objective before -> after (count, mean of 3 search phases) |
+|---|---|---|---|---|---|
+| pic | 29 | 266 -> 284 | 726 -> 673 | 393 -> 331 | 373 -> 311 |
+| k60 | 27 | 316 -> 314 | 611 -> 585 | 257 -> 243 | 269 -> 221 |
+
+### End to end after all fixes: prompt v9 + new2 start + 3-phase relieve (3 dsh per board, 2026-10-09)
+
+Submitted layouts re-routed at 8 independent grid offsets (exact native router). Earlier rows are
+the runs above (different start layout versions, so this is the end-to-end change, not v9 alone).
+
+| Board | Configuration | Clean nets (count, median per session) | Clean nets (mean of 3 sessions) | Vias, layer steps (count, median per session) | Vias (mean of 3) | Offsets converged (count of 8, per session) |
+|---|---|---|---|---|---|---|
+| k60 (318 nets) | v7, old start, no margin output | 307 / 291 / 299 | 299.0 | 573 / 692 / 611 | 625 | 0 / 0 / 0 |
+| k60 | v8 + margin output, old start | 284 / 310 / 294 | 296.0 | 636 / 491 / 621 | 583 | 0 / 2 / 0 |
+| k60 | v9 + relieve, new2 start | 316 / 316 / 309 | 313.7 | 540 / 552 / 545 | 546 | 3 / 4 / 0 |
+| k60 | human | 318 | 318 | 310 | 310 | 8 |
+| pic (310 nets) | v7, first-fix start, no margin output | 304 / 308 / 310 | 307.3 | 552 / 529 / 430 | 504 | 0 / 2 / 8 |
+| pic | v9 + relieve (2 phases), first-fix start | 308 / 308 / 308 | 308.0 | 528 / 533 / 527 | 529 | 4 / 4 / 3 |
+| pic | v9 + relieve (3 phases), new2 start | 306 / 310 / 310 | 308.7 | 517 / 425 / 499 | 480 | 1 / 8 / 8 |
+| pic | human | 310 | 310 | 342 | 342 | 8 |
+
+Sessions now use 12-19 of 20 minutes and 3-5 relieve calls. k60: +15 clean nets and -79 vias
+against the v7 runs; pic: best vias 425 (human 342), 2 of 3 sessions converge at every offset.
+
+## v9 sweep over 14 boards (2026-10-09): agent vs no agent vs human
+
+Prompt v9 + routing-margin output + relieve, new2 start layout; 3 dsh sessions per board, 20 min,
+12 place calls (k60 / pic: the v9b runs above; others: harness/results/v9s-<board>, 2 boards at a time,
+RELIEVE_WORKERS=5). No agent = new2 start + Cypress, seeds 1000 / 8919 / 16838 (start-regression).
+Scoring (`experiments/sweep-eval.mjs`): exact native router at 8 independent grid offsets, median per
+layout; ppc-n3 with the tool routing (layer heuristic + incremental) at 3 phases. Rows in
+harness/results/sweep-eval/rows.jsonl.
+
+| Board | Signal nets (count) | Human: clean nets / vias (count) | No agent (start + Cypress): clean nets, mean of 3 seeds (count) | No agent: vias, mean (count) | Agent v9: clean nets per session (count) | Agent v9: clean nets, mean (count) | Agent v9: vias per session (count) | Agent v9: vias, mean (count) | Agent v9: vias / human (x) | Agent v9: sessions converged at every phase (count of 3) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| z3r0 | 46 | 46 / 32 | 46.0 | 22 | 46 / 46 / 46 | 46.0 | 21 / 19 / 22 | 21 | 0.65 | 3 |
+| pico | 86 | 86 / 57 | 86.0 | 75 | 86 / 86 / 86 | 86.0 | 55 / 57 / 66 | 59 | 1.04 | 0 |
+| edk | 124 | 124 / 66 | 124.0 | 107 | 124 / 124 / 124 | 124.0 | 75 / 84 / 83 | 81 | 1.22 | 3 |
+| edu-fpga | 108 | 108 / 77 | 103.0 | 216 | 108 / 108 / 108 | 108.0 | 96 / 93 / 96 | 95 | 1.23 | 3 |
+| fsl-mini | 162 | 162 / 191 | 162.0 | 312 | 162 / 162 / 162 | 162.0 | 280 / 287 / 289 | 285 | 1.49 | 3 |
+| edu-k60 | 157 | 157 / 188 | 153.7 | 401 | 157 / 157 / 157 | 157.0 | 277 / 281 / 279 | 279 | 1.48 | 1 |
+| edu-nxp | 163 | 163 / 203 | 163.0 | 339 | 163 / 163 / 163 | 163.0 | 270 / 270 / 213 | 251 | 1.24 | 3 |
+| safety | 186 | 186 / 227 | 186.0 | 386 | 186 / 186 / 186 | 186.0 | 258 / 364 / 349 | 324 | 1.43 | 1 |
+| pic | 310 | 310 / 347 | 267.7 | 715 | 306 / 310 / 310 | 308.7 | 517 / 425 / 499 | 480 | 1.38 | 2 |
+| nxp | 370 | 369 / 587 | 370.0 | 780 | 370 / 370 / 370 | 370.0 | 824 / 740 / 710 | 758 | 1.29 | 3 |
+| rx | 400 | 399 / 625 | 400.0 | 804 | 400 / 400 / 400 | 400.0 | 838 / 809 / 791 | 813 | 1.30 | 3 |
+| k60 | 318 | 318 / 301 | 310.3 | 602 | 316 / 316 / 309 | 313.7 | 540 / 552 / 545 | 546 | 1.81 | 0 |
+| acc | 617 | 617 / 2576 | 617.0 | 3175 | 617 / 617 / 617 | 617.0 | 2769 / 2887 / 2844 | 2833 | 1.10 | 3 |
+| ppc-n3 | 1607 | 1607 / 8768 | - | - | 1607 / 1607 / 1607 | 1607.0 | 9620 / 9774 / 9429 | 9608 | 1.10 | 3 |
+
+Clean nets: the agent matches or beats the human count on 12 of 14 boards (nxp / rx: 370 / 400, the
+human layout routes 369 / 399); k60 309-316 of 318, pic 306-310 of 310. Agent vs no agent: clean nets
+equal or higher on every board, vias lower on every board (edu-fpga 216 -> 95, fsl-mini 312 -> 285,
+pic 715 -> 480). Vias vs human: geometric mean x1.24 (0.65 z3r0 ... 1.81 k60); remaining gap mostly on
+k60 / fsl-mini / edu-k60 / safety / pic (x1.4-1.8). ppc-n3: 1607 / 1607 in every session (v7: 1604-1606),
+vias 9429-9774 vs human 8768 (tool routing).
+
+relieve inside the sessions (158 calls): result better than its input 64 times, worse 57, mean change
+0 clean nets / -0.2 % vias, i.e. about measurement noise on agent candidates (the offline gains, pic
++18 clean, were on congested no-agent layouts). On ppc-n3 it evaluates ~20 candidates per call. The
+end-to-end gains of this round come mainly from the start-layout fixes.
+
+relieve removed (2026-10-09): about noise on agent candidates (above) while costing a place call;
+lib/relieve.mjs, its worker, the `relieve` command and experiments/relieve-check.mjs are deleted.
+Prompt v10 = v9 without the relieve parts (v9 kept as the record of the runs above).

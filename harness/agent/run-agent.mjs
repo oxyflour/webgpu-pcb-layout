@@ -36,14 +36,17 @@ const gateway = http.createServer(async (req, res) => {
     for await (const chunk of req) { body += chunk; if (body.length > 1 << 20) throw new Error('request too large'); }
     const { command, input } = JSON.parse(body);
     if (busy) throw new Error('another pcb command is still running; run commands one at a time');
-    if (command === 'place' && placeCalls >= places) throw new Error(`place budget (${places}) used up: inspect/status and submit the best candidate`);
-    if (command === 'place') placeCalls++;
+    const costly = command === 'place';
+    if (costly && placeCalls >= places) throw new Error(`place budget (${places}) used up: inspect/status and submit the best candidate`);
+    if (costly) placeCalls++;
     if (command === 'check' && ++checkCalls > MAX_CHECKS) throw new Error(`check limit (${MAX_CHECKS}) reached: decide with what you have and run place`);
     busy = true;
     try {
       const result = await callTool(sessionDir, command, input);
       // A Cypress timeout/error (e.g. a busy GPU) does not use up the place budget.
-      if (command === 'place' && !result.candidate) { placeCalls--; result.note = 'this failed place did not count against the budget'; }
+      if (costly && !result.candidate) { placeCalls--; result.note = 'this failed place did not count against the budget'; }
+      // Sessions stopped after 8-10 of 20 minutes believing time was up (v7/v8 k60): report the real budget.
+      if (result && typeof result === 'object' && !Array.isArray(result)) result.budget = { minutesUsed: Math.round((Date.now() - start) / 6000) / 10, minutesLeft: Math.max(0, Math.round((minutes * 60000 - (Date.now() - start)) / 6000) / 10), placeCallsLeft: places - placeCalls };
       res.end(JSON.stringify(result));
     } finally { busy = false; }
   } catch (e) { res.end(JSON.stringify({ error: e.message })); }

@@ -12,7 +12,8 @@ const HELP = `pcb <command> [flags]
   pcb map [--candidate c003]                ASCII floorplan of both sides (keepouts, fixed parts, candidate)
   pcb check --input plan.json               fast: are the planned spots free? (no Cypress)
   pcb place --input plan.json               run Cypress -> legalize -> route; makes a candidate
-  pcb inspect [--candidate c003] [--refs U1,R5 | --refs all] [--nets failed | --nets N1,N2]
+  pcb inspect [--candidate c003] [--refs U1,R5 | --refs all] [--nets failed | --nets fragile | --nets N1,N2] [--congestion 1]
+                                            --congestion 1: routing margin, 10 most congested areas and their parts, fragile nets
   pcb status                                candidates, best, target
   pcb submit --candidate c003               choose the final layout
 
@@ -25,7 +26,7 @@ plan.json for place (all fields optional):
 
 const argv = process.argv.slice(2), command = argv[0];
 if (!command || command === 'help' || command === '--help') { console.log(HELP); process.exit(0); }
-const allowed = { info: ['section', 'page', 'refs'], knobs: [], map: ['candidate'], check: ['input'], place: ['input'], inspect: ['candidate', 'refs', 'nets'], status: [], submit: ['candidate'] };
+const allowed = { info: ['section', 'page', 'refs'], knobs: [], map: ['candidate'], check: ['input'], place: ['input'], inspect: ['candidate', 'refs', 'nets', 'congestion'], status: [], submit: ['candidate'] };
 if (!allowed[command]) { console.log(JSON.stringify({ error: `unknown command ${command}` }) + '\n' + HELP); process.exit(2); }
 const flags = {};
 for (let k = 1; k < argv.length; k += 2) {
@@ -43,7 +44,8 @@ if (flags.input) {
   if (flags.page) input.page = Number(flags.page);
   if (flags.candidate) input.candidate = flags.candidate;
   if (flags.refs) input.refs = flags.refs === 'all' ? 'all' : flags.refs.split(',').map((s) => s.trim()).filter(Boolean);
-  if (flags.nets) input.nets = flags.nets === 'failed' ? 'failed' : flags.nets.split(',').map((s) => s.trim()).filter(Boolean);
+  if (flags.congestion) input.congestion = flags.congestion !== '0';
+  if (flags.nets) input.nets = flags.nets === 'failed' || flags.nets === 'fragile' ? flags.nets : flags.nets.split(',').map((s) => s.trim()).filter(Boolean);
 }
 const res = await fetch(process.env.PCB_TOOL_URL, { method: 'POST', headers: { authorization: `Bearer ${process.env.PCB_TOOL_TOKEN}`, 'content-type': 'application/json' },
   body: JSON.stringify({ command, input }), signal: AbortSignal.timeout(172000) }).catch((e) => ({ text: async () => JSON.stringify({ error: `gateway: ${e.message}` }) }));

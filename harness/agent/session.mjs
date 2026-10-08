@@ -18,7 +18,7 @@ export async function initSession(dir, { board, seed = 1, reference = null }) {
   fs.mkdirSync(path.join(dir, 'candidates'), { recursive: true });
   const b = loadBoard(board), human = await evaluateRobust(b, b.a.originalLayout, toolRouting(b));
   writeJson(path.join(dir, 'session.json'), { board, seed, next: 0, candidates: {}, best: null, submitted: null, placeCalls: 0, reference,
-    target: { clean: human.clean, nets: human.nets, vias: human.vias, viaSites: human.viaSites, hpwlMm: human.hpwlMm, noise: human.noise } });
+    target: { clean: human.clean, nets: human.nets, vias: human.vias, viaSites: human.viaSites, hpwlMm: human.hpwlMm, noise: human.noise, margin: human.margin } });
 }
 
 // Lexicographic: geometry legal, clean nets, then vias + HPWL relative to the human target.
@@ -37,13 +37,33 @@ export function createSession(dir) {
   b.p.nets.forEach((n, ni) => n.pins.forEach((pi) => { netOfPin[pi] = ni; }));
   const signalNets = (i) => [...new Set(b.p.nets.filter((n) => n.pins.some((pi) => b.p.pins[pi].componentIndex === i)).map((n) => n.id))];
 
+  // Congestion hotspots: board areas (binMm squares) with most overflowing router cells when every
+  // net takes its shortest path (round 1), averaged over grid phases, with the parts inside.
+  const congestion = (m, L, n) => {
+    const ob = m.overflowBins; if (!ob) return [];
+    const total = Object.values(ob.round1).reduce((a, v) => a + v, 0) || 1, B = ob.binMm;
+    return Object.entries(ob.round1).sort((x, y) => y[1] - x[1]).slice(0, n).map(([k, v]) => {
+      const [i, j] = k.split(',').map(Number), x0 = i * B, y0 = j * B;
+      const isBig = (q) => comps[q].pins.length >= 8 || comps[q].fixed;
+      const overlaps = (q) => { const [w, h] = rotatedSize(comps[q], L[q].rotation); return L[q].x + w / 2 > x0 && L[q].x - w / 2 < x0 + B && L[q].y + h / 2 > y0 && L[q].y - h / 2 < y0 + B; };
+      const big = comps.map((c, q) => (isBig(q) && overlaps(q)) ? q : -1).filter((q) => q >= 0).sort((p, q) => comps[q].pins.length - comps[p].pins.length);
+      const small = comps.map((c, q) => (!isBig(q) && L[q].x >= x0 && L[q].x < x0 + B && L[q].y >= y0 && L[q].y < y0 + B) ? q : -1).filter((q) => q >= 0);
+      return { areaMm: [x0, y0, x0 + B, y0 + B], overflowRound1: Math.round(v / ob.runs), shareOfAll: `${Math.round(100 * v / total)}%`, stillOverflowingAtEnd: Math.round((ob.end[k] ?? 0) / ob.runs * 10) / 10,
+        ics: big.map((q) => `${comps[q].id}${comps[q].fixed ? '(fixed)' : ''}`), smallParts: small.length, smallRefs: small.slice(0, 12).map((q) => comps[q].id) };
+    });
+  };
+  // PCB_MARGIN_FEEDBACK=0: tool output without routingMargin / congestion / fragileNets (prompt v7 baseline).
+  const feedback = process.env.PCB_MARGIN_FEEDBACK !== '0';
+  const shownTarget = (t) => { if (feedback || !t) return t; const { margin, ...rest } = t; return rest; };
+  const marginOf = (m, s) => m.margin ? { ...m.margin, human: s.target.margin ?? null } : null;
+
   const commands = {
     info({ section = 'summary', page = 0, refs } = {}) {
       const s = state(), per = 60;
       if (section === 'summary') {
         const fixed = comps.map((c, i) => c.fixed ? { ref: c.id, footprint: fp.get(c.id)?.library, ...pose(b.a.originalLayout, i), size: [r2(c.width), r2(c.height)], signalPins: c.pins.length } : null).filter(Boolean);
         return { board: s.board, canvasMm: [r2(b.p.canvas.width), r2(b.p.canvas.height)], origin: 'top-left, y grows downward, mm', copperLayers: b.a.routing.layers,
-          parts: comps.length, movable: comps.filter((c) => !c.fixed).length, signalNets: b.p.nets.length, humanTarget: s.target,
+          parts: comps.length, movable: comps.filter((c) => !c.fixed).length, signalNets: b.p.nets.length, humanTarget: shownTarget(s.target),
           fixedParts: fixed, note: 'Fixed parts (connectors, mechanical, through-hole) never move. Movable parts keep their assigned side. Power/ground nets are not routed or scored but are listed per part.' };
       }
       if (section === 'parts') {
@@ -166,29 +186,34 @@ export function createSession(dir) {
       const leg = legalize(b, r.layout);
       const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), deadlineS: Math.max(15, 125 - (performance.now() - t0) / 1000) });
       const moved = comps.map((c, i) => [c.id, Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y)]).filter(([ref, d]) => !comps[idx.get(ref)].fixed && d > 0).sort((x, y) => y[1] - x[1]);
-      const { perNet, ...metrics } = m;
-      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, knobs, netWeights, seed: runSeed, cypress: { status: r.status, wallS: r.wallS, finalOverflow: r.finalOverflow }, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, metrics, perNet, layout: leg.layout, start: init });
+      const { perNet, overflowBins, fragileNets = [], ...metrics } = m;
+      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, knobs, netWeights, seed: runSeed, cypress: { status: r.status, wallS: r.wallS, finalOverflow: r.finalOverflow }, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, metrics, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
       s2.candidates[id] = { id, from, planned: Object.keys(plan).length, cypress: r.status, metrics };
       const prev = s2.best && s2.candidates[s2.best];
       const accepted = !prev || better(rank(metrics, s2.target), rank(prev.metrics, s2.target));
       if (accepted) s2.best = id;
       writeJson(file, s2);
-      return { candidate: id, best: s2.best, newBest: accepted, scoringNote: `clean/vias are medians over ${m.noise.shifts} routing-grid phases; metrics.noise gives their min-max. Two candidates whose clean/vias differ by less than that spread are equal within measurement noise.`, ...(m.routeConverged ? {} : { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` }), cypress: r.status, cypressSeconds: r2(r.wallS), metrics, humanTarget: s2.target,
+      if (!feedback) delete metrics.margin;
+      return { candidate: id, best: s2.best, newBest: accepted, scoringNote: `clean/vias are medians over ${m.noise.shifts} routing-grid phases; metrics.noise gives their min-max. Two candidates whose clean/vias differ by less than that spread are equal within measurement noise.`, ...(m.margin?.timeLimited ? { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` } : {}), cypress: r.status, cypressSeconds: r2(r.wallS), metrics, humanTarget: shownTarget(s2.target),
+        ...(feedback ? { routingMargin: marginOf(m, s2), congestion: congestion(m, leg.layout, 4), fragileNets: { count: fragileNets.length, nets: fragileNets.slice(0, 12) } } : {}),
         failedNets: perNet.filter((n) => n.status !== 'clean').slice(0, 20).map((n) => n.net),
         mostViaNets: perNet.filter((n) => n.vias > 0).sort((x, y) => y.vias - x.vias).slice(0, 8).map((n) => `${n.net}:${n.vias}`),
         plannedDriftMm: Object.fromEntries(Object.keys(plan).map((ref) => { const i = idx.get(ref); return [ref, r2(Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y))]; })),
         largestMovesFromStartMm: moved.slice(0, 8).map(([ref, d]) => `${ref}:${r2(d)}`) };
     },
 
-    inspect({ candidate, refs, nets } = {}) {
+    inspect({ candidate, refs, nets, congestion: cong } = {}) {
       const s = state(), id = candidate ?? s.best;
       if (!s.candidates[id]) throw new Error(`unknown candidate ${id}`);
       const c = readJson(path.join(dir, 'candidates', `${id}.json`)), L = c.layout;
-      const out = { candidate: id, metrics: c.metrics, cypress: c.cypress };
+      const { margin, ...shown } = c.metrics;
+      const out = { candidate: id, metrics: feedback ? c.metrics : shown, cypress: c.cypress, ...(feedback ? { routingMargin: marginOf(c.metrics, s) } : {}) };
+      if (cong && !feedback) throw new Error('unknown flag congestion');
+      if (cong) { out.congestion = congestion({ overflowBins: c.overflowBins }, L, 10); out.fragileNets = c.fragileNets ?? []; }
       const want = refs === 'all' ? comps.map((x) => x.id) : refs;
       if (Array.isArray(want)) { if (want.length > 500) throw new Error('at most 500 refs'); out.poses = Object.fromEntries(want.map((ref) => { const i = idx.get(ref); if (i === undefined) throw new Error(`unknown ref ${ref}`); return [ref, pose(L, i)]; })); }
-      if (nets === 'failed' || Array.isArray(nets)) {
-        const sel = nets === 'failed' ? c.perNet.filter((n) => n.status !== 'clean').map((n) => n.net) : nets;
+      if (nets === 'failed' || nets === 'fragile' || Array.isArray(nets)) {
+        const sel = nets === 'failed' ? c.perNet.filter((n) => n.status !== 'clean').map((n) => n.net) : nets === 'fragile' ? (c.fragileNets ?? []) : nets;
         out.nets = sel.slice(0, 30).map((name) => {
           const ni = b.p.nets.findIndex((n) => n.id === name); if (ni < 0) throw new Error(`unknown net ${name}`);
           const pts = b.p.nets[ni].pins.map((pi) => { const [x, y] = worldPin(b.p, L, pi); return `${comps[b.p.pins[pi].componentIndex].id}@(${r2(x)},${r2(y)})`; });
@@ -200,7 +225,7 @@ export function createSession(dir) {
 
     status() {
       const s = state();
-      return { board: s.board, placeCalls: s.placeCalls, best: s.best, submitted: s.submitted, humanTarget: s.target,
+      return { board: s.board, placeCalls: s.placeCalls, best: s.best, submitted: s.submitted, humanTarget: shownTarget(s.target),
         candidates: Object.values(s.candidates).slice(-12).map((c) => ({ id: c.id, from: c.from, planned: c.planned, cypress: c.cypress, clean: c.metrics.clean, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm, legal: legalOk(c.metrics) })) };
     },
 
