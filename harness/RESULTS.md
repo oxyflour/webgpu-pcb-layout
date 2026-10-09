@@ -565,3 +565,153 @@ end-to-end gains of this round come mainly from the start-layout fixes.
 relieve removed (2026-10-09): about noise on agent candidates (above) while costing a place call;
 lib/relieve.mjs, its worker, the `relieve` command and experiments/relieve-check.mjs are deleted.
 Prompt v10 = v9 without the relieve parts (v9 kept as the record of the runs above).
+
+## Attachment tree / pruned graph (2026-10-09, key information, no agent)
+
+Hypothesis: humans place outward from the main chip one part at a time, so the placement follows a
+tree (or a pruned graph) of the netlist. Analysis of the 15 human layouts
+(`experiments/tree-structure.mjs`, `tree-clusters.mjs`, `tree-anchors.mjs`; part graph = signal
+nets with 2-30 parts, edge length = shortest human pin-to-pin distance):
+
+- The netlist is not a tree: cycle rank 0.8-1.4 x parts (k60: 382 parts, 893 links, 512); in BFS
+  order from the main chip only 33-55 % of the parts have exactly one earlier neighbour.
+- Humans keep a spanning tree short and the cycle-closing links long: MST edges median 1.8-5.2 mm,
+  the other links 7.6-24 mm; links <= 3 mm only: k60 cycle rank 512 -> 55, ppc-n3 2213 -> 340.
+- It is not one tree from the main chip: hop depth vs distance from it Spearman 0.03-0.66; the BFS
+  parent is the nearest linked part for 25-42 % of small parts; the nearest linked part of a
+  small part is an IC for 15-49 % (chains of passives); 51-85 % of small parts hang on 0-1 parts
+  within 3 mm, 5-44 % on >= 2.
+- The current init's strongest partner (pins-small weight) is the human parent (nearest linked
+  part) for 50-79 % of small parts.
+
+Key-information test (`experiments/tree.mjs`, human IC poses for all levels, 3 seeds, robust
+scoring; init option `linkScale` in lib/start-layout.mjs):
+
+| Board, configuration | Clean nets (count, seeds 1/2/3) | Vias (count) | HPWL (mm) | Non-IC parts, start to human pose, median (mm) |
+|---|---|---|---|---|
+| k60, ics (tool init) + Cypress | 316 / 316 / 308 | 509 / 496 / 532 | 5593 / 5569 / 5671 | 4.7-4.9 |
+| k60, human parent x10 in the init + Cypress | 293 / 284 / 296 | 639 / 665 / 640 | 5912 / 5820 / 5828 | 4.7 |
+| k60, same + Cypress weight 3 on the parent nets | 277 / 276 / 289 | 666 / 669 / 614 | 5888 / 5837 / 5838 | 4.7 |
+| k60, human MST links only (others x0.2) + Cypress | 318 / 316 / 312 | 507 / 493 / 523 | 5647 / 5715 / 5690 | 4.5 |
+| k60, ics, start only | 318 / 314 / 304 | 499 / 509 / 551 | 5627 / 5568 / 5722 | 4.7-4.9 |
+| k60, human parent x3, start only | 297 / 289 / 292 | 605 / 593 / 589 | 5749 / 5702 / 5775 | 4.6-4.8 |
+| k60, human MST links x0.2, start only | 312 / 316 / 313 | 518 / 518 / 486 | 5672 / 5751 / 5685 | 4.5 |
+| k60, human MST links only (others x0), start only | 316 / 318 / 318 | 499 / 493 / 481 | 5907 / 5884 / 5865 | 4.3-4.5 |
+| pic, ics, start only | 310 / 310 / 308 | 526 / 501 / 512 | 5532 / 5449 / 5453 | 9.7-9.9 |
+| pic, human parent x3, start only | 304 / 304 / 306 | 565 / 567 / 495 | 5471 / 5553 / 5458 | 10.4-10.7 |
+| pic, human MST links only, start only | 308 / 306 / 310 | 537 / 537 / 520 | 5811 / 5733 / 5678 | 8.5 |
+| acc, ics, start only | 617 / 617 / 617 | 2854 / 2833 / 2851 | 17104 / 17097 / 17181 | 5.2-5.5 |
+| acc, human parent x3, start only | 617 / 617 / 617 | 2909 / 2857 / 2921 | 17046 / 17069 / 17080 | 5.2-5.3 |
+| acc, human MST links only, start only | 617 / 617 / 617 | 2812 / 2857 / 2874 | 17102 / 17136 / 17115 | 3.8-4.0 |
+
+(Human legal references: k60 318 / 323 / 5814, acc 617 / 2620 / 17295.) The human tree is not key
+information for the init: pulling a part to its human parent is worse on all three boards (k60 -20
+clean, +130 vias); keeping only the human tree links brings parts closer to their human pose (acc
+5.4 -> 3.9 mm) but leaves the metrics within noise (k60 vias -20, pic +20, acc 0) at +3-5 % HPWL.
+Which part sits next to which is not what the tool misses; the remaining gap is in exact poses
+(hotspot-inject: human poses of the 66-76 small parts in the congested areas give 463-473 vias).
+Not passed to the agent.
+
+## What in the human small-part poses matters (k60, 2026-10-09)
+
+Start: the tool layouts of the section above (human IC poses + init + Cypress, seeds 1-3); small
+parts (movable, < 8 pins, 396) get parts of their human pose, legalized, 5 grid phases
+(`experiments/pose-ablation.mjs`).
+
+| Small parts given... | Parts (count) | Vias (count, seeds 1/2/3) | Clean nets (count of 318) |
+|---|---|---|---|
+| nothing (tool) | 0 | 504 / 509 / 541 | 315 / 313 / 312 |
+| human x, y, rotation | 396 | 336 / 337 / 337 | 318 |
+| human x, y, tool rotation | 396 | 394 / 390 / 390 | 318 |
+| tool x, y, human rotation | 396 | 532 / 525 / 551 | 316-318 |
+| human pose + uniform noise +-1 mm / +-2 mm | 396 | 345 / 362 / 361 ; 405 / 395 / 394 | 318 |
+| only parts with a signal net / only decaps | 369 / 27 | 357 / 340 / 356 ; 490 / 508 / 520 | 318 ; 314-318 |
+| only parts > 5 mm / <= 5 mm from the human position | ~218 / ~178 | 380 / 388 / 393 ; 475 / 501 / 469 | 318 ; 312-316 |
+| only parts with another rotation (mod 180) | 239 | 435 / 422 / 438 | 316-318 |
+| only the repeated bottom channels (x 55-120, y > 52) | 51 | 474 / 460 / 455 | 318 |
+| only the top-right quarter (x > 90, y < 45) | 101 | 464 / 466 / 510 | 314-316 |
+
+Position to ~1-2 mm plus rotation is the information; the parts the tool puts > 5 mm off (median
+10.8 mm; 2-pin parts between partners ~25 mm apart, 52 without a signal net) carry ~70 % of the
+gap; no board region dominates. In the plot (human vs tool) humans lay out repeated sub-circuits as
+identical copies aligned with their connector / IC pins and use the whole board; the tool piles
+them into a few clusters.
+
+Net crossings (`experiments/crossings.mjs`, straight MST segments of every signal net): human legal
+885, tool 1023-1069, human +-1 mm 900-949, +-2 mm 942-961; the tool's spanning-tree length is
+shorter (4557-4636 mm vs 4788). Crowding of the 0-1 mm ring around the ICs (`ic-bands.mjs`: area
+covered 0.34-0.36 vs human 0.22, pins/cm2 17-19 vs 9) is not causal: legalizing with the ICs
+inflated by 1 mm (`ic-ring.mjs`) gave 517 vias (from 504).
+
+Crossing removal is causal for part of the gap (`experiments/uncross.mjs`: greedy 180 deg turns
+of 2-pin parts and swaps of same-size parts on one side within 10 mm, cost = crossings + 0.2 x
+spanning-tree mm; legal by construction, k60 2 s, acc 10 s incl. evaluation):
+
+| Board, tool layout | Crossings (count, before -> after) | Vias before (count, seeds 1/2/3) | Vias after (count) | Clean before / after (count) | HPWL after (mm) |
+|---|---|---|---|---|---|
+| k60, start + Cypress | 1060->809 / 1023->855 / 1069->873 | 504 / 509 / 541 | 464 / 473 / 480 | 315,313,312 / 318,316,316 | 5518 / 5560 / 5623 |
+| k60, start only | 1045->821 / 1039->865 / 1147->867 | 499 / 509 / 551 | 455 / 469 / 492 | 318,314,304 / 316,316,311 | 5587 / 5573 / 5607 |
+| pic, start only | 947->756 / 842->674 / 860->707 | 526 / 501 / 512 | 489 / 480 / 470 | 310,310,308 / 308,310,310 | 5546 / 5465 / 5461 |
+| acc, start only | 13858->13473 / 13824->13419 / 14036->13571 | 2854 / 2833 / 2851 | 2797 / 2804 / 2867 | 617 / 617 | 17092 / 17103 / 17154 |
+| k60, human legal | 885->794 | 336 | 344 | 318 / 318 | 5841 |
+
+-25 to -45 vias without human information (lambda 0.05 / 1 and radius 25 are no better). After
+it the tool has fewer straight crossings than the human (~840 vs 885) but still ~470 vias, so
+the rest of the gap is not straight-line crossings.
+
+## Crossing removal in the tool pipeline (lib/uncross.mjs, 2026-10-09)
+
+`place` is now start layout -> Cypress -> legalize -> **uncross** -> route. uncross = the greedy pass
+of experiments/uncross.mjs (180 deg turns of movable 2-pin parts, swaps of same-size parts on one
+side within 10 mm; cost = straight crossings of signal-net spanning trees + 0.2 x tree mm), with
+segments in a 5 mm grid, the agent's planned parts kept, a 10 s deadline, and no re-legalizing when
+the result passes legalOk (it always did; the legalizer is not idempotent: re-legalizing an already
+legal layout moves ~230 parts on ppc-n3, 5 on k60, 27 on pic). PCB_UNCROSS=0 switches it off. The
+editor's auto layout runs it too (swaps only inside a module, 5 s deadline).
+
+| Board | Parts (count) | uncross time, 4 passes (s) | Crossings before -> after (count) | `place` call end to end (s) |
+|---|---|---|---|---|
+| k60 (start + legalize) | 467 | 0.2 | 1060 -> 814 | 20 |
+| pic (start + legalize) | 435 | 0.1 | 1265 -> 1013 | - |
+| ppc-n3 (start + legalize) | 2207 | 21.7 (1 pass: 5.5) | 54453 -> 42507 | - |
+| ppc-n3 in `place` (10 s deadline, ~2 passes) | 2207 | 10.1 | 53469 -> 43087 | 131 (Cypress 16, routing to its 125 s deadline) |
+
+Editor auto layout, k60 (editor router, 0.457 mm grid, deterministic): without uncross 309 clean nets / 797 vias,
+with it 313 / 695.
+
+End to end, prompt v10, 3 dsh sessions per arm, 20 min, 12 place calls (all sessions used 12),
+one board per batch (results/v10-<board> = PCB_UNCROSS=0, v10u-<board> = with uncross). Submitted
+layouts scored with the exact native router at 8 grid offsets (`sweep-eval.mjs --prefixes v10,v10u`,
+rows in results/uncross-eval.jsonl), median per layout:
+
+| Board | Configuration | Clean nets (count, per session) | Clean nets (mean of 3) | Vias (count, per session) | Vias (mean of 3) | HPWL (mm, per session) | Offsets converged (count of 8, per session) |
+|---|---|---|---|---|---|---|---|
+| k60 (318 nets) | v10, no uncross | 304 / 316 / 318 | 312.7 | 595 / 467 / 552 | 538 | 5722 / 5544 / 6518 | 0 / 4 / 8 |
+| k60 | v10 + uncross | 308 / 314 / 314 | 312.0 | 576 / 559 / 558 | 564 | 5512 / 5884 / 5798 | 0 / 0 / 0 |
+| k60 | human | 318 | 318 | 301 | 301 | 5799 | 8 |
+| pic (310 nets) | v10, no uncross | 310 / 310 / 310 | 310.0 | 496 / 481 / 491 | 489 | 5443 / 5384 / 5311 | 6 / 6 / 6 |
+| pic | v10 + uncross | 310 / 308 / 310 | 309.3 | 435 / 454 / 402 | 430 | 5626 / 5744 / 5145 | 7 / 3 / 8 |
+| pic | human | 310 | 310 | 347 | 347 | 5955 | 8 |
+
+All candidates of the sessions (36 per arm, in-session scoring: tool routing, 5 phases):
+
+| Board | Configuration | Clean nets (count, mean over 36 candidates) | Vias (count, median over 36 candidates) | HPWL (mm, median) |
+|---|---|---|---|---|
+| k60 | v10, no uncross | 298.4 | 576 | 5744 |
+| k60 | v10 + uncross | 287.3 | 591 | 5797 |
+| pic | v10, no uncross | 303.8 | 522 | 5448 |
+| pic | v10 + uncross | 307.8 | 439 | 5624 |
+
+The k60 arms differ by session trajectory, not by the pass: applied offline to the same 36
+no-uncross candidates (`experiments/uncross-paired.mjs`, tool routing, paired):
+
+| Board | Candidates (count) | Clean nets without -> with uncross (count, mean) | Candidates with more / fewer / equal clean nets (count) | Vias without -> with (count, mean) | Candidates with fewer vias (count of 36) | Median via change (count) | HPWL without -> with (mm, mean) | Crossings without -> with (count, mean) |
+|---|---|---|---|---|---|---|---|---|
+| k60 | 36 | 298.4 -> 303.2 | 28 / 2 / 6 | 614 -> 579 | 36 | -32 | 5991 -> 5933 | 1327 -> 1056 |
+| pic | 36 | 303.8 -> 305.2 | 18 / 2 / 16 | 544 -> 524 | 35 | -19 | 5519 -> 5497 | 993 -> 829 |
+
+uncross helps every candidate (k60 -6 % vias, +4.8 clean nets; pic -4 % vias), legal in all 72
+cases. End to end it shows on pic (vias 489 -> 430 mean, best session 402 vs human 347) but not on
+k60 (538 -> 564), where the no-uncross arm had one lucky session (467) and the with-uncross
+sessions all stalled at ~558-576 without a converged offset; 3 sessions per arm are not enough to
+see a ~30-via effect against the session spread (k60 467-595). Kept on.
