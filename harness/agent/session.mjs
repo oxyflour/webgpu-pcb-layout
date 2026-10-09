@@ -3,11 +3,13 @@
 // router evaluate it. State lives in the session dir, outside the agent's workspace.
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadBoard, legalize, evaluateRobust, legalOk, rotatedSize, worldPin, needsFastRouting, toolRouting } from '../lib/board.mjs';
+import { loadBoard, legalize, evaluateRobust, legalOk, placementMetrics, rotatedSize, worldPin, needsFastRouting, toolRouting } from '../lib/board.mjs';
 import { runCypress, KNOBS } from '../lib/cypress.mjs';
 import { startLayout } from '../lib/init.mjs';
+import { createUncross } from '../lib/uncross.mjs';
 import { lib } from '../lib/env.mjs';
 
+const uncross = createUncross({ worldPin, rotatedSize });
 const { placementMasks, blockedCells, maskCellRect } = await lib('src/geometry/mask.js');
 
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -56,6 +58,8 @@ export function createSession(dir) {
   const feedback = process.env.PCB_MARGIN_FEEDBACK !== '0';
   const shownTarget = (t) => { if (feedback || !t) return t; const { margin, ...rest } = t; return rest; };
   const marginOf = (m, s) => m.margin ? { ...m.margin, human: s.target.margin ?? null } : null;
+  // PCB_UNCROSS=0: no crossing removal after the legalizer (baseline before lib/uncross.mjs).
+  const doUncross = process.env.PCB_UNCROSS !== '0';
 
   const commands = {
     info({ section = 'summary', page = 0, refs } = {}) {
@@ -183,18 +187,27 @@ export function createSession(dir) {
       const r = await runCypress(b, { jobDir, seed: runSeed, init, knobs, netWeights, budgetS: big ? 80 : 150 });
       const s2 = state(); s2.next++; s2.placeCalls++;
       if (!r.layout) { writeJson(file, s2); return { candidate: null, status: r.status, error: r.error, wallS: r2(r.wallS) }; }
-      const leg = legalize(b, r.layout);
+      let leg = legalize(b, r.layout), unx = null;
+      // Crossing removal (180 deg turns of 2-pin parts, same-size swaps): legal by construction, so
+      // only re-legalize if the geometry check says otherwise (the legalizer is not idempotent on
+      // ppc: it moves ~230 parts of an already legal layout); keep the old layout if still illegal.
+      if (doUncross) {
+        const u = uncross(b, leg.layout, { deadlineMs: 10000, keep: Object.keys(plan).map((ref) => idx.get(ref)) }), legal = (L) => legalOk(placementMetrics(b, L));
+        const L2 = legal(u.layout) ? u.layout : legalize(b, u.layout).layout;
+        unx = { flips: u.flips, swaps: u.swaps, crossings: u.crossings, seconds: r2(u.ms / 1000), timedOut: u.timedOut };
+        if (legal(L2) || !legal(leg.layout)) leg = { ...leg, layout: L2 }; else unx.rejected = 'illegal after re-legalizing';
+      }
       const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), deadlineS: Math.max(15, 125 - (performance.now() - t0) / 1000) });
       const moved = comps.map((c, i) => [c.id, Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y)]).filter(([ref, d]) => !comps[idx.get(ref)].fixed && d > 0).sort((x, y) => y[1] - x[1]);
       const { perNet, overflowBins, fragileNets = [], ...metrics } = m;
-      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, knobs, netWeights, seed: runSeed, cypress: { status: r.status, wallS: r.wallS, finalOverflow: r.finalOverflow }, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, metrics, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
+      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, knobs, netWeights, seed: runSeed, cypress: { status: r.status, wallS: r.wallS, finalOverflow: r.finalOverflow }, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, uncross: unx, metrics, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
       s2.candidates[id] = { id, from, planned: Object.keys(plan).length, cypress: r.status, metrics };
       const prev = s2.best && s2.candidates[s2.best];
       const accepted = !prev || better(rank(metrics, s2.target), rank(prev.metrics, s2.target));
       if (accepted) s2.best = id;
       writeJson(file, s2);
       if (!feedback) delete metrics.margin;
-      return { candidate: id, best: s2.best, newBest: accepted, scoringNote: `clean/vias are medians over ${m.noise.shifts} routing-grid phases; metrics.noise gives their min-max. Two candidates whose clean/vias differ by less than that spread are equal within measurement noise.`, ...(m.margin?.timeLimited ? { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` } : {}), cypress: r.status, cypressSeconds: r2(r.wallS), metrics, humanTarget: shownTarget(s2.target),
+      return { candidate: id, best: s2.best, newBest: accepted, scoringNote: `clean/vias are medians over ${m.noise.shifts} routing-grid phases; metrics.noise gives their min-max. Two candidates whose clean/vias differ by less than that spread are equal within measurement noise.`, ...(m.margin?.timeLimited ? { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` } : {}), cypress: r.status, cypressSeconds: r2(r.wallS), ...(unx ? { uncross: unx } : {}), metrics, humanTarget: shownTarget(s2.target),
         ...(feedback ? { routingMargin: marginOf(m, s2), congestion: congestion(m, leg.layout, 4), fragileNets: { count: fragileNets.length, nets: fragileNets.slice(0, 12) } } : {}),
         failedNets: perNet.filter((n) => n.status !== 'clean').slice(0, 20).map((n) => n.net),
         mostViaNets: perNet.filter((n) => n.vias > 0).sort((x, y) => y.vias - x.vias).slice(0, 8).map((n) => `${n.net}:${n.vias}`),

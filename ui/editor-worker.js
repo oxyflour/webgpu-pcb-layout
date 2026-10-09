@@ -13,8 +13,10 @@ import { memberOverlaps } from '../src/optimizer/relayout.js';
 import { parseOptions, placeBoard } from '../bench/pipeline.mjs';
 // Served by harness/ui/server.mjs from the harness (same start layout as the agent tool).
 import { createStartLayout } from '../harness/lib/start-layout.mjs';
+import { createUncross } from '../harness/lib/uncross.mjs';
 
 const { startLayout } = createStartLayout({ worldPin, rotatedSize });
+const uncross = createUncross({ worldPin, rotatedSize });
 
 const post = (type, data = {}) => self.postMessage({ type, ...data });
 let device = null, board = null, session = null, cleanup = null;
@@ -72,6 +74,13 @@ async function load({ name, text, placement, seed = 1 }) {
     post('progress', { message: `自动布局：${problem.components.length} 个器件、${plan.modules.length} 个模块` });
     const out = await placeBoard(adapted, o, { device, seed, plan, initLayout, initMode: 'global' });
     layout = out.layout; timing = out.timing;
+    // Crossing removal of the harness tool (lib/uncross.mjs): 180 deg turns of 2-pin parts and
+    // same-size swaps inside a module; keeps legality; k60 0.2 s, ppc-n3 ~5 s per pass.
+    post('progress', { message: '去除网络交叉' });
+    const group = new Int32Array(problem.components.length).fill(-1);
+    plan.modules.forEach((m, k) => m.members.forEach((i) => { group[i] = k; }));
+    const u = uncross({ p: problem }, layout, { deadlineMs: 5000, group });
+    layout = u.layout; timing = { ...timing, uncross: { ms: u.ms, flips: u.flips, swaps: u.swaps, crossings: u.crossings } };
     modules = plan.modules.map((m) => ({ members: [...m.members] }));
   }
   modules.forEach((m, k) => { m.name = moduleName(problem, m, k); });

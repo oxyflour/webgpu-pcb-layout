@@ -4,25 +4,28 @@
 // (experiments/why-stable.mjs, child processes); larger boards: evaluateRobust with the tool routing
 // (3 phases). Resumable, rows to results/sweep-eval/rows.jsonl; --summary prints the table.
 // node harness/experiments/sweep-eval.mjs [--boards a,b] [--jobs 10] | --summary
+// --prefixes p,q --out FILE: agent sessions of results/<p>-<board> for every prefix, labelled <p>-rep<r>
+// (A/B of tool versions, e.g. uncross-eval).
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { HARNESS_ROOT } from '../lib/env.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
-const R = path.join(HARNESS_ROOT, 'results'), OUT = path.join(R, 'sweep-eval', 'rows.jsonl');
+const R = path.join(HARNESS_ROOT, 'results'), OUT = arg('out') ? path.resolve(arg('out')) : path.join(R, 'sweep-eval', 'rows.jsonl'), PREFIXES = arg('prefixes')?.split(',');
 const OFFSETS = ['0,0', '0.05,0.31', '0.13,0.07', '0.21,0.26', '0.29,0.14', '0.37,0.33', '0.09,0.19', '0.25,0.02'];
 const BIG = new Set(['ppc-n3', 'ppc-n1']);
 const ALL = ['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'safety', 'pic', 'nxp', 'rx', 'k60', 'acc', 'ppc-n3'];
 
 function layouts(board) {
   const out = [{ label: 'human', file: 'human' }];
-  for (const pre of ['v9s', 'v9b']) {
+  for (const pre of PREFIXES ?? ['v9s', 'v9b']) {
     const d = path.join(R, `${pre}-${board}`); if (!fs.existsSync(d)) continue;
     for (const r of [1, 2, 3]) { const sf = path.join(d, `rep${r}`, 'session', 'session.json'); if (!fs.existsSync(sf) || !fs.existsSync(path.join(d, `rep${r}`, 'summary.json'))) continue; // finished sessions only
-      const s = JSON.parse(fs.readFileSync(sf, 'utf8')), id = s.submitted ?? s.best; if (id) out.push({ label: `agent-rep${r}`, file: path.join(d, `rep${r}`, 'session', 'candidates', `${id}.json`) }); }
-    break;
+      const s = JSON.parse(fs.readFileSync(sf, 'utf8')), id = s.submitted ?? s.best; if (id) out.push({ label: PREFIXES ? `${pre}-rep${r}` : `agent-rep${r}`, file: path.join(d, `rep${r}`, 'session', 'candidates', `${id}.json`) }); }
+    if (!PREFIXES) break;
   }
+  if (PREFIXES) return out;
   for (const seed of [1000, 8919, 16838]) { const f = path.join(R, 'sweep-eval', 'tool', `${board}-${seed}.json`); if (fs.existsSync(f)) out.push({ label: `tool-${seed}`, file: f }); }
   return out;
 }
