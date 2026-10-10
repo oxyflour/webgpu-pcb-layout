@@ -14,6 +14,7 @@ The WebGPU placer / LNS of webgpu-layout-code is not used.
 | `lib/env.mjs` | Paths: adapter checkout (`CYPRESS_LAYOUT_ROOT`, default the `codex/cypress-official-refresh` worktree), boards (`CYPRESS_PLACER_ROOT`), container (`CYPRESS_CONTAINER`). |
 | `lib/board.mjs` | Load a registered KiCad case like `bench/cypress/compare.mjs` (THT fixed, original sides; `only` = sub-board); `legalize`; `evaluate` = repository geometry + PathFinder routing at 0.4 mm, board layers, 40 rounds, with per-net status; `evaluateRobust` = median over grid phases; `toolRouting` / `exactRouting`. |
 | `native/router.cpp`, `lib/native-router.mjs` | Native routing loop (bit-identical to the JS router; optional layer-aware A*). Build: `cmd /c harness/native/build.cmd` from PowerShell (MSVC 2022). |
+| `lib/tracks.mjs` | Human routing (KiCad track segments / arcs per problem net, per-net graph with the pads attached) for key-information experiments. |
 | `lib/modules.mjs` | Netlist modules (IC + small parts linked only to it). |
 | `lib/cypress.mjs` | One Cypress job: Bookshelf export, warm start, net weights, hard timeout (150 s), import, final pin check (<= 0.025 mm). |
 | `cypress/run.py` | Container-side runner: copy of the adapter `run.py` + job-local log (parallel jobs), warm-start orientation (`hints.json`), per-net weights. |
@@ -35,6 +36,12 @@ docker start codex-cypress-official-20261004
 node harness/agent/batch.mjs --board k60 --prompt harness/prompts/v6.md --minutes 20 --places 12 --out harness/results/v6-k60
 node harness/agent/trace.mjs harness/results/v6-k60/rep1
 ```
+
+Other agents with the same gateway, tool, prompt and budget: `--agent claude` (Claude Code `claude -p`,
+default `--model claude-haiku-5-5`, restricted mode: file tools confined to the workspace, shell limited to
+`./pcb`, node, python, ls, cat) and `--agent codex` (`codex exec`, default `--model gpt-6-luna`,
+workspace-write sandbox with `windows.sandbox="unelevated"`, network on for the local gateway; without the
+unelevated sandbox every command is rejected "blocked by policy" on Windows).
 
 One board per batch: three k60 agents already share the GPU; six concurrent jobs pushed
 Cypress over its 150 s limit. A timed-out `place` is not charged to the agent's budget.

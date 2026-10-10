@@ -13,7 +13,8 @@ export function createStartLayout({ worldPin, rotatedSize }) {
   // mode 'pins-small': same, weighted by 1/pin count of the neighbour;
   // mode 'centres': mean of neighbour part centres (first version, kept for comparison).
   // largeIc: small parts around ICs with >= 100 pins start by the human rules of placeNearLargeICs.
-  function startLayout(b, plan = {}, { seed = 1, base = null, sweeps = 8, jitterMm = 1, mode = 'pins-small', largeIc = false } = {}) {
+  // linkScale(i, j): factor on the pull of part j on part i in the pin modes (experiments/tree.mjs).
+  function startLayout(b, plan = {}, { seed = 1, base = null, sweeps = 8, jitterMm = 1, mode = 'pins-small', largeIc = false, linkScale = null } = {}) {
     const p = b.p, n = p.components.length, rnd = rng(seed), W = p.canvas.width, H = p.canvas.height;
     const idx = new Map(p.components.map((c, i) => [c.id, i]));
     const L = p.components.map((c, i) => c.fixed ? { ...c.fixed } : base ? { ...base[i] } : { x: W / 2, y: H / 2, rotation: 0, side: c.sides === 'bottom' ? 1 : 0 });
@@ -55,7 +56,7 @@ export function createStartLayout({ worldPin, rotatedSize }) {
           // Free neighbours count with their centre; positioned ones with the exact pin.
           // pins-small: humans put small parts next to the partner with fewer pins (k60 median
           // 4.3 mm from it vs 15.8 mm from the larger one), so weight by 1/pin count.
-          const k = mode === 'pins-small' ? 1 / Math.max(1, p.components[j].pins.length) : 1;
+          const k = (mode === 'pins-small' ? 1 / Math.max(1, p.components[j].pins.length) : 1) * (linkScale ? linkScale(i, j) : 1);
           const [x, y] = known[j] ? worldPin(p, L, pi) : [L[j].x, L[j].y], ww = (known[j] ? w : w * 0.5) * k;
           sx += ww * x; sy += ww * y; sw += ww;
         }

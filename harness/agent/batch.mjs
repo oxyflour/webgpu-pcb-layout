@@ -1,4 +1,4 @@
-// Three independent dsh sessions (rep1..rep3) on one board and prompt, run in parallel.
+// Three independent agent sessions (dsh, or --agent claude [--model M]) (rep1..rep3) on one board and prompt, run in parallel.
 // node harness/agent/batch.mjs --board pico --prompt harness/prompts/v1.md --minutes 20 --places 8 --out DIR
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +8,7 @@ const args = process.argv.slice(2), arg = (n, d) => { const i = args.indexOf(`--
 const board = arg('board', 'pico'), out = path.resolve(arg('out', `harness/results/batch-${board}-${Date.now()}`)), reps = Number(arg('reps', 3));
 fs.mkdirSync(out, { recursive: true });
 if (fs.existsSync(path.join(out, 'batch.json'))) throw new Error('batch exists; choose a new --out');
-const pass = ['prompt', 'minutes', 'places'].flatMap((k) => arg(k) ? [`--${k}`, arg(k)] : []);
+const pass = ['prompt', 'minutes', 'places', 'agent', 'model'].flatMap((k) => arg(k) ? [`--${k}`, arg(k)] : []);
 const results = await Promise.all(Array.from({ length: reps }, (_, r) => new Promise((resolve) => {
   const dir = path.join(out, `rep${r + 1}`), log = fs.openSync(path.join(out, `rep${r + 1}.log`), 'w');
   const child = spawn(process.execPath, [path.join(import.meta.dirname, 'run-agent.mjs'), '--board', board, '--out', dir, '--seed', String(r + 1), ...pass], { stdio: ['ignore', log, log], windowsHide: true });

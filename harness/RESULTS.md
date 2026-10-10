@@ -565,3 +565,268 @@ end-to-end gains of this round come mainly from the start-layout fixes.
 relieve removed (2026-10-09): about noise on agent candidates (above) while costing a place call;
 lib/relieve.mjs, its worker, the `relieve` command and experiments/relieve-check.mjs are deleted.
 Prompt v10 = v9 without the relieve parts (v9 kept as the record of the runs above).
+
+## Attachment tree / pruned graph (2026-10-09, key information, no agent)
+
+Hypothesis: humans place outward from the main chip one part at a time, so the placement follows a
+tree (or a pruned graph) of the netlist. Analysis of the 15 human layouts
+(`experiments/tree-structure.mjs`, `tree-clusters.mjs`, `tree-anchors.mjs`; part graph = signal
+nets with 2-30 parts, edge length = shortest human pin-to-pin distance):
+
+- The netlist is not a tree: cycle rank 0.8-1.4 x parts (k60: 382 parts, 893 links, 512); in BFS
+  order from the main chip only 33-55 % of the parts have exactly one earlier neighbour.
+- Humans keep a spanning tree short and the cycle-closing links long: MST edges median 1.8-5.2 mm,
+  the other links 7.6-24 mm; links <= 3 mm only: k60 cycle rank 512 -> 55, ppc-n3 2213 -> 340.
+- It is not one tree from the main chip: hop depth vs distance from it Spearman 0.03-0.66; the BFS
+  parent is the nearest linked part for 25-42 % of small parts; the nearest linked part of a
+  small part is an IC for 15-49 % (chains of passives); 51-85 % of small parts hang on 0-1 parts
+  within 3 mm, 5-44 % on >= 2.
+- The current init's strongest partner (pins-small weight) is the human parent (nearest linked
+  part) for 50-79 % of small parts.
+
+Key-information test (`experiments/tree.mjs`, human IC poses for all levels, 3 seeds, robust
+scoring; init option `linkScale` in lib/start-layout.mjs):
+
+| Board, configuration | Clean nets (count, seeds 1/2/3) | Vias (count) | HPWL (mm) | Non-IC parts, start to human pose, median (mm) |
+|---|---|---|---|---|
+| k60, ics (tool init) + Cypress | 316 / 316 / 308 | 509 / 496 / 532 | 5593 / 5569 / 5671 | 4.7-4.9 |
+| k60, human parent x10 in the init + Cypress | 293 / 284 / 296 | 639 / 665 / 640 | 5912 / 5820 / 5828 | 4.7 |
+| k60, same + Cypress weight 3 on the parent nets | 277 / 276 / 289 | 666 / 669 / 614 | 5888 / 5837 / 5838 | 4.7 |
+| k60, human MST links only (others x0.2) + Cypress | 318 / 316 / 312 | 507 / 493 / 523 | 5647 / 5715 / 5690 | 4.5 |
+| k60, ics, start only | 318 / 314 / 304 | 499 / 509 / 551 | 5627 / 5568 / 5722 | 4.7-4.9 |
+| k60, human parent x3, start only | 297 / 289 / 292 | 605 / 593 / 589 | 5749 / 5702 / 5775 | 4.6-4.8 |
+| k60, human MST links x0.2, start only | 312 / 316 / 313 | 518 / 518 / 486 | 5672 / 5751 / 5685 | 4.5 |
+| k60, human MST links only (others x0), start only | 316 / 318 / 318 | 499 / 493 / 481 | 5907 / 5884 / 5865 | 4.3-4.5 |
+| pic, ics, start only | 310 / 310 / 308 | 526 / 501 / 512 | 5532 / 5449 / 5453 | 9.7-9.9 |
+| pic, human parent x3, start only | 304 / 304 / 306 | 565 / 567 / 495 | 5471 / 5553 / 5458 | 10.4-10.7 |
+| pic, human MST links only, start only | 308 / 306 / 310 | 537 / 537 / 520 | 5811 / 5733 / 5678 | 8.5 |
+| acc, ics, start only | 617 / 617 / 617 | 2854 / 2833 / 2851 | 17104 / 17097 / 17181 | 5.2-5.5 |
+| acc, human parent x3, start only | 617 / 617 / 617 | 2909 / 2857 / 2921 | 17046 / 17069 / 17080 | 5.2-5.3 |
+| acc, human MST links only, start only | 617 / 617 / 617 | 2812 / 2857 / 2874 | 17102 / 17136 / 17115 | 3.8-4.0 |
+
+(Human legal references: k60 318 / 323 / 5814, acc 617 / 2620 / 17295.) The human tree is not key
+information for the init: pulling a part to its human parent is worse on all three boards (k60 -20
+clean, +130 vias); keeping only the human tree links brings parts closer to their human pose (acc
+5.4 -> 3.9 mm) but leaves the metrics within noise (k60 vias -20, pic +20, acc 0) at +3-5 % HPWL.
+Which part sits next to which is not what the tool misses; the remaining gap is in exact poses
+(hotspot-inject: human poses of the 66-76 small parts in the congested areas give 463-473 vias).
+Not passed to the agent.
+
+## What in the human small-part poses matters (k60, 2026-10-09)
+
+Start: the tool layouts of the section above (human IC poses + init + Cypress, seeds 1-3); small
+parts (movable, < 8 pins, 396) get parts of their human pose, legalized, 5 grid phases
+(`experiments/pose-ablation.mjs`).
+
+| Small parts given... | Parts (count) | Vias (count, seeds 1/2/3) | Clean nets (count of 318) |
+|---|---|---|---|
+| nothing (tool) | 0 | 504 / 509 / 541 | 315 / 313 / 312 |
+| human x, y, rotation | 396 | 336 / 337 / 337 | 318 |
+| human x, y, tool rotation | 396 | 394 / 390 / 390 | 318 |
+| tool x, y, human rotation | 396 | 532 / 525 / 551 | 316-318 |
+| human pose + uniform noise +-1 mm / +-2 mm | 396 | 345 / 362 / 361 ; 405 / 395 / 394 | 318 |
+| only parts with a signal net / only decaps | 369 / 27 | 357 / 340 / 356 ; 490 / 508 / 520 | 318 ; 314-318 |
+| only parts > 5 mm / <= 5 mm from the human position | ~218 / ~178 | 380 / 388 / 393 ; 475 / 501 / 469 | 318 ; 312-316 |
+| only parts with another rotation (mod 180) | 239 | 435 / 422 / 438 | 316-318 |
+| only the repeated bottom channels (x 55-120, y > 52) | 51 | 474 / 460 / 455 | 318 |
+| only the top-right quarter (x > 90, y < 45) | 101 | 464 / 466 / 510 | 314-316 |
+
+Position to ~1-2 mm plus rotation is the information; the parts the tool puts > 5 mm off (median
+10.8 mm; 2-pin parts between partners ~25 mm apart, 52 without a signal net) carry ~70 % of the
+gap; no board region dominates. In the plot (human vs tool) humans lay out repeated sub-circuits as
+identical copies aligned with their connector / IC pins and use the whole board; the tool piles
+them into a few clusters.
+
+Net crossings (`experiments/crossings.mjs`, straight MST segments of every signal net): human legal
+885, tool 1023-1069, human +-1 mm 900-949, +-2 mm 942-961; the tool's spanning-tree length is
+shorter (4557-4636 mm vs 4788). Crowding of the 0-1 mm ring around the ICs (`ic-bands.mjs`: area
+covered 0.34-0.36 vs human 0.22, pins/cm2 17-19 vs 9) is not causal: legalizing with the ICs
+inflated by 1 mm (`ic-ring.mjs`) gave 517 vias (from 504).
+
+Crossing removal is causal for part of the gap (`experiments/uncross.mjs`: greedy 180 deg turns
+of 2-pin parts and swaps of same-size parts on one side within 10 mm, cost = crossings + 0.2 x
+spanning-tree mm; legal by construction, k60 2 s, acc 10 s incl. evaluation):
+
+| Board, tool layout | Crossings (count, before -> after) | Vias before (count, seeds 1/2/3) | Vias after (count) | Clean before / after (count) | HPWL after (mm) |
+|---|---|---|---|---|---|
+| k60, start + Cypress | 1060->809 / 1023->855 / 1069->873 | 504 / 509 / 541 | 464 / 473 / 480 | 315,313,312 / 318,316,316 | 5518 / 5560 / 5623 |
+| k60, start only | 1045->821 / 1039->865 / 1147->867 | 499 / 509 / 551 | 455 / 469 / 492 | 318,314,304 / 316,316,311 | 5587 / 5573 / 5607 |
+| pic, start only | 947->756 / 842->674 / 860->707 | 526 / 501 / 512 | 489 / 480 / 470 | 310,310,308 / 308,310,310 | 5546 / 5465 / 5461 |
+| acc, start only | 13858->13473 / 13824->13419 / 14036->13571 | 2854 / 2833 / 2851 | 2797 / 2804 / 2867 | 617 / 617 | 17092 / 17103 / 17154 |
+| k60, human legal | 885->794 | 336 | 344 | 318 / 318 | 5841 |
+
+-25 to -45 vias without human information (lambda 0.05 / 1 and radius 25 are no better). After
+it the tool has fewer straight crossings than the human (~840 vs 885) but still ~470 vias, so
+the rest of the gap is not straight-line crossings.
+
+## Coarse vs fine placement, proxies for vias (k60, 2026-10-09)
+
+`experiments/coarse.mjs`: human IC poses; small parts planned at their human position + uniform
+noise (human rotation), then the harness Cypress pass, legalizer, 5 grid phases.
+
+| Small-part start | Vias (count, seeds 1/2/3) | Clean (count of 318) | Small parts to human after Cypress, median (mm) |
+|---|---|---|---|
+| human +-0 mm | 343 / 340 / 342 | 318 | 0.2-0.6 |
+| human +-2 mm | 371 / 407 / 373 | 318 | 1.4-1.6 |
+| human +-5 mm | 497 / 518 / 487 | 318 | 3.6-3.9 |
+| human +-10 mm | 711 / 769 / 650 | 313-318 | 7.3-7.7 |
+| human +-5 mm, init rotation | 509 / 535 / 501 | 318 | 3.9 |
+| tool init (no small-part info) | 504 / 509 / 541 | 308-316 | 4.7 |
+| tool init, Cypress target_density 0.5 / 0.4 (default 0.65) | 500 / 519 / 545 ; 493 / 514 / 525 | 306-316 | 5.6-6.0 |
+
+The tool is as good as "human +-5 mm": its coarse placement is right, the gap is the arrangement
+below ~2 mm, and the Cypress pass does not repair it (noise in = noise out). Rigid shifts of whole
+human clusters (small parts linked by pins <= 3 mm apart; `pose-ablation.mjs gjit<S>`): +-2 mm
+382 / 395 / 377, +-5 mm 433 / 499 / 439 (independent +-5 mm 514 / 540 / 484), so the arrangement
+relative to the surroundings matters, not only inside clusters. Not the cause (`alignment.mjs`):
+rows/columns (human 0.69-0.80 of small parts share x or y with a neighbour, tool 0.46) and gaps
+(nearest-neighbour p50 human 0.28 mm, tool 0.12): the human layout after Cypress has 0.49 / 0.13 mm
+and still 340 vias.
+
+Round-1 overflow (cells claimed by > 1 net after one routing pass) vs vias over 126 k60 layouts of
+these experiments: Pearson 0.981 (HPWL 0.42). But optimizing it directly does not transfer
+(`ovf-search.mjs`, greedy shifts / turns / swaps of small parts near overflow cells, legal moves,
+cost = mean round-1 overflow over 4 grid phases disjoint from the evaluation's, 0.4 s per eval):
+tool seed 1, 400 evals: search overflow 788 -> 688, evaluation round-1 overflow 769 -> 717, vias
+504 -> 526. Full routing as the objective costs 1.9 s per phase and one phase is noisy (same
+layout 468 / 506 / 515 vias on three phases), i.e. ~6 s per move.
+
+## Placement templates learned from the other human boards (2026-10-09, leave one board out)
+
+`experiments/templates.mjs`: Prim tree on the human layout grown from the fixed parts and ICs (each
+step attaches the small part with the shortest human pin link to a placed part). Per small part,
+in the frame of its parent's pin (outward normal, tangent): d1 = parent pin -> own linked pin,
+d2 = own linked pin -> own centre. Class = prefix | signal pins | pads | size | GND pad | supply
+pad | parent IC or small | net size; prediction = class median on the other boards (backoff to
+coarser classes). Human IC poses, parts placed in tree order, rest = tool init, legalized.
+
+Gate on k60 (seed 1): oracle d1/d2 rebuilds the human poses (89 % of small parts within 2 mm,
+357 vias); learned d1/d2: median 5.6 mm from human, 13 % within 2 mm, 525 vias (tool 499).
+Offset predictability (`templates-error.mjs`, no error accumulation):
+
+| Board | Parent kind | Parts (count) | Human d1 length, median (mm) | d1 error, learned, p50 / p90 (mm) | d2 error, learned, p50 / p90 (mm) |
+|---|---|---|---|---|---|
+| k60 | IC | 85 | 2.6 | 2.9 / 9.2 | 1.2 / 1.7 |
+| k60 | small part | 254 | 2.4 | 3.0 / 6.7 | 1.2 / 2.4 |
+| pic | IC | 82 | 4.5 | 4.3 / 11.8 | 0.8 / 2.1 |
+| pic | small part | 243 | 3.2 | 3.5 / 10.4 | 0.8 / 2.4 |
+| acc | IC | 168 | 1.6 | 1.6 / 9.2 | 0.5 / 1.4 |
+| ppc-n3 | small part | 731 | 1.5 | 1.5 / 3.9 | 0.5 / 1.4 |
+
+d2 (orientation around the own pin) is predictable, d1 (where the part sits relative to the
+parent pin) is not: the learned error equals d1 itself. Context (`link-direction.mjs`): 48-64 % of
+the parts have no other signal link (pull-ups, filter caps, ESD: their place is set by space);
+for the others, direction to the other links has cosine p50 0.42-0.92 with d1, error with the
+true length 1.4-2.4 mm.
+
+"Own pin on the parent pin + learned d2" (seed 1, vias, tool -> templates): + Cypress k60 509 ->
+476, pic 497 -> 527, acc 2839 -> 2799, nxp 721 -> 756, rx 800 -> 787, edu-k60 290 -> 292; start
+only k60 499 -> 467, pic 526 -> 543, acc 2863 -> 2811, nxp 735 -> 762, rx 795 -> 778, edu-k60 304
+-> 287; HPWL +2-8 %. No reliable gain: templates are not the missing information.
+
+The KiCad files hold the human routing (segments / vias: k60 4461 / 456, pic 5588 / 506, acc
+59024 / 1875, ppc-n3 54302 / 4629), unused so far.
+
+## Human routing as key information (2026-10-10)
+
+`lib/tracks.mjs` reads the human tracks per problem net (segments, track arcs as chords; net table
+from the first `(net N name)` of each number) and builds a per-net graph (T-junctions split, pads
+attached). Signal nets whose pads are all joined by the tracks: pico 85/86, edk 124/124, fsl-mini
+161/161, safety 185/186, pic 303/309, nxp 358/369, rx 388/399, k60 305/315, acc 601/612, ppc-n3
+1566/1603 (z3r0 6/45, edu-k60 70/156, edu-nxp 77/162 not usable).
+
+Do small parts sit on the routes of their nets? (`experiments/track-trunk.mjs`; trunk = human track
+paths joining the net's other pads; on trunk = track stub < 0.5 x distance to the nearest other
+pad; straight-line version = distance to the straight spanning tree of the other pads.)
+
+| Board | Single-net small parts (count) | On the track trunk, human (share) | Straight-line version: human (share) | Straight-line version: tool (share) | Series parts (count) | Detour P->part->D, straight, p90: human / tool (ratio) |
+|---|---|---|---|---|---|---|
+| k60 | 317 | 0.42 | 0.21 | 0.16 | 28 | 0.99 / 1.62 |
+| pic | 327 | 0.44 | 0.20 | 0.16 | 21 | 0.97 / 2.92 |
+| acc | 233 | 0.33 | 0.19 | 0.28 | 30 | 1.34 / 3.00 |
+| nxp / rx / safety | 296 / 303 / 174 | 0.45 / 0.44 / 0.39 | 0.18 / 0.20 / 0.17 | - | 24 / 36 / 13 | - |
+
+Humans do not put single-net parts on the straight trunk more than the tool; a few tool series
+parts are far off their path (p90), but there are only 20-36 series parts per board.
+
+Corridors (`experiments/corridor-keepout.mjs`): the human tracks of the backbone nets (no small
+part; k60 28 nets, 1169 of 6194 mm of signal track) as same-side blockers while legalizing the
+tool layout (ICs held): 56 parts moved 0.25 mm on average, 504 -> 524 vias (with the ICs not held
+the legalizer pushed the ICs: 993 vias).
+
+## Starting from the human layout: where do the tool's algorithms move it? (k60, 2026-10-10)
+
+`experiments/from-human.mjs`, seed 1, 5 grid phases. loo = every small part (movable, < 8 pins)
+re-placed by the tool's start-layout rule while all other parts stay at their human pose (one
+call per part), the answers combined; slot = then the nearest spot where the part fits among the
+legalized human poses (0.1 mm spiral).
+
+| Start: human layout, then... | Small-part drift from human, median / p90 (mm) | Within 1 mm (share) | Rotations changed (count of 396) | Vias (count) | HPWL (mm) |
+|---|---|---|---|---|---|
+| legalizer only | 0.07 / 0.99 | 0.90 | 0 | 346 | 5817 |
+| harness Cypress + legalizer | 0.55 / 1.67 | 0.80 | 0 | 343 | 5683 |
+| benchmark Cypress (1000 iterations, lr 0.01) + legalizer | 2.16 / 5.17 | 0.18 | 0 | 363 | 5582 |
+| legalizer + crossing pass (uncross.mjs) | flips / swaps | - | 38 flips | 344 | 5841 |
+| loo (rule position + rule rotation) | 4.28 / 31.0 | 0.11 | 266 | 437 | 5876 |
+| loo, human rotation | 4.00 / 30.8 | 0.11 | 0 | 447 | 5920 |
+| loo + slot | 3.70 / 31.0 | 0.22 | 266 | 472 | 6159 |
+| loo + slot, human rotation | 2.54 / 35.6 | 0.37 | 0 | 411 | 5891 |
+
+Cypress, legalizer and crossing pass keep the human quality (Cypress pulls towards shorter wires,
++0-20 vias). The loss is in the start-layout rule even with perfect context: its position is
+4.3 mm off and its rotation rule is a coin flip on the axis (`rot-rule.mjs`, k60 at the human
+position: 2-pad 2-signal parts 87 same / 4 flipped / 58 other axis, 2-pad 1-signal 59 / 3 / 63).
+Axis rules with perfect context (`axis-rules.mjs`, agreement with the human axis of 2-pad parts):
+
+| Board | 2-pad parts (count) | Pins rule (current) | Fit (axis that overlaps least) | Rows (majority of 2-pad neighbours < 3 mm) | Radial to the nearest IC edge (< 5 mm) | Fit, then pins |
+|---|---|---|---|---|---|---|
+| k60 | 328 | 0.49 | 0.78 | 0.82 | 0.52 | 0.86 |
+| pic | 339 | 0.53 | 0.55 | 0.87 | 0.47 | 0.73 |
+| acc | 465 | 0.49 | 0.62 | 0.72 | 0.45 | 0.67 |
+| nxp | 333 | 0.46 | 0.64 | 0.79 | 0.34 | 0.80 |
+| rx | 343 | 0.50 | 0.67 | 0.72 | 0.33 | 0.83 |
+| safety | 202 | 0.39 | 0.80 | 0.84 | 0.84 | 0.90 |
+
+The axis pass on tool layouts (`axis-pass.mjs`: after legalizing, re-pick each 2-pad part's axis
+by fit -> rows -> pins, legalize again): k60 vias 504 / 509 / 541 -> 499 / 475 / 516 (rows first:
+501 / 496 / 515); it cannot help while the positions are 4-5 mm off.
+
+Agent: `agent/run-agent.mjs --agent claude [--model claude-haiku-5-5]` runs Claude Code (`claude -p`,
+restricted mode: file tools confined to the workspace, no user/project settings, shell limited
+to ./pcb, node, python, ls, cat; same gateway, prompt, budgets and audit as dsh).
+
+## Claude Code (Haiku 5.5) vs dsh (DeepSeek Flash) as the agent (k60, 2026-10-10)
+
+Same tool, gateway, prompt v10 and budget (20 min, 12 place calls), 3 sessions each, run one batch
+after the other (harness/results/v10-claude-k60, v10-dsh-k60); final layouts scored by the runner
+(5 grid phases, native exact). Human legal reference 318 / 323 vias / 5814 mm.
+
+| Agent | Clean nets (count of 318, sessions 1/2/3) | Vias (count) | HPWL (mm) | Minutes used (of 20) | Place calls used (of 12) | Cost per session (USD) |
+|---|---|---|---|---|---|---|
+| Claude Code, claude-haiku-5-5 | 314 / 314 / 292 | 506 / 531 / 638 | 5701 / 5634 / 5982 | 7.3 / 7.3 / 8.3 | 11 / 9 / 9 | 1.03 / 1.08 / 1.37 |
+| dsh, deepseek-flash | 318 / 314 / 310 | 563 / 571 / 570 | 6403 / 5691 / 5626 | 13.5 / 12.9 / 13.2 | 12 / 12 / 12 | - |
+
+Candidate sequences: Claude restarts from the centroid with a new floorplan on most calls (big
+jumps, e.g. rep2 c001 314 / 531 then c002 214 / 1014) and submitted its best candidate every time;
+rep3 started from a weak floorplan (276 / 645), refined it for 5 calls and stopped at 8 min with 3
+calls left. dsh refines one floorplan step by step (from = previous candidate) and uses the whole
+budget. Claude reaches the two best layouts of the six sessions, but is less consistent and stops
+early.
+
+Codex (`--agent codex`: `codex exec --json -m gpt-6-luna`, workspace-write sandbox with
+windows.sandbox="unelevated", network on for the local gateway, approval_policy never, user config
+and rules ignored), same tool / prompt v10 / budget, harness/results/v10-codex-k60:
+
+| Agent | Clean nets (count of 318, sessions 1/2/3) | Vias (count) | HPWL (mm) | Minutes used (of 20) | Place calls used (of 12) | Tokens per session: input (cached) / output |
+|---|---|---|---|---|---|---|
+| Codex, gpt-6-luna | 297 / 293 / 318 | 701 / 715 / 540 | 6544 / 6282 / 5621 | 8.4 / 7.7 / 6.9 | 12 / 12 / 12 | 2.6M (2.5M) / 15k; 2.3M (2.2M) / 14k; 1.8M (1.8M) / 14k |
+| Claude Code, claude-haiku-5-5 | 314 / 314 / 292 | 506 / 531 / 638 | 5701 / 5634 / 5982 | 7.3 / 7.3 / 8.3 | 11 / 9 / 9 | - |
+| dsh, deepseek-flash | 318 / 314 / 310 | 563 / 571 / 570 | 6403 / 5691 / 5626 | 13.5 / 12.9 / 13.2 | 12 / 12 / 12 | - |
+
+Codex uses all 12 calls in 7-8 min (fast calls, little thinking between them) and refines from its
+best candidate like dsh; sessions 1 and 2 started from weak floorplans (198 / 1090 and 272 / 729)
+and never recovered (best 304 / 734 and 293 / 715), session 3 started well (304 / 535) and ended
+318 / 540, the best clean + vias of the dsh / Codex sessions. Sessions 1 and 2 submitted a
+candidate with fewer vias over one with more clean nets (c007 297 / 701 vs c009 304 / 734).
+Across the three agents the start floorplan decides the session: no agent recovers from a weak
+first IC placement within 12 calls.
