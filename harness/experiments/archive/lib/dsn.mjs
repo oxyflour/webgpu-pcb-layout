@@ -5,7 +5,7 @@
 // Only signal nets are routed (power/ground pads have net -1 and are obstacles, as in the router).
 // Coordinates: mm -> um, y negated (DSN is y-up).
 
-import { rotateQuarter, localPin } from '../../core/src/problem.js';
+import { rotateQuarter, localPin } from '../../../../core/src/problem.js';
 
 const q = (s) => `"${String(s).replace(/"/g, '')}"`;
 const um = (v) => Math.round(v * 1000 * 10) / 10;

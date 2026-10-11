@@ -1,4 +1,4 @@
-// Shared real-board registry for the project and Cypress benchmarks.
+// Benchmark board registry: name -> KiCad file relative to boardsRoot (harness/lib/env.mjs).
 const CIAA = 'benchmark/ciaa-Hardware/PCB';
 const PPC = 'benchmark/powerpc-laptop-mobo/KiCAD/openPPCnotebook';
 export const KICAD_CASES = [

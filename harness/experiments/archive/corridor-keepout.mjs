@@ -6,7 +6,7 @@
 // node harness/experiments/corridor-keepout.mjs --board k60 --layout L.json --nets backbone --out FILE [--tag T]
 import fs from 'node:fs';
 import { loadBoard, legalize, evaluateRobust } from '../../lib/board.mjs';
-import { loadTracks } from '../../lib/tracks.mjs';
+import { loadTracks } from './lib/tracks.mjs';
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const b = loadBoard(arg('board')), p = b.p, C = p.components, which = arg('nets', 'backbone'), src = arg('layout');
 const L0 = (() => { const j = JSON.parse(fs.readFileSync(src, 'utf8')); return j.layout ?? j; })();

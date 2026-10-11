@@ -1,5 +1,5 @@
 {
-  "name": "cypress-agent-harness",
+  "name": "pcb-layout-harness",
   "private": true,
   "type": "module",
   "scripts": {

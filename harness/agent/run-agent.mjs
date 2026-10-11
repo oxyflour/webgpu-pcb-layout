@@ -25,7 +25,7 @@ if (fs.existsSync(path.join(out, 'events.jsonl'))) throw new Error('Output alrea
 const sessionDir = path.join(out, 'session');
 await initSession(sessionDir, { board, seed });
 // Agent workspace outside the repo so it cannot read the harness, boards or human layout.
-const ws = path.join(os.homedir(), 'agent-ws', `cypress-${board}-${crypto.randomUUID()}`);
+const ws = path.join(os.homedir(), 'agent-ws', `pcb-${board}-${crypto.randomUUID()}`);
 fs.mkdirSync(ws, { recursive: true });
 
 const token = crypto.randomUUID();

@@ -6,8 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadBoard, legalize } from '../../lib/board.mjs';
-import { exportDsn } from '../../lib/dsn.mjs';
-import { scoreSes } from '../../lib/ses.mjs';
+import { exportDsn } from './lib/dsn.mjs';
+import { scoreSes } from './lib/ses.mjs';
 import { HARNESS_ROOT, FREEROUTING_DIR, required } from '../../lib/env.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };

@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadBoard } from '../../lib/board.mjs';
-import { findArrays, buildModules } from '../../lib/modules.mjs';
+import { findArrays, buildModules } from './lib/modules.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const b = loadBoard(arg('board')), variant = arg('variant', 'arrays'), outdir = arg('outdir');

@@ -2,9 +2,9 @@
 // problem net, in canvas coordinates, and a per-net graph (segment endpoints, T-junctions split,
 // layers ignored: vias join layers at the same point) with the pads of the net attached.
 import fs from 'node:fs';
-import { worldPin } from './board.mjs';
+import { worldPin } from '../../../lib/board.mjs';
 
-import * as P from '../../core/src/problem.js';
+import * as P from '../../../../core/src/problem.js';
 const NUM = String.raw`(-?[\d.]+(?:e-?\d+)?)`;
 
 export function loadTracks(b) {

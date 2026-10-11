@@ -9,7 +9,7 @@
 // node harness/experiments/track-trunk.mjs --board k60 [--tool L.json]
 import fs from 'node:fs';
 import { loadBoard } from '../../lib/board.mjs';
-import { loadTracks, padBoxes, netGraph, dijkstra } from '../../lib/tracks.mjs';
+import { loadTracks, padBoxes, netGraph, dijkstra } from './lib/tracks.mjs';
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const b = loadBoard(arg('board')), p = b.p, C = p.components, H = b.a.originalLayout;
 const tool = arg('tool') ? (() => { const j = JSON.parse(fs.readFileSync(arg('tool'), 'utf8')); return j.layout ?? j; })() : null;

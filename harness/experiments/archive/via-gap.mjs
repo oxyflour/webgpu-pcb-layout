@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadBoard, worldPin } from '../../lib/board.mjs';
-import { buildModules } from '../../lib/modules.mjs';
+import { buildModules } from './lib/modules.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const b = loadBoard(arg('board', 'ppc-n3')), dir = arg('dir'), human = arg('human', 'human'), runs = arg('runs').split(',');

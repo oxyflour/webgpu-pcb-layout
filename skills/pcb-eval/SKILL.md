@@ -5,19 +5,18 @@ description: 为一块新 PCB（KiCad 文件或 kicadToIR 输出的 IR JSON）�
 
 # 新板子评测（harness）
 
-评测管线在 `harness/`：`start layout -> 0.1 mm 合法化 -> detail pass（小器件局部搜索：HPWL + 布线通道 + 去耦电容到其 IC + 关键网络）-> native 布线器`。不再使用 Cypress，无需 GPU / 容器。算法与历史结果见 `harness/README.md`、`harness/RESULTS.md`。
+评测管线在 `harness/`：`start layout -> 0.1 mm 合法化 -> detail pass（小器件局部搜索：HPWL + 布线通道 + 去耦电容到其 IC + 关键网络）-> 网格布线器`。算法与历史结果见 `harness/README.md`、`harness/RESULTS.md`。
 
 ## 0. 环境
 
-本分支自包含：适配层代码已放在 `vendor/webgpu-layout-code`。本机路径写在 `harness/local.json`（不提交，从 `harness/local.example.json` 复制）或环境变量里：`placerRoot` 只在用已登记的 KiCad 基准板时需要；`boards.json` 里登记的板子自带路径。不需要 Cypress、Docker 或 GPU。首次运行前编译 native 布线器：`cmd /c harness
-ativeuild.cmd`（不编译时用 JS 布线器，结果相同但慢）。
+仓库自包含：算法代码在 `core/`（问题模型、KiCad/IR 导入、合法化、布线器），不依赖其他 checkout，不需要 Cypress、Docker 或 GPU。本机路径写在 `harness/local.json`（不提交，从 `harness/local.example.json` 复制）或环境变量：`boardsRoot`（`PCB_BOARDS_ROOT`）只在用 `core/bench/kicad-cases.mjs` 里的基准 KiCad 板时需要；`harness/boards.json` 登记的板子自带路径。首次运行前编译 native 布线器：`cmd /c harness\native\build.cmd`（不编译时用 JS 布线器，结果相同但慢）。`npm test` 在 `test/fixtures` 的 IR 上跑回归测试。
 
 ## 1. 准备板子文件
 
 两种输入都可以：
 
 - **KiCad**：`.kicad_pcb`（KiCad 4–8）。原理图子页（封装的 `path`）和网络类会被自动读取。
-- **IR JSON**：`kicadToIR` 的输出（适配仓库 `src/kicad/adapter.js`，`webgpu-layout-code`），即 `{format, yAxis, name, source, board, nets, footprints}`。
+- **IR JSON**：`kicadToIR` 的输出（`core/src/kicad/adapter.js`），即 `{format, yAxis, name, source, board, nets, footprints}`。
   - `footprints[].placement` 是**人工布局**（所有"对标人工"的指标都以它为参照；没有人工布局的板子只能看绝对值）。
   - 可选字段（约束推断用）：`footprints[].sheet`（原理图子页路径，同一子页的 IC 被认为是该页去耦电容的服务对象）、`nets[].netclass`（网络类名）、顶层 `netClasses: [{name, clearance, traceWidth, viaDia}]`。没有它们时，去耦电容退回"同电源上的任一 IC"，关键网络只按命名（晶振、`_P/_N`、`DP/DM`、`+/-`）识别。
   - 从已登记的 KiCad 板导出带这些字段的 IR：`node harness/experiments/export-ir.mjs --board k60 --out boards/k60-ir.json`。

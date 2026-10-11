@@ -1,9 +1,10 @@
-// Starting layouts for Cypress. A plan pins some movable parts to explicit poses; every
+// Start layouts of the tool (and of the web editor's auto layout). A plan pins some movable parts to
+// explicit poses; every
 // other movable part starts at the connectivity centroid of already-positioned parts
 // (fixed parts and planned parts), refined by a few Jacobi sweeps, plus a small seeded jitter
-// so stacked parts are separable by Cypress's density force. Not a placer: Cypress places.
+// so stacked parts stay separable; the legalizer and the detail pass place them (lib/detail.mjs).
 // Pure module (no Node imports): the editor worker loads it in the browser (harness/ui/server.mjs
-// serves harness/lib at /harness/lib/). The geometry helpers of the adapter src/problem.js are
+// serves harness/lib at /harness/lib/). The geometry helpers of core/src/problem.js are
 // passed in; lib/init.mjs binds them for Node.
 export function createStartLayout({ worldPin, rotatedSize }) {
   function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9 >>> 0) / 4294967296); }
@@ -114,7 +115,7 @@ export function createStartLayout({ worldPin, rotatedSize }) {
     // positioned neighbour and stayed at the board centre (1-6 parts per board, ppc 70-102). Repeat
     // the neighbour sweep and the supply anchoring for the parts still unplaced.
     for (let pass = 0; pass < 4; pass++) { const left = free.filter((i) => !placed[i]); if (!left.length) break; sweep(left, 4); anchorBySupply(); }
-    // Rotation of free parts: Cypress runs with frozen orientations (see cypress.mjs), so pick
+    // Rotation of free parts:
     // the quarter turn whose pins are closest to the pins they connect to (fixed, planned, or
     // the current estimate of other free parts).
     if (mode !== 'centres') for (const i of free) {
