@@ -1119,3 +1119,62 @@ converged at every grid phase: 35 of 42 (pico 0, k60 0, pic 2 of 3). No agent no
 boards (k60 318 in all seeds; pic 293.7). fsl-mini: every agent layout keeps one overlap, U601 under
 the fixed shield can SH701 as in the human layout (also in all v9 sessions), so the runner marks them
 not legal.
+
+
+## New metrics against the human layout: decoupling capacitors and critical nets (2026-10-11)
+
+`lib/human-metrics.mjs`, `experiments/human-metrics.mjs` (rows in results/human-metrics-v12.jsonl):
+the v12 sweep layouts (human = the KiCad layout as is; no agent = start + legalizer + detail pass,
+3 seeds; agent = v12 submitted layouts, 3 sessions; values are means over the 3). Routed lengths
+and vias from evaluateRobust (native exact, 5 phases; ppc-n3 tool routing, 3 phases), perNet of the
+median-via phase.
+
+Decoupling capacitor = ref C*, 2 pads, one on a ground net, the other on a supply (power-class net,
+or a routed net that looks like one: +..., VDD, VCC, xVy, or > 30 parts); distance = its supply pad
+to the nearest pad of an IC (>= 8 pads) on the same supply. Critical nets: crystal = nets on Y* / X*
+parts with <= 4 pads; clock = CLK / OSC / XTAL in the name; reset = RST / RESET; differential pairs =
+names that differ only in _P/_N, P/N, +/-, DP/DM.
+
+| Board | Decoupling capacitors with an IC on their supply (count) | Distance to the nearest IC supply pin, median: human / no agent / agent (mm) | p90: human / no agent / agent (mm) | Within 3 mm: human / no agent / agent (share) | Same IC as human: no agent / agent (share) |
+|---|---|---|---|---|---|
+| z3r0 | 7 | 4.9 / 6.9 / 6.4 | 7.7 / 10.9 / 10.9 | 0.43 / 0.05 / 0.00 | 0.52 / 0.43 |
+| pico | 9 | 1.6 / 6.7 / 8.2 | 8.5 / 22.8 / 17.9 | 0.78 / 0.18 / 0.11 | 0.48 / 0.59 |
+| edk | 18 | 3.4 / 11.9 / 17.7 | 28.2 / 28.5 / 31.2 | 0.22 / 0.06 / 0.04 | 0.22 / 0.24 |
+| edu-fpga | 45 | 5.8 / 12.5 / 14.2 | 14.7 / 29.9 / 32.3 | 0.09 / 0.03 / 0.03 | 0.42 / 0.43 |
+| fsl-mini | 29 | 5.3 / 13.0 / 14.5 | 14.2 / 35.0 / 34.5 | 0.10 / 0.03 / 0.07 | 0.24 / 0.33 |
+| edu-k60 | 32 | 5.7 / 16.2 / 18.7 | 16.9 / 36.7 / 47.9 | 0.28 / 0.00 / 0.01 | 0.49 / 0.54 |
+| edu-nxp | 31 | 6.2 / 16.7 / 12.6 | 14.9 / 31.0 / 32.2 | 0.32 / 0.01 / 0.02 | 0.32 / 0.45 |
+| safety | 62 | 5.1 / 20.0 / 16.8 | 10.1 / 35.7 / 37.3 | 0.08 / 0.02 / 0.03 | 0.62 / 0.53 |
+| pic | 56 | 6.0 / 8.6 / 8.6 | 15.7 / 28.3 / 25.7 | 0.20 / 0.10 / 0.07 | 0.18 / 0.26 |
+| nxp | 55 | 4.0 / 9.7 / 7.7 | 14.3 / 30.4 / 27.6 | 0.40 / 0.08 / 0.11 | 0.24 / 0.25 |
+| rx | 47 | 3.0 / 7.2 / 7.2 | 9.6 / 19.8 / 20.5 | 0.49 / 0.08 / 0.12 | 0.31 / 0.19 |
+| k60 | 55 | 3.3 / 15.3 / 13.0 | 24.9 / 32.8 / 34.3 | 0.45 / 0.00 / 0.04 | 0.29 / 0.26 |
+| acc | 235 | 0.9 / 10.6 / 7.4 | 5.3 / 42.4 / 20.2 | 0.85 / 0.15 / 0.21 | 0.39 / 0.46 |
+| ppc-n3 | 553 | 2.7 / 15.1 / 10.6 | 16.2 / 66.1 / 27.7 | 0.52 / 0.07 / 0.10 | 0.64 / 0.66 |
+
+| Board | Crystal nets (count) | Crystal nets, routed length: human / no agent / agent (mm) | Clock nets (count) | Clock nets, routed length: human / no agent / agent (mm) | Reset nets (count) | Reset nets, routed length: human / no agent / agent (mm) | Differential pairs (count) | Pairs, routed length: human / no agent / agent (mm) | Pairs, length mismatch median: human / no agent / agent (mm) | Vias on all these nets: human / no agent / agent (count) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| z3r0 | 0 | 0 / 0 / 0 | 1 | 24 / 21 / 23 | 1 | 43 / 45 / 44 | 2 | 36 / 18 / 19 | 2.0 / 2.5 / 3.3 | 5 / 7 / 6 |
+| pico | 4 | 17 / 17 / 21 | 2 | 42 / 28 / 38 | 2 | 46 / 31 / 26 | 1 | 30 / 30 / 24 | 0.4 / 3.9 / 3.2 | 16 / 15 / 11 |
+| edk | 0 | 0 / 0 / 0 | 11 | 265 / 286 / 267 | 2 | 93 / 69 / 69 | 1 | 88 / 81 / 83 | 1.2 / 3.6 / 2.8 | 10 / 15 / 13 |
+| edu-fpga | 1 | 22 / 22 / 36 | 1 | 11 / 13 / 13 | 1 | 3 / 17 / 11 | 1 | 47 / 66 / 53 | 1.2 / 1.2 / 1.9 | 4 / 4 / 7 |
+| fsl-mini | 2 | 25 / 39 / 46 | 4 | 91 / 124 / 109 | 2 | 104 / 121 / 123 | 7 | 434 / 429 / 416 | 1.6 / 2.4 / 3.3 | 25 / 34 / 33 |
+| edu-k60 | 6 | 89 / 110 / 34 | 3 | 109 / 113 / 97 | 2 | 67 / 64 / 84 | 2 | 238 / 225 / 232 | 1.2 / 1.6 / 2.5 | 21 / 30 / 21 |
+| edu-nxp | 6 | 89 / 95 / 122 | 2 | 54 / 49 / 31 | 6 | 182 / 119 / 133 | 2 | 213 / 195 / 225 | 3.6 / 2.8 / 2.1 | 28 / 37 / 23 |
+| safety | 6 | 46 / 98 / 51 | 4 | 166 / 123 / 135 | 7 | 285 / 225 / 243 | 2 | 133 / 70 / 63 | 13.2 / 12.7 / 16.0 | 26 / 41 / 32 |
+| pic | 2 | 12 / 14 / 25 | 6 | 114 / 78 / 59 | 5 | 142 / 169 / 86 | 5 | 264 / 202 / 252 | 3.2 / 1.9 / 1.7 | 29 / 43 / 41 |
+| nxp | 6 | 46 / 122 / 112 | 5 | 155 / 128 / 138 | 6 | 78 / 149 / 119 | 3 | 198 / 223 / 251 | 1.2 / 1.3 / 1.3 | 40 / 61 / 54 |
+| rx | 6 | 37 / 115 / 113 | 4 | 89 / 82 / 58 | 4 | 50 / 93 / 113 | 3 | 201 / 272 / 280 | 0.8 / 1.9 / 0.7 | 33 / 49 / 40 |
+| k60 | 2 | 12 / 5 / 14 | 6 | 90 / 70 / 52 | 3 | 35 / 48 / 49 | 2 | 171 / 206 / 192 | 7.2 / 4.5 / 3.6 | 13 / 27 / 25 |
+| acc | 4 | 6 / 7 / 8 | 26 | 1006 / 1070 / 1071 | 5 | 227 / 160 / 157 | 133 | 9229 / 11472 / 8711 | 1.2 / 1.6 / 1.5 | 1403 / 1563 / 1411 |
+| ppc-n3 | 14 | 116 / 206 / 134 | 85 | 4383 / 2920 / 3035 | 23 | 2226 / 1350 / 1220 | 56 | 5524 / 3819 / 3369 | 1.2 / 3.5 / 2.9 | 1311 / 1428 / 1379 |
+
+Decoupling is the clearest gap and nothing in the tool optimizes it: on every board the human puts
+decaps closer to the IC supply pins (median 0.9-6.2 mm vs 6.4-20 mm, 1.3-12x; within 3 mm: k60 0.45 vs
+0.00-0.04, acc 0.85 vs 0.15-0.21, ppc-n3 0.52 vs 0.07-0.10), and the tool assigns only 18-66 % of
+them to the IC the human chose. The supply is routed only on boards where it is a signal-class net
+(k60 +3.3V), so the router's clean / vias barely see it. Critical nets are mixed: the tool's clock,
+reset and pair lengths are often shorter than the human's (the human routes them deliberately, the
+tool packs), but crystal nets are 2.5-3x longer on nxp / rx (112-122 vs 37-46 mm) and the critical
+nets carry more vias than in the human layout on 12 of 14 boards for no agent (agent: 11 of 14). Pair mismatch is within a
+few mm everywhere (the router does not match lengths).
