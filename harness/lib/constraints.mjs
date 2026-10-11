@@ -114,13 +114,20 @@ export function decapDistance(L, C, d) {
 }
 
 // Values of every constraint for a layout (perNet from evaluate / evaluateRobust with detail: true).
+// Lower bound on a net's vias from its pads alone: SMD pads on both board sides and no through-hole
+// pad means at least one layer change (sides never move, so this holds for every layout).
+export function minViasOf(b, L, ni) { let top = false, bot = false;
+  for (const r of b.a.routing.pads) { if (r.net !== ni) continue; if (r.tht || r.hole) return 0; if (L[r.comp].side === 1) bot = true; else top = true; }
+  return top && bot ? 1 : 0; }
+
 export function evalConstraints(b, L, C, perNet) {
   const dist = C.decaps.map((d) => decapDistance(L, C, d)), q = (v, f) => { const s = [...v].sort((a, c) => a - c); return s.length ? +s[Math.min(s.length - 1, Math.floor(f * s.length))].toFixed(2) : null; };
   const decap = { count: dist.length, fromSheet: C.decaps.filter((d) => d.source === 'sheet').length, medianMm: q(dist, 0.5), p90Mm: q(dist, 0.9), within3mm: dist.length ? +(dist.filter((v) => v <= 3).length / dist.length).toFixed(2) : null,
     overMax: C.decaps.filter((d, k) => d.maxMm != null && dist[k] > d.maxMm).map((d) => d.ref) };
   const critical = C.critical.map((c) => { const len = c.nets.map((ni) => perNet[ni].lengthMm), vias = c.nets.reduce((a, ni) => a + perNet[ni].vias, 0), clean = c.nets.every((ni) => perNet[ni].status === 'clean');
     const v = { name: c.name, kind: c.kind, nets: c.nets.length, clean, lengthMm: Math.round(len.reduce((a, x) => a + x, 0) * 10) / 10, maxNetLengthMm: Math.round(Math.max(...len) * 10) / 10, vias, ...(c.kind === 'pair' ? { mismatchMm: Math.round(Math.abs(len[0] - len[1]) * 10) / 10 } : {}) };
-    const fails = [...(c.maxLengthMm != null && v.maxNetLengthMm > c.maxLengthMm ? ['length'] : []), ...(c.maxVias != null && vias > c.maxVias ? ['vias'] : []), ...(c.maxMismatchMm != null && v.mismatchMm > c.maxMismatchMm ? ['mismatch'] : []), ...(!clean ? ['not routed'] : [])];
+    const minVias = c.nets.reduce((a, ni) => a + minViasOf(b, L, ni), 0); v.minVias = minVias;
+    const fails = [...(c.maxLengthMm != null && v.maxNetLengthMm > c.maxLengthMm ? ['length'] : []), ...(c.maxVias != null && minVias > c.maxVias ? ['infeasible: pads on both sides'] : c.maxVias != null && vias > c.maxVias ? ['vias'] : []), ...(c.maxMismatchMm != null && v.mismatchMm > c.maxMismatchMm ? ['mismatch'] : []), ...(!clean ? ['not routed'] : [])];
     return { ...v, pass: fails.length === 0, fails }; });
   return { decap, critical };
 }

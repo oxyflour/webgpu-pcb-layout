@@ -15,10 +15,15 @@ import { loadConstraints } from './constraints.mjs';
 // Optional human-practice terms (RESULTS.md "New metrics against the human layout"):
 //   kappa (default 0.5) * distance (mm) of every decoupling capacitor's supply pad to the nearest supply pad of
 //   its assigned IC(s) (lib/constraints.mjs: constraint file, else same schematic sheet, else any IC on the
-//   supply) beyond decapFreeMm, + 10 x kappa per mm beyond a decap's maxMm; chi: crystal nets count (1 + chi) x HPWL.
+//   supply) beyond decapFreeMm, + 10 x kappa per mm beyond a decap's maxMm;
+//   critical nets with limits in the constraint file (maxVias, maxLengthMm, keepoutMm, layer, priority,
+//   maxMismatchMm): HPWL x (1 + critW), + 10 per mm of HPWL beyond maxLengthMm, + |HPWL difference| of a
+//   pair beyond maxMismatchMm, + rho per foreign pad (sharing a layer with the net) in the corridor of
+//   the net's pin-to-pin spanning-tree segments (half width keepoutMm or 0.2, + 0.2 mm): a clear,
+//   straight path the router can take without vias. `constraints` overrides loadConstraints(b); chi: crystal nets count (1 + chi) x HPWL.
 const analyses = new WeakMap();
 
-export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals = Infinity, budgetS = 30, seed = 1, gap = 0.8, clearance = 0.1, kappa = 0.5, decapFreeMm = 0, chi = 0 } = {}) {
+export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals = Infinity, budgetS = 30, seed = 1, gap = 0.8, clearance = 0.1, kappa = 0.5, decapFreeMm = 0, chi = 0, critW = 3, rho = 4, constraints = null } = {}) {
   const p = b.p, C = p.components, n = C.length, L = layout.map((q) => ({ ...q })), t0 = performance.now();
   let s = seed * 2654435761 >>> 0; const rnd = () => ((s = Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9 >>> 0) / 4294967296), pickOf = (a) => a[Math.floor(rnd() * a.length)];
   const small = [...Array(n).keys()].filter((i) => !C[i].fixed && C[i].pins.length < 8);
@@ -43,7 +48,7 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
     for (const pi of ps) { const [x, y] = worldPin(p, L, pi); if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return x1 - x0 + y1 - y0; };
   const hpN = p.nets.map((_, ni) => hp(ni));
   // Decoupling and crystal terms.
-  const CN = kappa || chi ? (analyses.get(b) ?? (analyses.set(b, loadConstraints(b)), analyses.get(b))) : null, HA = CN?.analysis;
+  const CN = constraints ?? analyses.get(b) ?? (analyses.set(b, loadConstraints(b)), analyses.get(b)), HA = CN.analysis;
   const wN = new Float64Array(p.nets.length).fill(1); if (chi) for (const ni of HA.groups.crystal) wN[ni] = 1 + chi;
   const decaps = kappa ? CN.decaps.map((d) => { const ics = new Set(d.ics); return { ...d, ic: HA.icPadsOn[d.net].filter((q) => ics.has(HA.padOf[q].comp)) }; }).filter((d) => d.ic.length) : [];
   const decapOwn = new Int32Array(n).fill(-1); decaps.forEach((d, k) => { decapOwn[d.comp] = k; });
@@ -68,6 +73,28 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
     for (const j of near) { if (!padsOf[j].length) continue;
       for (const pj of padsOf[j]) { const cb = padBox(pj); for (let k = 0; k < mine.length; k++) { if (S.has(j) && pj <= mine[k]) continue; sum += pairPen(mine[k], mb[k], pj, cb); } } }
     return sum; };
+  // Critical nets with limits.
+  const LIM = ['priority', 'maxVias', 'layer', 'keepoutMm', 'maxLengthMm', 'maxMismatchMm'];
+  const crit = critW || rho ? CN.critical.filter((c) => LIM.some((k) => c[k] != null)).map((c) => ({ ...c, hw: (c.keepoutMm ?? 0.2) + 0.2 })) : [];
+  for (const c of crit) for (const ni of c.nets) wN[ni] *= 1 + critW;
+  const critOfComp = Array.from({ length: n }, () => new Set()); crit.forEach((c, k) => c.nets.forEach((ni) => p.nets[ni].pins.forEach((pi) => critOfComp[p.pins[pi].componentIndex].add(k))));
+  // Layers of a net's pads (sides never change in the pass, so cached).
+  const layerCache = new Map(), netLayers = (ni) => { if (!layerCache.has(ni)) { let m = 0; for (let pj = 0; pj < RP.length; pj++) if (RP[pj].net === ni) m |= padBox(pj)[4]; layerCache.set(ni, m); } return layerCache.get(ni); };
+  const segsOf = (ni) => { const pts = p.nets[ni].pins.map((pi) => worldPin(p, L, pi)), inT = pts.map(() => false), best = pts.map((q) => [Math.hypot(q[0] - pts[0][0], q[1] - pts[0][1]), 0]), out = []; inT[0] = true;
+    for (let it = 1; it < pts.length; it++) { let u = -1; for (let k = 0; k < pts.length; k++) if (!inT[k] && (u < 0 || best[k][0] < best[u][0])) u = k; inT[u] = true; out.push([pts[best[u][1]], pts[u]]);
+      for (let k = 0; k < pts.length; k++) if (!inT[k]) { const d = Math.hypot(pts[k][0] - pts[u][0], pts[k][1] - pts[u][1]); if (d < best[k][0]) best[k] = [d, u]; } } return out; };
+  const segDist = (x, y, [a, c]) => { const dx = c[0] - a[0], dy = c[1] - a[1], l2 = dx * dx + dy * dy, u = l2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)) : 0; return Math.hypot(a[0] + u * dx - x, a[1] + u * dy - y); };
+  const critBox = (c) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const ni of c.nets) for (const pi of p.nets[ni].pins) { const [x, y] = worldPin(p, L, pi); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return [x0 - c.hw - 1, y0 - c.hw - 1, x1 + c.hw + 1, y1 + c.hw + 1]; };
+  const critCost = (k) => { const c = crit[k]; let s = 0;
+    for (const ni of c.nets) { const lm = netLayers(ni);
+      for (const sg of segsOf(ni)) { stamp++; visit([Math.min(sg[0][0], sg[1][0]) - c.hw - 1, Math.min(sg[0][1], sg[1][1]) - c.hw - 1, Math.max(sg[0][0], sg[1][0]) + c.hw + 1, Math.max(sg[0][1], sg[1][1]) + c.hw + 1], (j) => {
+        for (const pj of padsOf[j]) { if (RP[pj].net === ni) continue; const bx = padBox(pj); if (!(bx[4] & lm)) continue; const r = Math.max(bx[2] - bx[0], bx[3] - bx[1]) / 2; if (segDist((bx[0] + bx[2]) / 2, (bx[1] + bx[3]) / 2, sg) < c.hw + r) s += rho; } }); }
+      if (c.maxLengthMm != null) s += 10 * Math.max(0, hp(ni) - c.maxLengthMm); }
+    if (c.kind === 'pair' && c.maxMismatchMm != null) s += Math.max(0, Math.abs(hp(c.nets[0]) - hp(c.nets[1])) - c.maxMismatchMm);
+    return s; };
+  const intersects = (a, c) => a[0] < c[2] && c[0] < a[2] && a[1] < c[3] && c[1] < a[3];
+  const critTouched = (parts, ks) => { for (const i of parts) { for (const k of critOfComp[i]) ks.add(k); const a = box(i); crit.forEach((c, k) => { if (!ks.has(k) && intersects(a, critBox(c))) ks.add(k); }); } return ks; };
+  const critOf = (ks) => { let s = 0; for (const k of ks) s += critCost(k); return s; };
   const sig = p.nets.map((net) => new Set(net.pins.map((pi) => p.pins[pi].componentIndex)).size <= 30);
   const partnerMean = (i) => { let sx = 0, sy = 0, k = 0; for (const ni of netsOf[i]) { if (!sig[ni]) continue; for (const pi of p.nets[ni].pins) { if (p.pins[pi].componentIndex === i) continue; const [x, y] = worldPin(p, L, pi); sx += x; sy += y; k++; } } return k ? [sx / k, sy / k] : null; };
   const sizeKey = (i, r) => rotatedSize(C[i], r).map((v) => v.toFixed(2)).join();
@@ -89,11 +116,12 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
     L[i] = old; if (j >= 0) L[j] = oldJ;
     const g0 = nu ? chanOf(parts) : 0;
     L[i] = nw[0]; if (j >= 0) L[j] = nw[1];
-    const g1 = nu ? chanOf(parts) : 0, c1 = decapOf(parts);
-    L[i] = old; if (j >= 0) L[j] = oldJ; const c0 = decapOf(parts); L[i] = nw[0]; if (j >= 0) L[j] = nw[1];
+    const g1 = nu ? chanOf(parts) : 0, c1 = decapOf(parts), ks = crit.length ? critTouched(parts, new Set()) : null;
+    L[i] = old; if (j >= 0) L[j] = oldJ; const c0 = decapOf(parts); if (ks) critTouched(parts, ks); const k0 = ks?.size ? critOf(ks) : 0;
+    L[i] = nw[0]; if (j >= 0) L[j] = nw[1]; const k1 = ks?.size ? critOf(ks) : 0;
     const A = new Set(parts.flatMap((k) => [...netsOf[k]])), oldH = [...A].map((ni) => hpN[ni]);
     let dh = 0; for (const ni of A) { const v = hp(ni); dh += (v - hpN[ni]) * wN[ni]; hpN[ni] = v; }
-    const d = dh + nu * (g1 - g0) + kappa * (c1 - c0);
+    const d = dh + nu * (g1 - g0) + kappa * (c1 - c0) + (k1 - k0);
     const T = T0 ? T0 * Math.pow(1e-3, Math.min(1, (performance.now() - t0) / 1000 / budgetS)) : 0;
     if (d < -1e-6 || (T > 0 && rnd() < Math.exp(-d / T))) { accepted++; delta += d; for (const k of parts) { remove(k); insert(k); } }
     else { [...A].forEach((ni, k) => { hpN[ni] = oldH[k]; }); L[i] = old; if (j >= 0) L[j] = oldJ; }

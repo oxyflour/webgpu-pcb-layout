@@ -1326,3 +1326,39 @@ their keepout; ppc-n3 -108, noise). Pairs that still need vias have their pads o
 layers (pico, ppc-n3: 18 unchanged) or no via-free path in this placement (no agent passes fewer
 pairs than the human on every board): a failing constraint now points at the placement, which is what
 `place` reports to the agent.
+
+
+### Critical nets in the detail pass
+
+`lib/detail.mjs`, only for critical entries with limits from a constraint file: HPWL of their nets x
+(1 + critW, 3), + 10 per mm of HPWL beyond maxLengthMm, + pair HPWL difference beyond maxMismatchMm,
++ rho (4) per foreign pad sharing a layer within the corridor of the net's pin-to-pin spanning-tree
+segments (half width keepoutMm or 0.2, + 0.2 mm). `experiments/detail-critical.mjs`: example files
+(USB pairs maxVias 0, priority 1, keepout 0.4 mm), start layout -> 30 s detail pass without / with
+these terms, both routed with the router rules (results/detail-critical.jsonl):
+
+| Board | Constrained pairs (count) | Pairs passing: without -> with critical terms (count, mean of 3 seeds) | Vias on constrained nets (count) | Routed length of constrained nets (mm) | Clean nets (count) | Vias, all nets (count) |
+|---|---|---|---|---|---|---|
+| z3r0 | 2 | 2.0 -> 1.7 | 0.0 -> 0.7 | 23 -> 9 | 46.0 -> 46.0 | 29 -> 30 |
+| pico | 1 | 0.0 -> 0.0 | 2.0 -> 3.0 | 41 -> 27 | 86.0 -> 86.0 | 63 -> 63 |
+| edk | 1 | 1.0 -> 1.0 | 0.0 -> 0.0 | 80 -> 52 | 124.0 -> 124.0 | 115 -> 107 |
+| edu-fpga | 1 | 1.0 -> 1.0 | 0.0 -> 0.0 | 66 -> 67 | 108.0 -> 108.0 | 180 -> 193 |
+| fsl-mini | 3 | 1.7 -> 2.7 | 5.3 -> 2.7 | 350 -> 342 | 162.0 -> 162.0 | 281 -> 288 |
+| edu-k60 | 2 | 1.7 -> 1.7 | 0.7 -> 1.3 | 224 -> 116 | 157.0 -> 157.0 | 277 -> 292 |
+| edu-nxp | 3 | 2.7 -> 2.7 | 1.3 -> 1.3 | 407 -> 246 | 163.0 -> 163.0 | 225 -> 244 |
+| pic | 3 | 3.0 -> 2.3 | 0.0 -> 1.3 | 174 -> 134 | 284.0 -> 288.3 | 574 -> 569 |
+| nxp | 3 | 1.0 -> 1.0 | 10.0 -> 9.3 | 218 -> 90 | 370.0 -> 370.0 | 726 -> 735 |
+| rx | 3 | 1.0 -> 1.0 | 10.0 -> 8.7 | 294 -> 239 | 400.0 -> 400.0 | 782 -> 804 |
+| k60 | 2 | 1.0 -> 1.0 | 2.7 -> 2.0 | 231 -> 183 | 317.3 -> 316.7 | 499 -> 502 |
+| acc | 6 | 3.0 -> 3.0 | 23.3 -> 22.0 | 181 -> 177 | 617.0 -> 617.0 | 3131 -> 3144 |
+| ppc-n3 | 1 | 0.0 -> 0.0 | 18.0 -> 18.0 | 16 -> 5 | 1607.0 -> 1607.0 | 9970 -> 9953 |
+
+Pairs passing over all boards: 19.0 -> 19.0 of 31
+
+The terms shorten the constrained nets (routed length -20 to -60 % on 9 of 13 boards: edk 80 -> 52,
+edu-nxp 407 -> 246, nxp 218 -> 90 mm) at no cost in clean nets and within noise in vias, but do not make
+more pairs via-free (19 of 31 either way). 6 of the 29 maxVias-0 pairs are infeasible: their SMD pads
+sit on both board sides (pico, nxp / rx USB_AUX, acc OB_USB0 / OB_USB1, ppc-n3 USB2), so every layout
+needs >= 2 vias there; `evalConstraints` now reports `minVias` and fails such entries as "infeasible:
+pads on both sides" instead of "vias". Of the feasible pairs, the remaining failures are vias the router
+takes near crowded pads (acc, k60 CPU USB), which a straighter corridor alone did not remove.
