@@ -1362,3 +1362,28 @@ sit on both board sides (pico, nxp / rx USB_AUX, acc OB_USB0 / OB_USB1, ppc-n3 U
 needs >= 2 vias there; `evalConstraints` now reports `minVias` and fails such entries as "infeasible:
 pads on both sides" instead of "vias". Of the feasible pairs, the remaining failures are vias the router
 takes near crowded pads (acc, k60 CPU USB), which a straighter corridor alone did not remove.
+
+
+### Agents with constraints (prompt v13, k60 / pic, 2026-10-11)
+
+PCB_CONSTRAINTS_DIR=harness/constraints/examples (USB pairs maxVias 0, priority 1, keepout 0.4 mm), 3
+dsh sessions per board (results/v13c-<board>; agents called `info --section constraints` in every
+session), against v12d (decap term to the nearest IC, no constraint file). Final layouts routed
+with the example rules (5 grid phases), decaps measured to their assigned IC (results/v13c-eval.json):
+
+| Board, arm | Clean nets (count, sessions 1/2/3) | Vias (count) | Constrained USB pairs passing (count of k60 2 / pic 3) | Routed length of the pairs (mm) | Decap distance to the assigned IC, median (mm) | Decaps within 3 mm of their IC (share) |
+|---|---|---|---|---|---|---|
+| k60, human | 318 | 332 | 2 | 174 | 3.3 | 0.45 |
+| k60, v12d | 306 / 316 / 318 | 580 / 448 / 461 | 1 / 2 / 1 | 200 / 214 / 213 | 14.2 / 13.0 / 12.8 | 0.24 / 0.20 / 0.36 |
+| k60, v13c + constraints | 318 / 316 / 316 | 485 / 501 / 508 | 2 / 1 / 1 | 167 / 149 / 171 | 2.1 / 2.3 / 2.2 | 0.60 / 0.60 / 0.69 |
+| pic, human | 310 | 359 | 3 | 154 | 8.7 | 0.13 |
+| pic, v12d | 310 / 310 / 310 | 504 / 347 / 366 | 3 / 3 / 3 | 162 / 176 / 154 | 14.7 / 13.1 / 8.2 | 0.43 / 0.36 / 0.27 |
+| pic, v13c + constraints | 310 / 310 / 310 | 389 / 369 / 394 | 3 / 3 / 2 | 154 / 139 / 123 | 1.4 / 1.5 / 1.5 | 0.91 / 0.84 / 0.77 |
+
+End to end the constraint machinery does what the offline tests showed: decaps sit at their assigned
+IC (2.1-2.3 mm on k60 vs human 3.3; the nearest-IC term of v12d left them 13-14 mm from the assigned
+one) and the constrained pairs are shorter (k60 149-171 mm vs 200-214, human 174), while clean nets
+and vias stay within the session spread (k60 mean 316.7 / 498 vs 313.3 / 496; pic 310 / 384 vs 310 /
+406). It does not make more pairs via-free (k60 4 of 6 vs 4 of 6; pic 8 of 9 vs 9 of 9): the agents
+read the constraints but their lever is still the IC floorplan, and a failing pair in a session was
+not fixed by a later candidate.

@@ -48,7 +48,8 @@ export function kicadInfo(b) {
 
 const powerClass = /power|aliment|potencia|supply|gnd|ground|chassis|mec|terminal|^\+|\dV|VPHY|VPLL|PoE/i;
 
-export function loadConstraints(b, { file = path.join(HARNESS_ROOT, 'constraints', `${b.name}.json`) } = {}) {
+// PCB_CONSTRAINTS_DIR: another directory of <board>.json files (e.g. harness/constraints/examples for tests).
+export function loadConstraints(b, { file = path.join(process.env.PCB_CONSTRAINTS_DIR ?? path.join(HARNESS_ROOT, 'constraints'), `${b.name}.json`) } = {}) {
   const A = boardAnalysis(b), K = kicadInfo(b), fps = b.a.ir.footprints, ref = fps.map((f) => f.id), idx = new Map(ref.map((r, i) => [r, i]));
   const user = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   // Decaps.
