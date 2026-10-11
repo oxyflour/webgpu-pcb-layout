@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { registerBoard, loadBoard, evaluate, legalize, placementMetrics, BOARDS } from '../harness/lib/board.mjs';
 import { nativeAvailable } from '../harness/lib/native-router.mjs';
-import { detailPlace } from '../harness/lib/detail.mjs';
+import { detailPlace, nativeDetailAvailable } from '../harness/lib/detail.mjs';
 import { loadConstraints, constraintsTemplate, routerRules, evalConstraints } from '../harness/lib/constraints.mjs';
 import { startLayout } from '../harness/lib/init.mjs';
 
@@ -44,12 +44,19 @@ test('native router is bit-identical to the JS router; empty rules change nothin
 
 test('detail pass: legal, fixed parts untouched, deterministic when greedy, lower HPWL', () => {
   const b = loadBoard('t-z3r0'), L0 = legalize(b, startLayout(b, {}, { seed: 1 })).layout;
-  const run = () => detailPlace(b, L0, { T0: 0, evals: 4000, budgetS: 1e9, seed: 3 });
+  const run = () => detailPlace(b, L0, { T0: 0, evals: 4000, budgetS: 1e9, seed: 3, engine: 'js' });
   const d = run(), g = placementMetrics(b, d.layout).geometry;
   assert.equal(g.overlaps, 0); assert.equal(g.outside, 0); assert.equal(g.keepout, 0); assert.equal(g.fixedChanged, 0); assert.equal(g.sideChanged, 0);
   b.p.components.forEach((c, i) => { if (c.fixed || c.pins.length >= 8) assert.deepEqual(d.layout[i], L0[i], `${c.id} not moved`); });
   assert.deepEqual(run().layout, d.layout);
   assert.ok(placementMetrics(b, d.layout).hpwlMm < placementMetrics(b, L0).hpwlMm, 'HPWL drops');
+});
+
+test('native detail pass is identical to the JS one (greedy and annealed, fixed tries)', { skip: !nativeDetailAvailable() && 'native detail pass not built' }, () => {
+  for (const name of ['t-z3r0', 't-pico']) { const b = loadBoard(name), L0 = legalize(b, startLayout(b, {}, { seed: 1 })).layout;
+    for (const T0 of [0, 3]) { const o = { T0, evals: 5000, budgetS: 1e9, seed: 2 };
+      const js = detailPlace(b, L0, { ...o, engine: 'js' }), na = detailPlace(b, L0, { ...o, engine: 'native' });
+      assert.equal(na.engine, 'native'); assert.equal(na.accepted, js.accepted); assert.deepEqual(na.layout, js.layout, `${name} T0 ${T0}`); } }
 });
 
 test('constraints: decaps by schematic sheet, template round trip, file overrides, bad refs rejected', () => {
