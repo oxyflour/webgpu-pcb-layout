@@ -1178,3 +1178,50 @@ reset and pair lengths are often shorter than the human's (the human routes them
 tool packs), but crystal nets are 2.5-3x longer on nxp / rx (112-122 vs 37-46 mm) and the critical
 nets carry more vias than in the human layout on 12 of 14 boards for no agent (agent: 11 of 14). Pair mismatch is within a
 few mm everywhere (the router does not match lengths).
+
+
+### Decoupling and crystal terms in the detail pass (13 boards x 3 seeds, no agent)
+
+`lib/detail.mjs` options: `kappa` x distance (mm) of each decoupling capacitor's supply pad to the
+nearest same-supply IC pad (optionally only beyond `decapFreeMm`), `chi`: crystal nets count
+(1 + chi) x HPWL. `experiments/detail-metrics.mjs`: start layout (empty plan, seeds 1000 / 8919 /
+16838) -> legalizer -> 30 s detail pass -> evaluateRobust + human metrics, every variant on the same
+39 starts; ratios are paired per layout (rows in results/detail-metrics.jsonl).
+
+| Detail-pass variant | Layouts (count) | Clean nets, sum (count) | Vias vs base, geometric mean (x) | HPWL vs base (x) | Decap distance median vs base, geometric mean (x) | Decaps within 3 mm, mean over layouts (share) | Decaps on the human's IC, mean (share) | Crystal nets routed length vs base, geometric mean over layouts with crystals (x) | Vias on critical nets, sum (count) |
+|---|---|---|---|---|---|---|---|---|---|
+| base {} | 39 | 9091 | 1.000 | 1.000 | 1.000 | 0.05 | 0.38 | 1.000 | 5709 |
+| k0.5 {"kappa":0.5} | 39 | 9070 | 1.026 | 1.009 | 0.247 | 0.58 | 0.38 | 1.103 | 5759 |
+| k1 {"kappa":1} | 39 | 9072 | 1.042 | 1.010 | 0.227 | 0.63 | 0.39 | 1.097 | 5777 |
+| k2 {"kappa":2} | 39 | 9051 | 1.056 | 1.021 | 0.208 | 0.65 | 0.37 | 1.194 | 5737 |
+| k1x2 {"kappa":1,"chi":2} | 39 | 9091 | 1.037 | 1.014 | 0.228 | 0.63 | 0.38 | 1.019 | 5937 |
+| x4 {"chi":4} | 39 | 9075 | 1.021 | 1.004 | 0.980 | 0.06 | 0.36 | 0.978 | 5744 |
+| k1f3 {"kappa":1,"decapFreeMm":3} | 39 | 9059 | 1.062 | 1.013 | 0.288 | 0.59 | 0.38 | 1.007 | 5758 |
+| k2f4 {"kappa":2,"decapFreeMm":4} | 39 | 9051 | 1.053 | 1.015 | 0.332 | 0.23 | 0.38 | 1.028 | 5825 |
+
+Measurement noise: x4 changes neither decaps nor crystals measurably yet shows vias x1.021 (the
+pass is time-limited and the machine was shared), so differences below ~2 % are noise. kappa 0.5
+takes the decaps from 0.05 to 0.58 within 3 mm (human 0.08-0.85 by board; median distance x0.25) for
+vias x1.026 and -21 clean nets over 39 layouts, all on pic (-18 over 3 seeds, the most congested
+board) and k60 (-3). Larger kappa costs more vias for little more decap gain; a free radius (only
+the distance beyond 3-4 mm) is not better; the decap term does not move the decaps to the human's
+IC (0.38 either way: it picks the nearest IC). The crystal weight does not shorten crystal nets
+(chi 4: x0.98) and the decap term lengthens them 10-19 %; dropped. Default now kappa 0.5, chi 0.
+
+
+Agents with the decap term (prompt v12 unchanged, 3 dsh sessions per board, results/v12d-<board>;
+scored like the v12 sweep, 8 grid offsets, rows in results/decap-eval.jsonl and
+human-metrics-v12d.jsonl):
+
+| Board, tool | Clean nets (count, sessions 1/2/3) | Vias (count) | Decap distance median (mm) | Decaps within 3 mm (share) | Decaps on the human's IC (share) |
+|---|---|---|---|---|---|
+| k60, v12 (no decap term) | 316 / 316 / 314 | 469 / 432 / 441 | 12.5 / 11.9 / 14.7 | 0.04 / 0.07 / 0.02 | 0.25 / 0.29 / 0.24 |
+| k60, v12 + kappa 0.5 | 304 / 318 / 314 | 533 / 429 / 463 | 2.8 / 2.6 / 2.3 | 0.56 / 0.51 / 0.73 | 0.35 / 0.35 / 0.38 |
+| k60, human | 318 | 301 | 3.3 | 0.45 | 1 |
+| pic, v12 (no decap term) | 310 / 307 / 310 | 378 / 624 / 354 | 8.8 / 6.9 / 10.1 | 0.09 / 0.09 / 0.02 | 0.25 / 0.23 / 0.30 |
+| pic, v12 + kappa 0.5 | 310 / 310 / 310 | 503 / 341 / 357 | 1.5 / 1.7 / 2.4 | 0.93 / 0.88 / 0.66 | 0.36 / 0.27 / 0.30 |
+| pic, human | 310 | 347 | 6.0 | 0.20 | 1 |
+
+With agents the decaps reach (k60) or pass (pic) the human distance, and routing stays within the
+session spread (k60 mean 312 clean / 475 vias vs 315 / 447; pic 310 / 400 vs 309 / 452; one weak
+floorplan per arm). Kept as the default.

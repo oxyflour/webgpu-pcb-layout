@@ -11,8 +11,13 @@
 // 4 mm bucket grid of part bodies.
 // experiments/attract.mjs (obj hpwlg) is the offline version; RESULTS.md "Attraction test".
 import { rotatedSize, worldPin } from './board.mjs';
+import { boardAnalysis } from './human-metrics.mjs';
+// Optional human-practice terms (RESULTS.md "New metrics against the human layout"):
+//   kappa (default 0.5) * distance (mm) of every decoupling capacitor's supply pad to the nearest pad of an IC on
+//   the same supply beyond decapFreeMm (lib/human-metrics.mjs definitions); chi: crystal nets count (1 + chi) x HPWL.
+const analyses = new WeakMap();
 
-export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals = Infinity, budgetS = 30, seed = 1, gap = 0.8, clearance = 0.1 } = {}) {
+export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals = Infinity, budgetS = 30, seed = 1, gap = 0.8, clearance = 0.1, kappa = 0.5, decapFreeMm = 0, chi = 0 } = {}) {
   const p = b.p, C = p.components, n = C.length, L = layout.map((q) => ({ ...q })), t0 = performance.now();
   let s = seed * 2654435761 >>> 0; const rnd = () => ((s = Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9 >>> 0) / 4294967296), pickOf = (a) => a[Math.floor(rnd() * a.length)];
   const small = [...Array(n).keys()].filter((i) => !C[i].fixed && C[i].pins.length < 8);
@@ -36,6 +41,14 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
   const hp = (ni) => { const ps = p.nets[ni].pins; if (ps.length < 2) return 0; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const pi of ps) { const [x, y] = worldPin(p, L, pi); if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return x1 - x0 + y1 - y0; };
   const hpN = p.nets.map((_, ni) => hp(ni));
+  // Decoupling and crystal terms.
+  const HA = kappa || chi ? (analyses.get(b) ?? (analyses.set(b, boardAnalysis(b)), analyses.get(b))) : null;
+  const wN = new Float64Array(p.nets.length).fill(1); if (chi) for (const ni of HA.groups.crystal) wN[ni] = 1 + chi;
+  const decaps = kappa ? HA.decaps.map((d) => ({ ...d, ic: HA.icPadsOn[d.net].filter((q) => HA.padOf[q].comp !== d.comp) })).filter((d) => d.ic.length) : [];
+  const decapsBy = Array.from({ length: n }, () => []); decaps.forEach((d, k) => { decapsBy[d.comp].push(k); for (const q of new Set(d.ic.map((q) => HA.padOf[q].comp))) decapsBy[q].push(k); });
+  const centre = (rp) => { const q = L[rp.comp], [rx, ry] = rq(q.side ? -rp.lx : rp.lx, rp.ly, q.rotation); return [q.x + rx, q.y + ry]; };
+  const decapDist = (k) => { const d = decaps[k], [x, y] = centre(HA.padOf[d.pad].rp); let best = Infinity; for (const q of d.ic) { const [u, v] = centre(HA.padOf[q].rp), e = Math.hypot(u - x, v - y); if (e < best) best = e; } return Math.max(0, best - decapFreeMm); };
+  const decapOf = (parts) => { if (!kappa) return 0; const ks = new Set(parts.flatMap((i) => decapsBy[i])); let s = 0; for (const k of ks) s += decapDist(k); return s; };
   // Channel deficit (router pad geometry, as src/router/board-router.js rasterizes it).
   const RP = b.a.routing.pads, padsOf = Array.from({ length: n }, () => []); RP.forEach((pad, pi) => padsOf[pad.comp].push(pi));
   const rq = (x, y, r) => { r = ((r % 4) + 4) % 4; return r === 0 ? [x, y] : r === 1 ? [-y, x] : r === 2 ? [-x, -y] : [y, -x]; };
@@ -73,10 +86,11 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
     L[i] = old; if (j >= 0) L[j] = oldJ;
     const g0 = nu ? chanOf(parts) : 0;
     L[i] = nw[0]; if (j >= 0) L[j] = nw[1];
-    const g1 = nu ? chanOf(parts) : 0;
+    const g1 = nu ? chanOf(parts) : 0, c1 = decapOf(parts);
+    L[i] = old; if (j >= 0) L[j] = oldJ; const c0 = decapOf(parts); L[i] = nw[0]; if (j >= 0) L[j] = nw[1];
     const A = new Set(parts.flatMap((k) => [...netsOf[k]])), oldH = [...A].map((ni) => hpN[ni]);
-    let dh = 0; for (const ni of A) { const v = hp(ni); dh += v - hpN[ni]; hpN[ni] = v; }
-    const d = dh + nu * (g1 - g0);
+    let dh = 0; for (const ni of A) { const v = hp(ni); dh += (v - hpN[ni]) * wN[ni]; hpN[ni] = v; }
+    const d = dh + nu * (g1 - g0) + kappa * (c1 - c0);
     const T = T0 ? T0 * Math.pow(1e-3, Math.min(1, (performance.now() - t0) / 1000 / budgetS)) : 0;
     if (d < -1e-6 || (T > 0 && rnd() < Math.exp(-d / T))) { accepted++; delta += d; for (const k of parts) { remove(k); insert(k); } }
     else { [...A].forEach((ni, k) => { hpN[ni] = oldH[k]; }); L[i] = old; if (j >= 0) L[j] = oldJ; }
