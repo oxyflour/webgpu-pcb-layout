@@ -1461,3 +1461,32 @@ ppc-n3 is test only.
 
 So learning net weights for HPWL is a dead end for small parts: the remaining gap is positions HPWL
 cannot express at all, not a weighting of what it expresses. Not pursued further.
+
+
+### Baseline candidate and more place calls (prompt v15, k60 / pic, 2026-10-11)
+
+v15: before the agent starts, run-agent makes candidate c000 = the tool without a plan (start layout,
+legalizer, detail pass, routing; outside the agent's time and place budget), so the best candidate
+never ranks below the tool alone; `submit` notes a candidate ranked below the best; 20 place calls
+(v14: 12); prompt v15 = v14 + c000 as the reference, at least three clearly different floorplans
+before refining, revert worse refinements. Same example constraints, 3 dsh sessions per board
+(results/v15c-<board>), scored like v13c / v14c (example router rules, 5 grid phases;
+results/v15c-eval.json):
+
+| Board, arm | Clean nets (count, sessions 1/2/3) | Vias (count) | Vias, mean (count) | Worst session: clean / vias (count) | USB pairs passing (count, of k60 2 / pic 3) | Decaps to the assigned IC, median (mm) | Place calls used (count) |
+|---|---|---|---|---|---|---|---|
+| k60, human | 318 | 332 | 332 | - | 2 | 3.3 | - |
+| k60, v14c | 308 / 276 / 318 | 552 / 785 / 476 | 604 | 276 / 785 | 2 / 1 / 2 | 2.3 / 1.5 / 1.9 | 12 / 12 / 12 |
+| k60, v15c | 318 / 318 / 318 | 438 / 507 / 441 | 462 | 318 / 507 | 2 / 1 / 2 | 2.4 / 2.4 / 2.2 | 18 / 13 / 16 |
+| pic, human | 310 | 359 | 359 | - | 3 | 8.7 | - |
+| pic, v14c | 310 / 310 / 310 | 386 / 392 / 355 | 378 | 310 / 392 | 3 / 3 / 3 | 1.5 / 1.6 / 1.8 | 12 / 12 / 12 |
+| pic, v15c | 310 / 310 / 310 | 353 / 376 / 359 | 363 | 310 / 376 | 3 / 3 / 3 | 1.5 / 1.8 / 1.6 | 20 / 17 / 14 |
+
+The c000 baselines (in-session tool routing): k60 318 / 504, 316 / 557, 318 / 521; pic 291 / 549,
+283 / 592, 297 / 552. Every v15 session's best candidate is an agent candidate (k60: 7-13 of 13-18
+agent candidates beat c000, pic: all), so the baseline was the floor, not the result; the gain over
+v14 (k60 mean 604 -> 462 vias, every session 318 clean; pic 378 -> 363, the human count) comes from
+the agent's own search with more calls and the floorplan-diversity instruction. k60 sessions 1 / 3
+reach 438 / 441 vias, the best agent layouts so far; pic matches the human vias on average (363 vs
+359) with all nets routed, all USB pairs passing and decaps at their IC. pic session 3 submitted
+c002 (in-session 310 / 359) rather than its best c004 (310 / 352) although the submit note said so; a difference within the routing noise.
