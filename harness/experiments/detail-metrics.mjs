@@ -2,6 +2,7 @@
 // plan, seeds 1000 / 8919 / 16838) -> legalizer -> detail pass with each variant's options ->
 // legalizer -> evaluateRobust (native exact; tool routing > 1000 parts) + lib/human-metrics.mjs.
 // Resumable rows in --out; --summary prints per variant the totals over boards and seeds.
+// Variant option perPart: a fixed number of tries per small part (evals = perPart x small parts, no time limit).
 // node harness/experiments/detail-metrics.mjs --out F --variants '{"base":{},"k1":{"kappa":1}}' [--boards a,b] [--jobs 3] [--summary]
 import fs from 'node:fs';
 import { loadBoard, legalize, evaluateRobust, toolRouting, exactRouting, needsFastRouting, EVAL_BOARDS } from '../lib/board.mjs';
@@ -32,9 +33,9 @@ const tasks = (arg('boards') ?? BOARDS.join(',')).split(',').flatMap((board) => 
 console.log('tasks', tasks.length);
 const worker = async () => { for (let t; (t = tasks.shift());) {
   const b = loadBoard(t.board), A = boardAnalysis(b), opts = variants[t.variant];
-  const L0 = legalize(b, startLayout(b, {}, { seed: t.seed })).layout, d = detailPlace(b, L0, { budgetS: needsFastRouting(b) ? 60 : 30, seed: t.seed, ...opts }), L = legalize(b, d.layout).layout;
+  const L0 = legalize(b, startLayout(b, {}, { seed: t.seed })).layout, { perPart, ...o } = opts, nSmall = b.p.components.filter((c) => !c.fixed && c.pins.length < 8).length, d = detailPlace(b, L0, { budgetS: needsFastRouting(b) ? 60 : 30, seed: t.seed, ...(perPart != null ? { evals: perPart * nSmall, budgetS: 1e9 } : {}), ...o }), L = legalize(b, d.layout).layout;
   const m = await evaluateRobust(b, L, { detail: true, ...(needsFastRouting(b) ? toolRouting(b) : exactRouting()) });
-  const row = { ...t, options: opts, clean: m.clean, nets: m.nets, vias: m.vias, hpwlMm: m.hpwlMm, m: humanMetrics(b, L, A, { human: b.a.originalLayout, perNet: m.perNet }), c: evalConstraints(b, L, loadConstraints(b), m.perNet) };
+  const row = { ...t, options: opts, tries: d.evals, detailS: d.seconds, engine: d.engine ?? "js", clean: m.clean, nets: m.nets, vias: m.vias, hpwlMm: m.hpwlMm, m: humanMetrics(b, L, A, { human: b.a.originalLayout, perNet: m.perNet }), c: evalConstraints(b, L, loadConstraints(b), m.perNet) };
   fs.appendFileSync(out, JSON.stringify(row) + '\n'); console.log(t.board, t.seed, t.variant, row.clean, row.vias, row.m.decap.medianMm);
 } };
 await Promise.all(Array.from({ length: Number(arg('jobs', 3)) }, worker));

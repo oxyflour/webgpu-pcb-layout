@@ -32,6 +32,10 @@ const analyses = new WeakMap();
 // T0 = 0 and a fixed number of tries) | 'auto' (native when built). Distances use sqrt(dx^2 + dy^2), not Math.hypot, so both engines round alike.
 export const DETAIL_EXE = path.join(HARNESS_ROOT, 'native', process.platform === 'win32' ? 'detail.exe' : 'detail');
 export const nativeDetailAvailable = () => fs.existsSync(DETAIL_EXE);
+// Budget of the tool's detail pass: a number of tries per small part (load independent; the tries ->
+// quality curve flattens at ~13k / part, RESULTS.md) with a time cap. PCB_DETAIL_TRIES (per part) and
+// PCB_DETAIL_BUDGET (seconds) override.
+export const toolDetailBudget = (b) => ({ evals: Number(process.env.PCB_DETAIL_TRIES ?? 20000) * b.p.components.filter((c) => !c.fixed && c.pins.length < 8).length, budgetS: Number(process.env.PCB_DETAIL_BUDGET ?? 60) });
 const dist = (dx, dy) => Math.sqrt(dx * dx + dy * dy);
 
 export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals = Infinity, budgetS = 30, seed = 1, gap = 0.8, clearance = 0.1, kappa = 0.5, decapFreeMm = 0, chi = 0, critW = 3, rho = 4, constraints = null, engine = 'auto' } = {}) {

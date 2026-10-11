@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadBoard, legalize, evaluateRobust, legalOk, rotatedSize, worldPin, needsFastRouting, toolRouting } from '../lib/board.mjs';
 import { startLayout } from '../lib/init.mjs';
-import { detailPlace } from '../lib/detail.mjs';
+import { detailPlace, toolDetailBudget } from '../lib/detail.mjs';
 import { loadConstraints, routerRules, evalConstraints } from '../lib/constraints.mjs';
 
 import { placementMasks, blockedCells, maskCellRect } from '../../core/src/geometry/mask.js';
@@ -185,16 +185,16 @@ export function createSession(dir) {
       const runSeed = Number.isInteger(seed) ? seed : s.seed * 1000 + s.next;
       const init = startLayout(b, plan, { seed: runSeed, base });
       const id = `c${String(s.next).padStart(3, '0')}`;
-      // Time plan for one tool call (< 3 min end to end): detail pass (30 s; 60 s on > 1000 parts), then
+      // Time plan for one tool call (< 3 min end to end): detail pass (at most 60 s), then
       // routing until a deadline (one routing round on ppc can take 15-40 s, hence the margin).
-      const t0 = performance.now(), big = needsFastRouting(b);
+      const t0 = performance.now();
       const s2 = state(); s2.next++; s2.placeCalls++;
       let leg = legalize(b, init), detail = null;
       // Detailed placement of the small parts (lib/detail.mjs: HPWL + routing-channel term, annealed local
-      // search; k60 tool layouts 504-547 -> ~420 vias). PCB_DETAIL=0 turns it off, PCB_DETAIL_BUDGET sets its seconds.
+      // search; native/detail.cpp when built). PCB_DETAIL=0 turns it off; budget: toolDetailBudget.
       if (process.env.PCB_DETAIL !== '0') {
-        const d = detailPlace(b, leg.layout, { budgetS: Number(process.env.PCB_DETAIL_BUDGET ?? (big ? 60 : 30)), seed: runSeed });
-        leg = legalize(b, d.layout); detail = { evals: d.evals, accepted: d.accepted, seconds: d.seconds };
+        const d = detailPlace(b, leg.layout, { ...toolDetailBudget(b), seed: runSeed });
+        leg = legalize(b, d.layout); detail = { evals: d.evals, accepted: d.accepted, seconds: d.seconds, engine: d.engine ?? 'js' };
       }
       const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), ...(rules.length ? { netRules: rules } : {}), deadlineS: Math.max(15, 150 - (performance.now() - t0) / 1000) });
       const moved = comps.map((c, i) => [c.id, Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y)]).filter(([ref, d]) => !comps[idx.get(ref)].fixed && d > 0).sort((x, y) => y[1] - x[1]);
