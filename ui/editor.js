@@ -59,7 +59,7 @@ function maybeAutoRoute() {
 /** The placement changed: drawn routes are out of date, a running route is cancelled. */
 let routeCancelled = false;
 function layoutChanged() {
-  layoutDirty = true; layoutVersion++;
+  layoutDirty = true;
   if (routes) routesStale = true;
   if (routeRun) routeCancelled = true;
   stopRouting();
@@ -109,7 +109,6 @@ worker.onmessage = ({ data: m }) => {
   else if (m.type === 'idle') { workerBusy = false; hud(); maybeAutoRoute(); }
   else if (m.type === 'update') onUpdate(m);
   else if (m.type === 'export') download(`${m.name}.placement.json`, m.json);
-  else if (m.type === 'cypressInput') onCypressInput(m);
   else if (m.type === 'error') {
     $('#error').textContent = m.message;
     console.error(m.stack ?? m.message);
@@ -145,9 +144,7 @@ function onLoaded(m) {
   $('#autoRoute').checked = m.components.length < 1000;
   layoutDirty = true;
   $('#drop').classList.add('hidden');
-  for (const id of ['#boardSection', '#cypressSection', '#modSection', '#routeSection', '#viewSection']) $(id).hidden = false;
-  if (cypressJob) { clearInterval(cypressJob.timer); cypressJob = null; }
-  $('#cypressStatus').textContent = '选中未固定的器件后运行；其余器件按当前位置固定。'; $('#cypressInfo').innerHTML = ''; renderCypress();
+  for (const id of ['#boardSection', '#modSection', '#routeSection', '#viewSection']) $(id).hidden = false;
   $('#load').disabled = false;
   $('#loadStatus').textContent = `完成，${(m.loadMs / 1000).toFixed(1)} s`;
   $('#error').textContent = '';
@@ -236,7 +233,6 @@ function renderLastOp() {
 }
 
 function renderSelection() {
-  renderCypress();
   const sel = [...selection];
   $('#selSection').hidden = !vm || !sel.length;
   if (!vm || !sel.length) return;
@@ -741,58 +737,3 @@ requestDraw();
 // Read-only handle for debugging and scripted checks.
 window.__editor = { routes: () => routes && { stats: routes.stats, ms: routes.ms, stale: routesStale, running: !!routeRun }, drawNow: () => { const t = performance.now(); draw(); return performance.now() - t; }, setRats: (v) => { opts.rats = v; }, state: () => ({ layout: layout.map((p) => ({ ...p })), locked: [...locked], modules: modules.map((m) => ({ ...m, members: [...m.members] })), conflicts: [...conflicts], busy: inFlight > 0 || workerBusy }) };
 
-// ---- Cypress selection layout (harness/ui-server.mjs /api/cypress/place) ------------------------------------
-// The worker hands over the problem and the layout after all queued edits; the server solves the selected parts
-// with NVIDIA Cypress (every other part fixed where it is) and the result comes back as an undoable setLayout.
-let cypressBackend = { ok: false }, cypressJob = null, layoutVersion = 0;
-async function refreshCypress() {
-  try { const r = await fetch('/api/health', { cache: 'no-store' }); cypressBackend = r.ok ? await r.json() : { ok: false }; } catch { cypressBackend = { ok: false }; }
-  const b = $('#cypressBackend');
-  b.textContent = cypressBackend.running ? (cypressBackend.busy ? `运行中 · ${cypressBackend.container}` : `就绪 · ${cypressBackend.container}`) : cypressBackend.ok ? `容器 ${cypressBackend.container} 未运行` : '没有 Cypress 后台（用 harness/ui-server.mjs 启动页面）';
-  b.className = cypressBackend.running ? 'good' : 'bad';
-  renderCypress();
-}
-function renderCypress() {
-  const n = vm ? movableSel().length : 0;
-  $('#cypressRun').disabled = !vm || !n || !!cypressJob || !cypressBackend.running;
-  $('#cypressRun').textContent = n ? `Cypress 布局选中的 ${n} 个器件` : 'Cypress 布局选中器件';
-}
-function cypressRun() {
-  const sel = movableSel(); if (!vm || !sel.length || cypressJob) return;
-  cypressJob = { seq: ++seq, selected: sel, t0: performance.now(), version: layoutVersion, timer: 0 };
-  $('#cypressStatus').textContent = `准备 ${sel.length} 个器件…`; $('#cypressInfo').innerHTML = '';
-  worker.postMessage({ type: 'cypressInput', seq: cypressJob.seq });
-  renderCypress();
-}
-async function onCypressInput(m) {
-  const job = cypressJob; if (!job || m.seq !== job.seq) return;
-  job.version = layoutVersion;
-  job.timer = setInterval(() => { $('#cypressStatus').textContent = `Cypress CUDA 求解 ${job.selected.length} 个器件… ${((performance.now() - job.t0) / 1000).toFixed(0)} s`; }, 500);
-  try {
-    const r = await fetch('/api/cypress/place', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-      board: m.board, input: m.input, layout: m.layout, selected: job.selected, rotate: $('#cypressRotate').checked }) });
-    const res = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
-    if (!r.ok) throw new Error(res.error ?? `HTTP ${r.status}`);
-    if (cypressJob !== job || vm?.name !== m.board) return;
-    const c = res.cypress, g = res.legalize, x = res.metrics;
-    if (layoutVersion !== job.version) $('#cypressStatus').innerHTML = `<span class="bad">求解期间布局被修改，结果未应用</span>（job ${esc(res.job)}）`;
-    else { send('setLayout', { placements: res.placements }); $('#cypressStatus').textContent = `已应用（可撤销）· job ${res.job}`; }
-    $('#cypressInfo').innerHTML = kv([
-      ['器件 / 相关网络 (个)', `${res.selected} / ${x.nets}`],
-      ['相关网络 HPWL (mm)', `${x.hpwlBeforeMm.toFixed(1)} → ${x.hpwlAfterMm.toFixed(1)}`],
-      ['选中器件重叠对 (个)', `${x.overlapsBefore} → <span class="${x.overlapsAfter ? 'bad' : 'good'}">${x.overlapsAfter}</span>`],
-      ['旋转的器件 (个)', x.rotated],
-      ['Cypress', `${c.status === 'converged' ? '<span class="good">收敛</span>' : '<span class="bad">未收敛</span>'}，${c.iterations} 次迭代，overflow ${(+c.finalOverflow).toFixed(3)}`],
-      ['合法化移动 / 失败 / 微推 (个)', `${g.moved} / <span class="${g.failed ? 'bad' : ''}">${g.failed}</span> / ${g.nudged}`],
-      ['求解 / 总耗时 (s)', `${(+c.solveS).toFixed(1)} / ${res.elapsedS.toFixed(1)}`],
-    ]);
-  } catch (err) {
-    if (cypressJob === job) $('#cypressStatus').innerHTML = `<span class="bad">Cypress 布局失败：${esc(err.message)}</span>`;
-  } finally {
-    clearInterval(job.timer);
-    if (cypressJob === job) cypressJob = null;
-    refreshCypress();
-  }
-}
-$('#cypressRun').onclick = cypressRun;
-refreshCypress(); setInterval(refreshCypress, 10000);

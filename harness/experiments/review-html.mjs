@@ -6,12 +6,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadBoard, rotatedSize, legalOk, placementMetrics } from '../lib/board.mjs';
-import { evaluationRouting } from '../lib/router-gen.mjs';
+import { evaluationRouting } from '../../core/src/router/board-router.js';
 import { routeBoardNative } from '../lib/native-router.mjs';
-import { lib } from '../lib/env.mjs';
 import { routerLayerNames } from '../lib/kicad-export.mjs';
 
-const { rotateQuarter, localPin } = await lib('src/problem.js');
+import { rotateQuarter, localPin } from '../../core/src/problem.js';
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const b = loadBoard(arg('board', 'ppc-n3')), C = b.p.components, idx = new Map(C.map((c, i) => [c.id, i]));
 const ic = idx.get(arg('ic', 'U1')), win = Number(arg('window', 45)), outFile = path.resolve(arg('out'));

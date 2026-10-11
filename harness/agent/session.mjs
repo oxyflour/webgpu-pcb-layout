@@ -8,9 +8,8 @@ import { loadBoard, legalize, evaluateRobust, legalOk, rotatedSize, worldPin, ne
 import { startLayout } from '../lib/init.mjs';
 import { detailPlace } from '../lib/detail.mjs';
 import { loadConstraints, routerRules, evalConstraints } from '../lib/constraints.mjs';
-import { lib } from '../lib/env.mjs';
 
-const { placementMasks, blockedCells, maskCellRect } = await lib('src/geometry/mask.js');
+import { placementMasks, blockedCells, maskCellRect } from '../../core/src/geometry/mask.js';
 
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'));
 const writeJson = (f, v) => { fs.writeFileSync(`${f}.tmp`, JSON.stringify(v, null, 1)); fs.renameSync(`${f}.tmp`, f); };

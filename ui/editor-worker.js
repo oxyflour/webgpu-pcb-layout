@@ -68,7 +68,7 @@ async function load({ name, text, placement, seed = 1 }) {
     plan.modules.forEach((m) => { m.side = 'auto'; m.cohesion = o.cohesion; });
     // The global stage starts from the harness tool start layout (lib/start-layout.mjs: parts at
     // the weighted centre of the pins they connect to, anchored on the fixed parts) instead of
-    // random multi-starts: harness/experiments/editor-init.mjs, webgpu-vs-cypress.mjs.
+    // random multi-starts: harness/experiments/editor-init.mjs.
     post('progress', { message: `工具初始布局：${problem.components.length} 个器件` });
     const initLayout = startLayout({ p: problem, a: { ...adapted, ir } }, {}, { seed });
     post('progress', { message: `自动布局：${problem.components.length} 个器件、${plan.modules.length} 个模块` });
@@ -210,10 +210,6 @@ async function handle(msg) {
         changed.push(i);
       }
       return reply(msg.seq, 'agent', null, changed);
-    }
-    case 'cypressInput': {
-      // For the Cypress backend (harness/ui-server.mjs): the problem and the layout after every queued edit.
-      return post('cypressInput', { seq: msg.seq, board: board.name, input: board.adapted.input, layout: session.layout });
     }
     case 'export': {
       const layout = session.layout;

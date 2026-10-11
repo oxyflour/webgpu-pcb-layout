@@ -3,7 +3,7 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { loadBoard, shiftedRouting } from '../lib/board.mjs';
 import { routeBoardNative } from '../lib/native-router.mjs';
-import { evaluationRouting } from '../lib/router-gen.mjs';
+import { evaluationRouting } from '../../core/src/router/board-router.js';
 
 const b = loadBoard(workerData.name);
 parentPort.on('message', ({ id, layout, offset, maxRounds, cells }) => {

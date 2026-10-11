@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import { Worker } from 'node:worker_threads';
+import { legalizeLayout } from '../../core/src/optimizer/legalizer.js';
 import { loadBoard, legalize, evaluateRobust, rotatedSize, worldPin } from '../lib/board.mjs';
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const b = loadBoard(arg('board')), p = b.p, C = p.components, n = C.length, H = b.a.originalLayout;
@@ -34,7 +35,7 @@ else if (startArg.startsWith('noise')) { const S = Number(startArg.slice(5)), J 
   L = legalize(b, J).layout; }
 else { const j = JSON.parse(fs.readFileSync(startArg, 'utf8')); L = legalize(b, j.layout ?? j).layout; }
 // --cl > 0.1: the start is re-legalized at that clearance (spacing test).
-if (Number(arg('cl', 0.1)) > 0.1) { const { lib } = await import('../lib/env.mjs'), { legalizeLayout } = await lib('src/optimizer/legalizer.js'); L = legalizeLayout(p, L, { clearance: Number(arg('cl')) }).layout; }
+if (Number(arg('cl', 0.1)) > 0.1) { L = legalizeLayout(p, L, { clearance: Number(arg('cl')) }).layout; }
 L = L.map((q) => ({ ...q }));
 const L0 = L.map((q) => ({ ...q }));
 

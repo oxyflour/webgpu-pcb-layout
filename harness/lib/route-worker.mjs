@@ -1,7 +1,7 @@
 // Worker of the parallel router: builds the same router (shared usage/history arrays) and
 // routes the nets it is sent, reporting each net's route and the area its searches explored.
 import { parentPort, workerData } from 'node:worker_threads';
-import { routeBoard } from './router-gen.mjs';
+import { routeBoard } from '../../core/src/router/board-router.js';
 
 const { board, layout, sides, options, usageSab, historySab } = workerData;
 let wins = null;

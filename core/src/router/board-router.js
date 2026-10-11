@@ -135,7 +135,7 @@ export function routeBoard(board, layout, sides, options = {}) {
   // options.rasterOnly: the rasterized grid without routing (src/router/global-router.js builds its coarse grid from it).
   if (options.rasterOnly) return { grid: { W, H, L, P, cell }, owner, padCells, netPads, padCenter };
 
-  const usage = new Uint16Array(N), history = new Float32Array(N);
+  const usage = options.sharedUsage ?? new Uint16Array(N), history = options.sharedHistory ?? new Float32Array(N);
   // Blocks: k x k cells centred on the track / via cell (offsets lo..hi in x and y).
   const blocks = new Map();
   const blockOf = (k) => {
@@ -164,6 +164,7 @@ export function routeBoard(board, layout, sides, options = {}) {
   const g = new Float64Array(N), gen = new Int32Array(N), from = new Int32Array(N), mark = new Int32Array(N);
   let curGen = 0, markGen = 0;
   const heap = new MinHeap(1 << 16);
+  const AW = options.astarWeight ?? 1;
   // Negotiation (PathFinder): present-congestion factor, its growth per round, history cost added per round of overuse.
   let pres = options.presentFactor ?? 0.6;
   const presentGrowth = options.presentGrowth ?? 1.6, historyGain = options.historyGain ?? 0.4;
@@ -173,11 +174,12 @@ export function routeBoard(board, layout, sides, options = {}) {
   // A* from `sources` to any cell marked `targetMark`, inside the window.
   function search(net, sources, targetMark, tx, ty, win) {
     curGen++;
+    options.onWindow?.(win);
     // options.stats: counters for profiling (searches, cells popped, window cells).
     if (stats) { stats.searches++; stats.windowCells += (win[2] - win[0] + 1) * (win[3] - win[1] + 1) * L; }
     heap.n = 0;
     const [wx0, wy0, wx1, wy1] = win;
-    for (const s of sources) { gen[s] = curGen; g[s] = 0; from[s] = -1; const q = s % P; heap.push(Math.abs(q % W - tx) + Math.abs(((q / W) | 0) - ty), s); }
+    for (const s of sources) { gen[s] = curGen; g[s] = 0; from[s] = -1; const q = s % P; heap.push(AW * (Math.abs(q % W - tx) + Math.abs(((q / W) | 0) - ty)), s); }
     // The six neighbours are expanded in a fixed order without a closure per popped cell (the closure version spent
     // most of the routing time allocating and calling it); results are identical.
     const nb = new Int32Array(6), nx = new Int32Array(6), ny = new Int32Array(6), nbase = new Float64Array(6);
@@ -213,7 +215,7 @@ export function routeBoard(board, layout, sides, options = {}) {
         const ng = gc + nbase[j] * (1 + hist) * (1 + pres * use);
         if (gen[n] === curGen && g[n] <= ng) continue;
         gen[n] = curGen; g[n] = ng; from[n] = c;
-        heap.push(ng + Math.abs(nx[j] - tx) + Math.abs(ny[j] - ty), n);
+        heap.push(AW === 1 ? ng + Math.abs(nx[j] - tx) + Math.abs(ny[j] - ty) : ng + AW * (Math.abs(nx[j] - tx) + Math.abs(ny[j] - ty)), n);
       }
     }
     return -1;
@@ -255,6 +257,7 @@ export function routeBoard(board, layout, sides, options = {}) {
     return { complete, cells, paths };
   }
 
+  if (options.exposeRouter) return { routeNet, usage, history, setPres: (v) => { pres = v; }, pres, presentGrowth, historyGain, grid: { W, H, L, P, N, cell }, netPads, padCenter, netBlock, netVia, margin };
   const routes = new Array(board.netCount).fill(null);
   const order = [...Array(board.netCount).keys()].filter((n) => netPads[n].length >= 2);
   // Short nets first; later rounds keep the same order (PathFinder negotiates via costs).
@@ -289,12 +292,13 @@ export function routeBoard(board, layout, sides, options = {}) {
     overflow = 0;
     for (let c = 0; c < N; c++) if (usage[c] > 1) { overflow++; history[c] += historyGain * (usage[c] - 1); }
     options.onRound?.({ round: rounds, maxRounds, overflow });
+    if (options.deadline && performance.now() > options.deadline) break;
     if (!overflow) break;
     fullRound = overflow >= prevOverflow; prevOverflow = overflow;
     pres *= presentGrowth;
   }
 
-  let clean = 0, complete = 0, vias = 0, length = 0;
+  let clean = 0, complete = 0, vias = 0, length = 0, viaSites = 0;
   // Per net: 0 = nothing to route, 1 = clean, 2 = complete but sharing cells, 3 = incomplete.
   const status = new Uint8Array(board.netCount);
   // Optional observation only: count the exact same path transitions as the total,
@@ -309,6 +313,7 @@ export function routeBoard(board, layout, sides, options = {}) {
     for (const path of r.paths) for (let k = 1; k < path.length; k++) {
       if (Math.abs(path[k] - path[k - 1]) === P) {
         vias++;
+        if (!(k > 1 && Math.abs(path[k - 1] - path[k - 2]) === P)) viaSites++;
         if (netStats) {
           const q = path[k] % P;
           netStats[n].vias++;
@@ -318,7 +323,7 @@ export function routeBoard(board, layout, sides, options = {}) {
     }
   }
   return {
-    grid: { W, H, cell, layers: L }, rounds, overflow, nets: order.length, complete, clean, vias, length, status,
+    grid: { W, H, cell, layers: L }, rounds, overflow, nets: order.length, complete, clean, vias, viaSites, length, status,
     ...(netStats ? { netStats } : {}),
     /**
      * Polylines per net as [{layer, points:[[x,y],...], via?}] in mm; `via` marks a

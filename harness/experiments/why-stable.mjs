@@ -5,7 +5,7 @@
 // node harness/experiments/why-stable.mjs --board k60 --layout human|FILE --pitch 0.4 --offset dx,dy
 import fs from 'node:fs';
 import { loadBoard, legalize, placementMetrics } from '../lib/board.mjs';
-import { routeBoard, evaluationRouting } from '../lib/router-gen.mjs';
+import { routeBoard, evaluationRouting } from '../../core/src/router/board-router.js';
 import { routeBoardNative } from '../lib/native-router.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };

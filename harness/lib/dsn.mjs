@@ -4,9 +4,8 @@
 // router's pad centre and axis-aligned pad box); each component is one image placed at the origin.
 // Only signal nets are routed (power/ground pads have net -1 and are obstacles, as in the router).
 // Coordinates: mm -> um, y negated (DSN is y-up).
-import { lib } from './env.mjs';
 
-const { rotateQuarter, localPin } = await lib('src/problem.js');
+import { rotateQuarter, localPin } from '../../core/src/problem.js';
 
 const q = (s) => `"${String(s).replace(/"/g, '')}"`;
 const um = (v) => Math.round(v * 1000 * 10) / 10;

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Cypress PCB 布局与 Benchmark"
-  short_description: "Run NVIDIA Cypress PCB placement and benchmarks"
-  default_prompt: "使用 $cypress-layout 调用编译好的 Cypress 镜像进行 PCB 布局，并按每例 5 分钟预算运行对比 benchmark。"

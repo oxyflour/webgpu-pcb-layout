@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadBoard } from '../lib/board.mjs';
-import { routeBoard, evaluationRouting } from '../lib/router-gen.mjs';
+import { routeBoard, evaluationRouting } from '../../core/src/router/board-router.js';
 const argv = process.argv.slice(2), arg = (n, d) => { const i = argv.indexOf(`--${n}`); return i < 0 ? d : argv[i + 1]; };
 const board = arg('board', 'ppc-n3'), w = Number(arg('w', 1.5)), [k, m] = arg('part', '0/1').split('/').map(Number), out = arg('out');
 const dirs = argv.filter((a, i) => !a.startsWith('--') && !argv[i - 1]?.startsWith('--'));

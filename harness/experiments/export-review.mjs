@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadBoard } from '../lib/board.mjs';
-import { evaluationRouting } from '../lib/router-gen.mjs';
+import { evaluationRouting } from '../../core/src/router/board-router.js';
 import { routeBoardNative } from '../lib/native-router.mjs';
 import { exportKicad } from '../lib/kicad-export.mjs';
 

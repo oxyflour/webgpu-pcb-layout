@@ -3,7 +3,7 @@
 // node harness/experiments/route-profile.mjs --board ppc-n3 [--layout FILE] [--fast]
 import fs from 'node:fs';
 import { loadBoard } from '../lib/board.mjs';
-import { routeBoard, evaluationRouting } from '../lib/router-gen.mjs';
+import { routeBoard, evaluationRouting } from '../../core/src/router/board-router.js';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const b = loadBoard(arg('board', 'ppc-n3')), src = arg('layout'), L = src ? JSON.parse(fs.readFileSync(src, 'utf8')) : b.a.originalLayout;

@@ -1,8 +1,6 @@
 {
-  "_note": "Copy to harness/local.json (git-ignored) and adjust. Environment variables with the names in harness/lib/env.mjs override these. Only placerRoot is needed for the registered KiCad benchmark boards; Cypress and FreeRouting are optional (older experiments).",
-  "placerRoot": "../webgpu_pcb_placer",
+  "_note": "Copy to harness/local.json (git-ignored). Environment variables (harness/lib/env.mjs) override these; relative paths are relative to the repository root. boardsRoot: checkout with the benchmark KiCad boards (only for those boards). uiBoards: web editor sample boards. freeroutingDir: archived FreeRouting experiment only.",
+  "boardsRoot": "../webgpu_pcb_placer",
   "uiBoards": "../webgpu-layout/web/boards",
-  "layoutRoot": "vendor/webgpu-layout-code",
-  "cypressContainer": null,
   "freeroutingDir": null
 }

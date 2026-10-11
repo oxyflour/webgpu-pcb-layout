@@ -1,5 +1,5 @@
-import {rotatedSize,sharesSide,worldPin} from '../../src/problem.js';
-import {placementMasks,maskCellRect,blockedCells} from '../../src/geometry/mask.js';
+import {rotatedSize,sharesSide,worldPin} from '../src/problem.js';
+import {placementMasks,maskCellRect,blockedCells} from '../src/geometry/mask.js';
 
 // Real-board checks exempt pre-existing conflicts between locked components.
 export function repositoryMetrics(p,L,{clearance=.1}={}){

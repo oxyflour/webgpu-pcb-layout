@@ -1,16 +1,16 @@
-// Load a registered board (KiCad case or IR file) exactly as bench/cypress/compare.mjs does, and evaluate
+// Load a registered board (KiCad case or IR file) with the core adapter, and evaluate
 // layouts with the benchmark protocol: 0.1 mm legalization, strict geometry, PathFinder
 // routing on the board's layers at 0.4 mm (clean nets, vias) and unweighted signal HPWL.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { lib, PLACER_ROOT, HARNESS_ROOT, REPO_ROOT, required } from './env.mjs';
+import { BOARDS_ROOT, HARNESS_ROOT, REPO_ROOT, required } from './env.mjs';
 
-const { parseKicadBoard, designToProblem, kicadToIR } = await lib('src/kicad/adapter.js');
-const { irToProblem } = await lib('src/ir/to-problem.js');
-const P = await lib('src/problem.js');
-// Adapter router with harness hooks (deadline, weighted A*, ...): see router-gen.mjs.
-const { routeBoard, evaluationRouting } = await import('./router-gen.mjs');
+import { parseKicadBoard, designToProblem, kicadToIR } from '../../core/src/kicad/adapter.js';
+import { irToProblem } from '../../core/src/ir/to-problem.js';
+import * as P from '../../core/src/problem.js';
+// Core router (core/src/router/board-router.js; harness hooks: deadline, weighted A*, viaSites, ...).
+import { routeBoard, evaluationRouting } from '../../core/src/router/board-router.js';
 const { routeBoardNative, nativeAvailable } = await import('./native-router.mjs');
 
 // Routing used inside agent tool calls and for the human target. Native router (native/build.cmd);
@@ -20,25 +20,25 @@ const { routeBoardNative, nativeAvailable } = await import('./native-router.mjs'
 export const toolRouting = (b) => !nativeAvailable() ? (needsFastRouting(b) ? { fast: 'weighted' } : {}) : needsFastRouting(b) ? { router: 'native', layerHeuristic: true, incremental: true } : { router: 'native' };
 // Final evaluation: exact routing (native build when available, same result as JS).
 export const exactRouting = () => nativeAvailable() ? { router: 'native' } : {};
-const { repositoryMetrics } = await lib('bench/cypress/repository-metrics.mjs');
-const { legalizeLayout } = await lib('src/optimizer/legalizer.js');
-const { KICAD_CASES } = await lib('bench/kicad-cases.mjs');
+import { repositoryMetrics } from '../../core/bench/repository-metrics.mjs';
+import { legalizeLayout } from '../../core/src/optimizer/legalizer.js';
+import { KICAD_CASES } from '../../core/bench/kicad-cases.mjs';
 export const { normalizeProblem, rotatedSize, worldPin } = P;
 
-// Registered boards: the adapter's KiCad cases (paths relative to the placer checkout) and the local
+// Registered boards: the benchmark KiCad cases (core/bench/kicad-cases.mjs, paths relative to boardsRoot) and the local
 // registry harness/boards.json {"name": "path"} (a .kicad_pcb or an IR .json = kicadToIR output; paths
 // relative to the repository root or absolute). EVAL_BOARDS: the default board list of the sweeps.
 const LOCAL = (() => { const f = path.join(HARNESS_ROOT, 'boards.json'); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {}; })();
-export const BOARDS = { ...Object.fromEntries(KICAD_CASES.map(([k, v]) => [k, PLACER_ROOT ? path.join(PLACER_ROOT, v) : null])), ...Object.fromEntries(Object.entries(LOCAL).filter(([k]) => !k.startsWith('_')).map(([k, v]) => [k, path.resolve(REPO_ROOT, v)])) };
+export const BOARDS = { ...Object.fromEntries(KICAD_CASES.map(([k, v]) => [k, BOARDS_ROOT ? path.join(BOARDS_ROOT, v) : null])), ...Object.fromEntries(Object.entries(LOCAL).filter(([k]) => !k.startsWith('_')).map(([k, v]) => [k, path.resolve(REPO_ROOT, v)])) };
 export const EVAL_BOARDS = [...new Set(['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'safety', 'pic', 'nxp', 'rx', 'k60', 'acc', 'ppc-n3', ...Object.keys(LOCAL).filter((k) => !k.startsWith('_'))])];
 
-// locks: {ref: {x,y,rotation,side}} extra components held fixed (exported as Cypress terminals).
+// locks: {ref: {x,y,rotation,side}} extra components held fixed.
 // only: Set of refs -> sub-board with just these footprints (same outline, rules and adapter path;
-// nets keep only the pins of these parts), e.g. one module for a module-internal Cypress job.
+// nets keep only the pins of these parts), e.g. one module.
 const parsed = new Map();
 export function loadBoard(name, { locks = {}, only = null } = {}) {
   if (!BOARDS[name]) throw new Error(`Unknown board ${name}; known: ${Object.keys(BOARDS).join(', ')}`);
-  const file = required(BOARDS[name], 'placerRoot', 'CYPRESS_PLACER_ROOT', `board ${name} is a KiCad case of the placer checkout`), isIr = file.endsWith('.json');
+  const file = required(BOARDS[name], 'boardsRoot', 'PCB_BOARDS_ROOT', `board ${name} is a benchmark KiCad case (core/bench/kicad-cases.mjs) under the boards checkout`), isIr = file.endsWith('.json');
   if (!parsed.has(name)) { const text = fs.readFileSync(file, 'utf8'); parsed.set(name, { text, sha256: crypto.createHash('sha256').update(text).digest('hex'), ir: isIr ? JSON.parse(text) : kicadToIR(parseKicadBoard(text, name)) }); }
   const { text, sha256, ir } = parsed.get(name), copy = () => JSON.parse(JSON.stringify(ir));
   // An IR file goes through irToProblem (same problem as the KiCad path: checked on k60).

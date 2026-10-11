@@ -10,7 +10,7 @@
 // stop rules) and the final statistics copy src/router/board-router.js.
 import os from 'node:os';
 import { Worker } from 'node:worker_threads';
-import { routeBoard } from './router-gen.mjs';
+import { routeBoard } from '../../core/src/router/board-router.js';
 
 const WORKER = new URL('./route-worker.mjs', import.meta.url);
 

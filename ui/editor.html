@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PCB Layout Editor · Cypress</title>
+<title>PCB Layout Editor</title>
 <style>
   :root {
     --bg: #f6f5f3; --panel: #ffffff; --fg: #1c1917; --muted: #78716c; --line: #e7e5e4;
@@ -113,14 +113,6 @@
       <dl class="kv" id="lastOp"></dl>
     </section>
 
-    <section id="cypressSection" hidden>
-      <h2>Cypress 后台布局</h2>
-      <p class="sub" id="cypressBackend">检测后台…</p>
-      <div class="row"><label title="打开 Cypress 交叉项以优化朝向，耗时约 3–4 倍；关闭时朝向保持当前值"><input type="checkbox" id="cypressRotate"> 允许 Cypress 调整朝向（慢 3–4 倍）</label></div>
-      <div class="row"><button id="cypressRun" class="primary grow" disabled>Cypress 布局选中器件</button></div>
-      <p class="sub" id="cypressStatus">选中未固定的器件后运行；其余器件按当前位置固定。</p>
-      <dl class="kv" id="cypressInfo"></dl>
-    </section>
     <section id="selSection" hidden>
       <h2>选中</h2>
       <p class="ids" id="selIds"></p>

@@ -6,7 +6,6 @@
 // node harness/experiments/editor-init.mjs [--boards a,b] [--seeds 1,2,3] [--out DIR] [--phase place|evaluate|report]
 import fs from 'node:fs';
 import path from 'node:path';
-import { lib } from '../lib/env.mjs';
 import { BOARDS, loadBoard, evaluateRobust, exactRouting, placementMetrics } from '../lib/board.mjs';
 import { startLayout } from '../lib/init.mjs';
 
@@ -19,11 +18,10 @@ const log = (msg) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${
 fs.mkdirSync(out, { recursive: true });
 
 async function place() {
-  const { irToProblem } = await lib('src/ir/to-problem.js');
-  const { normalizeProblem } = await lib('src/problem.js');
-  const { autoModules } = await lib('src/optimizer/modules.js');
-  const { parseOptions, placeBoard } = await lib('bench/pipeline.mjs');
-  const { createNodeWebGpuDevice } = await lib('src/node.js');
+  // GPU path: needs the optional npm package webgpu (loaded only for the placement step).
+  const { irToProblem } = await import('../../core/src/ir/to-problem.js'), { normalizeProblem } = await import('../../core/src/problem.js');
+  const { autoModules } = await import('../../core/src/optimizer/modules.js'), { parseOptions, placeBoard } = await import('../../core/bench/pipeline.mjs');
+  const { createNodeWebGpuDevice } = await import('../../core/src/node.js');
   const device = await createNodeWebGpuDevice();
   for (const board of boards) {
     const ir = loadBoard(board).a.ir, adapted = irToProblem(ir, { preplace: true, sides: 'ir' }), problem = normalizeProblem(adapted.input);

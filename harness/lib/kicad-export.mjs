@@ -6,9 +6,8 @@
 // through when it spans the outer layers, blind/buried otherwise.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { lib } from './env.mjs';
 
-const { placementResult } = await lib('src/ir/to-problem.js');
+import { placementResult } from '../../core/src/ir/to-problem.js';
 const num = (v) => String(Math.round(v * 1e6) / 1e6);
 // Router layer l -> copper layer name: the router may use fewer layers than the file has (k60: 2 of
 // TOP/PWR/GND/BOT); its last layer is the bottom copper.

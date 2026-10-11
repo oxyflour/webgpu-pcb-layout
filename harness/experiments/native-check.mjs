@@ -2,7 +2,7 @@
 // per-net status), and the speed-up. node harness/experiments/native-check.mjs --board k60 [--layout FILE] [--incremental] [--weight 1.5]
 import fs from 'node:fs';
 import { loadBoard } from '../lib/board.mjs';
-import { routeBoard, evaluationRouting } from '../lib/router-gen.mjs';
+import { routeBoard, evaluationRouting } from '../../core/src/router/board-router.js';
 import { routeBoardNative } from '../lib/native-router.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };

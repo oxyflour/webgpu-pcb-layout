@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { routeBoard } from './router-gen.mjs';
+import { routeBoard } from '../../core/src/router/board-router.js';
 import { HARNESS_ROOT } from './env.mjs';
 
 export const NATIVE_EXE = path.join(HARNESS_ROOT, 'native', process.platform === 'win32' ? 'router.exe' : 'router');
