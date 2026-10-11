@@ -175,7 +175,7 @@ export function createSession(dir) {
       return { planned, note: 'shiftMm > 0: the wanted spot overlaps a fixed part, keepout, outline or another planned part (planned parts are legalized largest first). anchoredHpwlByRotation[r]: wirelength (mm) of the nets of this part to already-positioned parts if it had rotation r; lower is better.' };
     },
 
-    async place({ from = 'centroid', plan = {}, knobs, netWeights, seed } = {}) {
+    async place({ from = 'centroid', plan = {}, knobs, netWeights, seed, label } = {}) {
       const s = state();
       let base = null;
       if (from !== 'centroid') { if (!s.candidates[from]) throw new Error(`unknown candidate ${from}; use "centroid" or an existing id`); base = layoutOf(from); }
@@ -200,9 +200,9 @@ export function createSession(dir) {
       const moved = comps.map((c, i) => [c.id, Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y)]).filter(([ref, d]) => !comps[idx.get(ref)].fixed && d > 0).sort((x, y) => y[1] - x[1]);
       const { perNet, overflowBins, fragileNets = [], ...metrics } = m;
       const ce = evalConstraints(b, leg.layout, C, perNet), constraints = { decap: ce.decap, critical: { count: ce.critical.length, failingFeasible: ce.critical.filter((c) => !c.pass && !c.fails.some((f) => f.startsWith('infeasible'))).length, failing: ce.critical.filter((c) => !c.pass).map((c) => ({ name: c.name, fails: c.fails, vias: c.vias, lengthMm: c.lengthMm, ...(c.mismatchMm != null ? { mismatchMm: c.mismatchMm } : {}) })) } };
-      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, seed: runSeed, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, detail, metrics, constraints, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
+      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, seed: runSeed, ...(label ? { label: String(label).slice(0, 80) } : {}), legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, detail, metrics, constraints, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
       const constraintFails = ce.critical.filter((c) => !c.pass && !c.fails.some((f) => f.startsWith('infeasible'))).length + ce.decap.overMax.length;
-      s2.candidates[id] = { id, from, planned: Object.keys(plan).length, metrics, constraintFails };
+      s2.candidates[id] = { id, from, ...(label ? { label: String(label).slice(0, 80) } : {}), planned: Object.keys(plan).length, metrics, constraintFails };
       const prev = s2.best && s2.candidates[s2.best];
       const accepted = !prev || better(rank(metrics, s2.target, constraintFails), rank(prev.metrics, s2.target, prev.constraintFails ?? 0));
       if (accepted) s2.best = id;
@@ -240,14 +240,16 @@ export function createSession(dir) {
     status() {
       const s = state();
       return { board: s.board, placeCalls: s.placeCalls, best: s.best, submitted: s.submitted, humanTarget: shownTarget(s.target),
-        candidates: Object.values(s.candidates).slice(-12).map((c) => ({ id: c.id, from: c.from, planned: c.planned, clean: c.metrics.clean, constraintFails: c.constraintFails ?? 0, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm, legal: legalOk(c.metrics) })) };
+        candidates: Object.values(s.candidates).slice(-12).map((c) => ({ id: c.id, from: c.from, ...(c.label ? { label: c.label } : {}), planned: c.planned, clean: c.metrics.clean, constraintFails: c.constraintFails ?? 0, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm, legal: legalOk(c.metrics) })) };
     },
 
     submit({ candidate } = {}) {
       const s = state();
       if (!s.candidates[candidate]) throw new Error(`unknown candidate ${candidate}`);
       s.submitted = candidate; writeJson(file, s);
-      return { submitted: candidate, metrics: s.candidates[candidate].metrics };
+      const c = s.candidates[candidate], best = s.best && s.candidates[s.best];
+      const below = best && best.id !== candidate && better(rank(best.metrics, s.target, best.constraintFails ?? 0), rank(c.metrics, s.target, c.constraintFails ?? 0));
+      return { submitted: candidate, metrics: c.metrics, ...(below ? { note: `${candidate} ranks below the best candidate ${best.id} (clean nets, then failing constraints, then vias); submit ${best.id} unless you have a reason` } : {}) };
     },
 
   };

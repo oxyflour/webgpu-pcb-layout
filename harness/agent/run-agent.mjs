@@ -1,7 +1,7 @@
 // One agent session placing one board with the pcb tool: dsh (DeepSeek Flash, headless; default)
 // or --agent claude (Claude Code `claude -p`, --model default claude-haiku-5-5)
 // or --agent codex (Codex `codex exec`, --model default gpt-6-luna).
-// node harness/agent/run-agent.mjs --board pico --prompt harness/prompts/v1.md --minutes 20 --places 8 --out DIR [--seed 1] [--agent claude|codex --model M]
+// node harness/agent/run-agent.mjs --board pico --prompt harness/prompts/v15.md --minutes 20 --places 20 --out DIR [--seed 1] [--agent claude|codex --model M] [--no-baseline]
 // The gateway runs here, outside the dsh sandbox (which cannot spawn docker); the agent's
 // `pcb.cmd` only sends JSON requests. The trajectory is saved as events.jsonl + tools.jsonl.
 import fs from 'node:fs';
@@ -24,6 +24,11 @@ fs.mkdirSync(out, { recursive: true });
 if (fs.existsSync(path.join(out, 'events.jsonl'))) throw new Error('Output already has a run; choose a new --out');
 const sessionDir = path.join(out, 'session');
 await initSession(sessionDir, { board, seed });
+// Baseline: the tool's own layout without a plan, made before the agent starts (outside its time and place
+// budget) as candidate c000. The best candidate is ranked against it, so a session never ends below the
+// tool alone (v14 k60 session 2 ended at 276 / 785 against the tool's 318 / ~470).
+const baseline = args.includes('--no-baseline') ? null : await callTool(sessionDir, 'place', { from: 'centroid', plan: {}, label: 'tool baseline: no plan (made before the session, not counted)' });
+if (baseline?.error) throw new Error(`baseline place failed: ${baseline.error}`);
 // Agent workspace outside the repo so it cannot read the harness, boards or human layout.
 const ws = path.join(os.homedir(), 'agent-ws', `pcb-${board}-${crypto.randomUUID()}`);
 fs.mkdirSync(ws, { recursive: true });
@@ -153,8 +158,8 @@ fs.writeFileSync(path.join(out, 'stderr.txt'), stderr);
 fs.cpSync(ws, path.join(out, 'agent-workspace'), { recursive: true });
 for (const w of ['pcb.cmd', 'pcb']) fs.rmSync(path.join(out, 'agent-workspace', w), { force: true });
 const toolsFile = path.join(sessionDir, 'tools.jsonl'), tools = (fs.existsSync(toolsFile) ? fs.readFileSync(toolsFile, 'utf8') : '').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'result');
-const summary = { board, seed, stopReason: reason ?? 'agent finished', exitCode: code, minutes: (Date.now() - start) / 60000, placeCalls: state.placeCalls, maxShellToolS: maxToolS, maxPcbToolS: Math.max(0, ...tools.map((t) => t.seconds)),
+const summary = { board, seed, stopReason: reason ?? 'agent finished', exitCode: code, minutes: (Date.now() - start) / 60000, placeCalls, baseline: baseline && { candidate: baseline.candidate, clean: baseline.metrics.clean, vias: baseline.metrics.vias, hpwlMm: baseline.metrics.hpwlMm }, maxShellToolS: maxToolS, maxPcbToolS: Math.max(0, ...tools.map((t) => t.seconds)),
   errors: tools.filter((t) => t.result?.error).map((t) => `${t.command}: ${t.result.error}`).slice(0, 20), target: state.target, final,
   candidates: Object.values(state.candidates).map((c) => ({ id: c.id, from: c.from, planned: c.planned, clean: c.metrics.clean, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm })) };
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(summary, null, 1));
-console.log(JSON.stringify({ board, final: final && { clean: final.clean, vias: final.vias, hpwlMm: final.hpwlMm, legal: final.legal }, target: state.target, stop: summary.stopReason, places: state.placeCalls }));
+console.log(JSON.stringify({ board, final: final && { clean: final.clean, vias: final.vias, hpwlMm: final.hpwlMm, legal: final.legal }, target: state.target, stop: summary.stopReason, places: placeCalls }));
