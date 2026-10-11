@@ -4,7 +4,7 @@
 // Resumable rows in --out; --summary prints per variant the totals over boards and seeds.
 // node harness/experiments/detail-metrics.mjs --out F --variants '{"base":{},"k1":{"kappa":1}}' [--boards a,b] [--jobs 3] [--summary]
 import fs from 'node:fs';
-import { loadBoard, legalize, evaluateRobust, toolRouting, exactRouting, needsFastRouting } from '../lib/board.mjs';
+import { loadBoard, legalize, evaluateRobust, toolRouting, exactRouting, needsFastRouting, EVAL_BOARDS } from '../lib/board.mjs';
 import { startLayout } from '../lib/init.mjs';
 import { detailPlace } from '../lib/detail.mjs';
 import { boardAnalysis, humanMetrics } from '../lib/human-metrics.mjs';
@@ -12,7 +12,7 @@ import { loadConstraints, evalConstraints } from '../lib/constraints.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const out = arg('out'), seeds = [1000, 8919, 16838];
-const BOARDS = ['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'safety', 'pic', 'nxp', 'rx', 'k60', 'acc'];
+const BOARDS = EVAL_BOARDS.filter((b) => b !== 'ppc-n3');
 const rows = () => fs.existsSync(out) ? fs.readFileSync(out, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
 
 if (argv.includes('--summary')) {

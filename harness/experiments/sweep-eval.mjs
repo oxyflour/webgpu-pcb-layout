@@ -8,6 +8,7 @@
 // --prefixes p,q --out FILE: agent sessions of results/<p>-<board> for every prefix, labelled <p>-rep<r>
 // (A/B of tool versions, e.g. uncross-eval).
 import fs from 'node:fs';
+import { EVAL_BOARDS } from '../lib/board.mjs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { HARNESS_ROOT } from '../lib/env.mjs';
@@ -18,7 +19,7 @@ const R = path.join(HARNESS_ROOT, 'results'), DIR = arg('dir', 'sweep-eval'), OU
 const AGENT = arg('agent', 'v9s,v9b').split(','), PREFIXES = arg('prefixes')?.split(','), NAME = arg('name', 'v9'), TOOL = arg('tool-label', 'start + Cypress');
 const OFFSETS = ['0,0', '0.05,0.31', '0.13,0.07', '0.21,0.26', '0.29,0.14', '0.37,0.33', '0.09,0.19', '0.25,0.02'];
 const BIG = new Set(['ppc-n3', 'ppc-n1']);
-const ALL = ['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'safety', 'pic', 'nxp', 'rx', 'k60', 'acc', 'ppc-n3'];
+const ALL = EVAL_BOARDS;
 
 function layouts(board) {
   const out = [{ label: 'human', file: 'human' }];

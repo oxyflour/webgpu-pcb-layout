@@ -21,7 +21,14 @@ import { HARNESS_ROOT } from './env.mjs';
 import { boardAnalysis } from './human-metrics.mjs';
 
 // Footprint blocks of a .kicad_pcb (KiCad 4-8): reference, sheet path; net_class blocks (KiCad <= 5).
+// IR boards (harness/boards.json -> .json): optional footprints[].sheet (schematic sheet path) and
+// nets[].netclass (+ optional top-level netClasses [{name, clearance, traceWidth, viaDia}]).
 export function kicadInfo(b) {
+  if (b.format === 'ir') { const ir = b.a.ir, sheetOf = {}, byClass = new Map();
+    for (const f of ir.footprints) if (f.sheet != null) sheetOf[f.id] = String(f.sheet);
+    for (const n of ir.nets) if (n.netclass) { if (!byClass.has(n.netclass)) byClass.set(n.netclass, []); byClass.get(n.netclass).push(n.name); }
+    const rules = Object.fromEntries((ir.netClasses ?? []).map((c) => [c.name, c]));
+    return { sheetOf, netClasses: [...byClass].map(([name, nets]) => ({ name, clearance: rules[name]?.clearance ?? null, traceWidth: rules[name]?.traceWidth ?? null, viaDia: rules[name]?.viaDia ?? null, nets })) }; }
   const text = fs.readFileSync(b.file, 'utf8'), sheetOf = {}, netClasses = [];
   // Top-level blocks start with "\n  (" at depth 1; footprints are "(module" (<= 5) or "(footprint" (>= 6).
   for (const blk of text.split(/\n {2}(?=\((?:module|footprint|net_class) )/).slice(1)) {

@@ -4,13 +4,13 @@
 // node harness/experiments/noagent.mjs --out harness/results/sweep-eval-v12/tool [--boards a,b] [--jobs 2]
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadBoard, legalize, needsFastRouting } from '../lib/board.mjs';
+import { loadBoard, legalize, needsFastRouting, EVAL_BOARDS } from '../lib/board.mjs';
 import { startLayout } from '../lib/init.mjs';
 import { detailPlace } from '../lib/detail.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const out = path.resolve(arg('out')), seeds = arg('seeds', '1000,8919,16838').split(',').map(Number);
-const boards = arg('boards', 'z3r0,pico,edk,edu-fpga,fsl-mini,edu-k60,edu-nxp,safety,pic,nxp,rx,k60,acc,ppc-n3').split(',');
+const boards = arg('boards', EVAL_BOARDS.join(',')).split(',');
 fs.mkdirSync(out, { recursive: true });
 const tasks = boards.flatMap((board) => seeds.map((seed) => ({ board, seed }))).filter((t) => !fs.existsSync(path.join(out, `${t.board}-${t.seed}.json`)));
 const worker = async () => {

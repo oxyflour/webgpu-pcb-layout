@@ -5,7 +5,7 @@
 // node harness/experiments/detail-critical.mjs --out F [--boards a,b] [--jobs 3] [--summary]
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadBoard, legalize, evaluateRobust, toolRouting, exactRouting, needsFastRouting } from '../lib/board.mjs';
+import { loadBoard, legalize, evaluateRobust, toolRouting, exactRouting, needsFastRouting, EVAL_BOARDS } from '../lib/board.mjs';
 import { startLayout } from '../lib/init.mjs';
 import { detailPlace } from '../lib/detail.mjs';
 import { loadConstraints, routerRules, evalConstraints } from '../lib/constraints.mjs';
@@ -13,7 +13,7 @@ import { HARNESS_ROOT } from '../lib/env.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const out = path.resolve(arg('out')), cdir = path.resolve(arg('dir', path.join(HARNESS_ROOT, 'constraints', 'examples'))), seeds = [1000, 8919, 16838];
-const ALL = ['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'pic', 'nxp', 'rx', 'k60', 'acc', 'ppc-n3'];
+const ALL = EVAL_BOARDS;
 const rows = () => fs.existsSync(out) ? fs.readFileSync(out, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
 
 if (argv.includes('--summary')) {

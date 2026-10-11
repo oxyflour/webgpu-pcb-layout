@@ -6,13 +6,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { loadBoard, evaluateRobust, toolRouting, exactRouting, needsFastRouting } from '../lib/board.mjs';
+import { loadBoard, evaluateRobust, toolRouting, exactRouting, needsFastRouting, EVAL_BOARDS } from '../lib/board.mjs';
 import { loadConstraints, evalConstraints } from '../lib/constraints.mjs';
 import { HARNESS_ROOT } from '../lib/env.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const R = path.join(HARNESS_ROOT, 'results'), out = path.resolve(arg('out')), toolDir = arg('tool', 'sweep-eval-v13'), agents = arg('agents', 'v12s,v13c').split(',');
-const ALL = ['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'safety', 'pic', 'nxp', 'rx', 'k60', 'acc', 'ppc-n3'];
+const ALL = EVAL_BOARDS;
 const LABEL = { v12s: 'agent v12, best of 3', v13c: 'agent v13 + example constraints, best of 3', v12d: 'agent v12 + decap term, best of 3' };
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 fs.mkdirSync(out, { recursive: true });
@@ -45,6 +45,10 @@ for (const board of (arg('boards') ?? ALL.join(',')).split(',')) {
   console.log(board, r.stdout.trim().split('\n').at(-1));
   index.push({ board, ic: comps[ic].id, rows, file: `${board}.html` });
 }
+// Merge with the boards already in this directory's index (one board per run of eval-board).
+const idxFile = path.join(out, 'index.json'), old = fs.existsSync(idxFile) ? JSON.parse(fs.readFileSync(idxFile, 'utf8')) : [];
+const merged = [...old.filter((x) => !index.some((y) => y.board === x.board)), ...index].sort((x, y) => ALL.indexOf(x.board) - ALL.indexOf(y.board));
+fs.writeFileSync(idxFile, JSON.stringify(merged)); index.splice(0, index.length, ...merged);
 const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Layout review</title>
 <style>:root{--bg:#f7f7f5;--ink:#1d1d1b;--muted:#6b6b66;--line:#dcdcd6}@media (prefers-color-scheme:dark){:root{--bg:#161614;--ink:#ecebe6;--muted:#a3a29b;--line:#34342f}}
 body{background:var(--bg);color:var(--ink);font:14px system-ui,sans-serif;margin:0;padding:16px;max-width:1200px}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}th{color:var(--muted);font-weight:600}a{color:inherit}.wrap{overflow-x:auto}</style></head><body>

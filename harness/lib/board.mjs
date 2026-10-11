@@ -1,10 +1,10 @@
-// Load a registered KiCad case exactly as bench/cypress/compare.mjs does, and evaluate
+// Load a registered board (KiCad case or IR file) exactly as bench/cypress/compare.mjs does, and evaluate
 // layouts with the benchmark protocol: 0.1 mm legalization, strict geometry, PathFinder
 // routing on the board's layers at 0.4 mm (clean nets, vias) and unweighted signal HPWL.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { lib, PLACER_ROOT } from './env.mjs';
+import { lib, PLACER_ROOT, HARNESS_ROOT, REPO_ROOT } from './env.mjs';
 
 const { parseKicadBoard, designToProblem, kicadToIR } = await lib('src/kicad/adapter.js');
 const { irToProblem } = await lib('src/ir/to-problem.js');
@@ -25,7 +25,12 @@ const { legalizeLayout } = await lib('src/optimizer/legalizer.js');
 const { KICAD_CASES } = await lib('bench/kicad-cases.mjs');
 export const { normalizeProblem, rotatedSize, worldPin } = P;
 
-export const BOARDS = Object.fromEntries(KICAD_CASES);
+// Registered boards: the adapter's KiCad cases (paths relative to the placer checkout) and the local
+// registry harness/boards.json {"name": "path"} (a .kicad_pcb or an IR .json = kicadToIR output; paths
+// relative to the repository root or absolute). EVAL_BOARDS: the default board list of the sweeps.
+const LOCAL = (() => { const f = path.join(HARNESS_ROOT, 'boards.json'); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {}; })();
+export const BOARDS = { ...Object.fromEntries(KICAD_CASES.map(([k, v]) => [k, path.join(PLACER_ROOT, v)])), ...Object.fromEntries(Object.entries(LOCAL).filter(([k]) => !k.startsWith('_')).map(([k, v]) => [k, path.resolve(REPO_ROOT, v)])) };
+export const EVAL_BOARDS = [...new Set(['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'safety', 'pic', 'nxp', 'rx', 'k60', 'acc', 'ppc-n3', ...Object.keys(LOCAL).filter((k) => !k.startsWith('_'))])];
 
 // locks: {ref: {x,y,rotation,side}} extra components held fixed (exported as Cypress terminals).
 // only: Set of refs -> sub-board with just these footprints (same outline, rules and adapter path;
@@ -33,10 +38,11 @@ export const BOARDS = Object.fromEntries(KICAD_CASES);
 const parsed = new Map();
 export function loadBoard(name, { locks = {}, only = null } = {}) {
   if (!BOARDS[name]) throw new Error(`Unknown board ${name}; known: ${Object.keys(BOARDS).join(', ')}`);
-  const file = path.join(PLACER_ROOT, BOARDS[name]);
-  if (!parsed.has(name)) { const text = fs.readFileSync(file, 'utf8'); parsed.set(name, { text, sha256: crypto.createHash('sha256').update(text).digest('hex'), ir: kicadToIR(parseKicadBoard(text, name)) }); }
-  const { text, sha256, ir } = parsed.get(name);
-  const a = only ? irToProblem({ ...ir, footprints: ir.footprints.filter((f) => only.has(f.id)) }, { preplace: true, sides: 'original' }) : designToProblem(parseKicadBoard(text, name), { preplace: true, sides: 'original' });
+  const file = BOARDS[name], isIr = file.endsWith('.json');
+  if (!parsed.has(name)) { const text = fs.readFileSync(file, 'utf8'); parsed.set(name, { text, sha256: crypto.createHash('sha256').update(text).digest('hex'), ir: isIr ? JSON.parse(text) : kicadToIR(parseKicadBoard(text, name)) }); }
+  const { text, sha256, ir } = parsed.get(name), copy = () => JSON.parse(JSON.stringify(ir));
+  // An IR file goes through irToProblem (same problem as the KiCad path: checked on k60).
+  const a = only ? irToProblem({ ...copy(), footprints: copy().footprints.filter((f) => only.has(f.id)) }, { preplace: true, sides: 'original' }) : isIr ? irToProblem(copy(), { preplace: true, sides: 'original' }) : designToProblem(parseKicadBoard(text, name), { preplace: true, sides: 'original' });
   // Through-hole parts stay at their input pose (benchmark protocol: mechanical + THT fixed).
   a.input.components.forEach((c, i) => { if (c.twoSided && !c.fixed) c.fixed = { ...a.originalLayout[i] }; });
   const fixedByInput = new Set(a.input.components.filter((c) => c.fixed).map((c) => c.id));
@@ -47,7 +53,7 @@ export function loadBoard(name, { locks = {}, only = null } = {}) {
     c.fixed = { x: pose.x, y: pose.y, rotation: pose.rotation ?? 0, side: c.sides === 'bottom' ? 1 : 0 };
   }
   const p = normalizeProblem(a.input);
-  return { name, file, sha256, a, p, fixedByInput, ...(only ? { only } : {}) };
+  return { name, file, format: isIr ? 'ir' : 'kicad', sha256, a, p, fixedByInput, ...(only ? { only } : {}) };
 }
 
 export function legalize(b, layout) {
