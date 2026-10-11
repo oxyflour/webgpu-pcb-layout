@@ -659,6 +659,67 @@ spanning-tree mm; legal by construction, k60 2 s, acc 10 s incl. evaluation):
 it the tool has fewer straight crossings than the human (~840 vs 885) but still ~470 vias, so
 the rest of the gap is not straight-line crossings.
 
+## Crossing removal in the tool pipeline (lib/uncross.mjs, 2026-10-09)
+
+`place` is now start layout -> Cypress -> legalize -> **uncross** -> route. uncross = the greedy pass
+of experiments/uncross.mjs (180 deg turns of movable 2-pin parts, swaps of same-size parts on one
+side within 10 mm; cost = straight crossings of signal-net spanning trees + 0.2 x tree mm), with
+segments in a 5 mm grid, the agent's planned parts kept, a 10 s deadline, and no re-legalizing when
+the result passes legalOk (it always did; the legalizer is not idempotent: re-legalizing an already
+legal layout moves ~230 parts on ppc-n3, 5 on k60, 27 on pic). PCB_UNCROSS=0 switches it off. The
+editor's auto layout runs it too (swaps only inside a module, 5 s deadline).
+
+| Board | Parts (count) | uncross time, 4 passes (s) | Crossings before -> after (count) | `place` call end to end (s) |
+|---|---|---|---|---|
+| k60 (start + legalize) | 467 | 0.2 | 1060 -> 814 | 20 |
+| pic (start + legalize) | 435 | 0.1 | 1265 -> 1013 | - |
+| ppc-n3 (start + legalize) | 2207 | 21.7 (1 pass: 5.5) | 54453 -> 42507 | - |
+| ppc-n3 in `place` (10 s deadline, ~2 passes) | 2207 | 10.1 | 53469 -> 43087 | 131 (Cypress 16, routing to its 125 s deadline) |
+
+Editor auto layout, k60 (editor router, 0.457 mm grid, deterministic): without uncross 309 clean nets / 797 vias,
+with it 313 / 695.
+
+End to end, prompt v10, 3 dsh sessions per arm, 20 min, 12 place calls (all sessions used 12),
+one board per batch (results/v10-<board> = PCB_UNCROSS=0, v10u-<board> = with uncross). Submitted
+layouts scored with the exact native router at 8 grid offsets (`sweep-eval.mjs --prefixes v10,v10u`,
+rows in results/uncross-eval.jsonl), median per layout:
+
+| Board | Configuration | Clean nets (count, per session) | Clean nets (mean of 3) | Vias (count, per session) | Vias (mean of 3) | HPWL (mm, per session) | Offsets converged (count of 8, per session) |
+|---|---|---|---|---|---|---|---|
+| k60 (318 nets) | v10, no uncross | 304 / 316 / 318 | 312.7 | 595 / 467 / 552 | 538 | 5722 / 5544 / 6518 | 0 / 4 / 8 |
+| k60 | v10 + uncross | 308 / 314 / 314 | 312.0 | 576 / 559 / 558 | 564 | 5512 / 5884 / 5798 | 0 / 0 / 0 |
+| k60 | human | 318 | 318 | 301 | 301 | 5799 | 8 |
+| pic (310 nets) | v10, no uncross | 310 / 310 / 310 | 310.0 | 496 / 481 / 491 | 489 | 5443 / 5384 / 5311 | 6 / 6 / 6 |
+| pic | v10 + uncross | 310 / 308 / 310 | 309.3 | 435 / 454 / 402 | 430 | 5626 / 5744 / 5145 | 7 / 3 / 8 |
+| pic | human | 310 | 310 | 347 | 347 | 5955 | 8 |
+
+All candidates of the sessions (36 per arm, in-session scoring: tool routing, 5 phases):
+
+| Board | Configuration | Clean nets (count, mean over 36 candidates) | Vias (count, median over 36 candidates) | HPWL (mm, median) |
+|---|---|---|---|---|
+| k60 | v10, no uncross | 298.4 | 576 | 5744 |
+| k60 | v10 + uncross | 287.3 | 591 | 5797 |
+| pic | v10, no uncross | 303.8 | 522 | 5448 |
+| pic | v10 + uncross | 307.8 | 439 | 5624 |
+
+The k60 arms differ by session trajectory, not by the pass: applied offline to the same 36
+no-uncross candidates (`experiments/uncross-paired.mjs`, tool routing, paired):
+
+| Board | Candidates (count) | Clean nets without -> with uncross (count, mean) | Candidates with more / fewer / equal clean nets (count) | Vias without -> with (count, mean) | Candidates with fewer vias (count of 36) | Median via change (count) | HPWL without -> with (mm, mean) | Crossings without -> with (count, mean) |
+|---|---|---|---|---|---|---|---|---|
+| k60 | 36 | 298.4 -> 303.2 | 28 / 2 / 6 | 614 -> 579 | 36 | -32 | 5991 -> 5933 | 1327 -> 1056 |
+| pic | 36 | 303.8 -> 305.2 | 18 / 2 / 16 | 544 -> 524 | 35 | -19 | 5519 -> 5497 | 993 -> 829 |
+
+uncross helps every candidate (k60 -6 % vias, +4.8 clean nets; pic -4 % vias), legal in all 72
+cases. End to end it shows on pic (vias 489 -> 430 mean, best session 402 vs human 347) but not on
+k60 (538 -> 564), where the no-uncross arm had one lucky session (467) and the with-uncross
+sessions all stalled at ~558-576 without a converged offset; 3 sessions per arm are not enough to
+see a ~30-via effect against the session spread (k60 467-595). Kept on.
+
+Superseded on 2026-10-11: `place` no longer runs uncross. After the detail pass (lib/detail.mjs,
+section "Attraction test") the crossing pass is not additive (k60 417 / 407 / 423 -> 443 / 409 / 460
+vias), and Cypress was removed. lib/uncross.mjs stays in the editor's auto layout.
+
 ## Coarse vs fine placement, proxies for vias (k60, 2026-10-09)
 
 `experiments/coarse.mjs`: human IC poses; small parts planned at their human position + uniform

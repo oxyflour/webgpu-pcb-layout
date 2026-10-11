@@ -22,6 +22,7 @@ The WebGPU placer / LNS of webgpu-layout-code is not used.
 | `cypress/run.py` | Container-side runner: copy of the adapter `run.py` + job-local log (parallel jobs), warm-start orientation (`hints.json`), per-net weights. |
 | `lib/start-layout.mjs`, `lib/init.mjs` | Start layout from a partial plan (see "Init" below). `start-layout.mjs` has no Node imports (geometry passed in) so the editor worker loads it too; `init.mjs` binds it for Node. |
 | `lib/detail.mjs` | Detail pass after the legalizer: annealed local search on small parts (< 8 pins) for HPWL + routing-channel deficit between facing pads (30 s per place; `PCB_DETAIL=0` turns it off). |
+| `lib/uncross.mjs` | Crossing removal (180 deg turns of 2-pin parts, same-size swaps); used by the editor's auto layout, not by `place` (not additive after the detail pass). |
 | `agent/session.mjs` | Tool commands: `info`, `map`, `check`, `place`, `inspect`, `status`, `knobs`, `submit`. |
 | `agent/cli.mjs` | In-sandbox client `pcb` (strict flags, JSON over HTTP). |
 | `agent/run-agent.mjs` | One dsh session: gateway outside the sandbox, task prompt, audit, trajectory (`events.jsonl`, `session/tools.jsonl`), independent final re-evaluation. |
