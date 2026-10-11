@@ -1523,3 +1523,57 @@ of the size of the session-to-session spread (edu-fpga 86-99, safety 267-287). L
 full load each place call's detail pass gets a fraction of its tries, so more calls do not buy more
 search. The native detail pass (C++, 10-19x faster, worktree claude-detail-native) addresses that
 directly; next step is a tries -> quality curve and a tries-based (load-independent) budget.
+
+## Native detail pass and a tries budget (2026-10-11)
+
+`native/detail.cpp` ports the detail pass (all terms, critical nets included): same random stream and
+move order, so for a fixed number of tries the layout is identical to the JS pass (npm test; k60 / pic
+with pair constraints: same layout, 3.7 s -> 0.36 s for 20000 tries). Tries per second, measured under
+load: pico ~200k, k60 107-143k, acc 47-61k, ppc 47-67k (10-19x the JS pass); the channel term is ~70 %
+of the time.
+
+Tries -> quality (start layout -> legalizer -> native detail pass with a fixed number of tries per small
+part, temperature schedule over the tries; 3 seeds, exact routing at 5 grid phases; tool routing on acc;
+results/tries-curve.jsonl in the worktree claude-detail-native, `detail-metrics.mjs` variants `perPart`;
+"30 s" = native pass with the old 30 s time budget, ~5 M tries):
+
+| Board | Human: vias (count) | 0 tries: vias, mean of 3 seeds (count) | 800 tries / part: vias (count) | 3200 / part: vias (count) | 12800 / part: vias (count) | 51200 / part: vias (count) | Native 30 s: vias (count) | 12800 / part: detail time (s) |
+|---|---|---|---|---|---|---|---|---|
+| pico | 57 | 77 | 68 | 63 | 63 | 66 | 65 | 3 |
+| edu-fpga | 77 | 285 | 227 | 190 | 172 | 131 | 117 | 8 |
+| safety | 227 | 415 | 330 | 307 | 297 | 255 | 274 | 19 |
+| pic | 347 | 748 | 565 | 546 | 516 | 523 | 526 | 28 |
+| k60 | 301 | 605 | 491 | 473 | 460 | 454 | 461 | 29 |
+| nxp | 587 | 786 | 707 | 708 | 707 | 692 | 685 | 26 |
+| acc | 2576 | 3205 | 3072 | 3009 | 3039 | - | 3035 | 79 |
+
+Clean nets equal at every budget except pic (267 at 0 tries, 282-294 from 800 tries / part) and k60
+(312 -> 316-317). The curve flattens at ~13k tries / part on pic / k60 / nxp / acc; edu-fpga and safety
+still gain up to 51k. Tool budget now: 20000 tries per small part, at most 60 s (`toolDetailBudget`,
+`PCB_DETAIL_TRIES`, `PCB_DETAIL_BUDGET`): pic / k60 7.7-7.9 M tries in 42-45 s, acc / ppc ~5-6 M tries
+at the 60 s cap, small boards in 1-4 s; the count no longer drops when the machine is loaded (until
+the cap).
+
+No-agent tool layouts with it, all 14 boards (3 seeds, scored like the sweeps; results/sweep-eval-native):
+
+| Board | Human: vias (count) | No agent, JS pass 30 s under sweep load (v15 sweep): vias, mean of 3 (count) | No agent, native pass with tries budget: vias, mean of 3 (count) | Agent v15: vias, mean of 3 (count) |
+|---|---|---|---|---|
+| z3r0 | 32 | 29 | 27 | 23 |
+| pico | 57 | 66 | 64 | 53 |
+| edk | 66 | 98 | 98 | 81 |
+| edu-fpga | 77 | 204 | 154 | 93 |
+| fsl-mini | 191 | 264 | 267 | 244 |
+| edu-k60 | 188 | 269 | 231 | 179 |
+| edu-nxp | 203 | 226 | 211 | 187 |
+| safety | 227 | 311 | 276 | 275 |
+| pic | 347 | 561 | 511 | 413 |
+| nxp | 587 | 709 | 699 | 677 |
+| rx | 625 | 744 | 736 | 716 |
+| k60 | 301 | 475 | 450 | 454 |
+| acc | 2576 | 3066 | 3019 | 2748 |
+| ppc-n3 | 8768 | 9952 | 9823 | 9628 |
+
+Geometric mean of vias / human: no-agent JS 1.342 -> native 1.258 (x0.937); agent v15 1.099. Clean nets
+of the native tool equal the JS tool's (pic 290.3 vs 287.0 of 310, k60 316.7 vs 316.0 of 318, every other
+board all nets). The agent still beats the tool on 12 of 14 boards (k60 and safety tie); the next sweep
+gives every place call the faster pass.
