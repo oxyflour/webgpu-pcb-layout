@@ -24,8 +24,9 @@ export async function initSession(dir, { board, seed = 1, reference = null }) {
     target: { clean: human.clean, nets: human.nets, vias: human.vias, viaSites: human.viaSites, hpwlMm: human.hpwlMm, noise: human.noise, margin: human.margin } });
 }
 
-// Lexicographic: geometry legal, clean nets, then vias + HPWL relative to the human target.
-export function rank(m, t) { return [legalOk(m) ? 1 : 0, m.clean, -(m.vias / t.vias + m.hpwlMm / t.hpwlMm)]; }
+// Lexicographic: geometry legal, clean nets, failing design constraints (fewer first; infeasible ones
+// are equal for every candidate and not counted), then vias + HPWL relative to the human target.
+export function rank(m, t, fails = 0) { return [legalOk(m) ? 1 : 0, m.clean, -fails, -(m.vias / t.vias + m.hpwlMm / t.hpwlMm)]; }
 const better = (a, b) => { for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k] > b[k]; return false; };
 
 export function createSession(dir) {
@@ -199,11 +200,12 @@ export function createSession(dir) {
       const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), ...(rules.length ? { netRules: rules } : {}), deadlineS: Math.max(15, 150 - (performance.now() - t0) / 1000) });
       const moved = comps.map((c, i) => [c.id, Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y)]).filter(([ref, d]) => !comps[idx.get(ref)].fixed && d > 0).sort((x, y) => y[1] - x[1]);
       const { perNet, overflowBins, fragileNets = [], ...metrics } = m;
-      const ce = evalConstraints(b, leg.layout, C, perNet), constraints = { decap: ce.decap, critical: { count: ce.critical.length, failing: ce.critical.filter((c) => !c.pass).map((c) => ({ name: c.name, fails: c.fails, vias: c.vias, lengthMm: c.lengthMm, ...(c.mismatchMm != null ? { mismatchMm: c.mismatchMm } : {}) })) } };
+      const ce = evalConstraints(b, leg.layout, C, perNet), constraints = { decap: ce.decap, critical: { count: ce.critical.length, failingFeasible: ce.critical.filter((c) => !c.pass && !c.fails.some((f) => f.startsWith('infeasible'))).length, failing: ce.critical.filter((c) => !c.pass).map((c) => ({ name: c.name, fails: c.fails, vias: c.vias, lengthMm: c.lengthMm, ...(c.mismatchMm != null ? { mismatchMm: c.mismatchMm } : {}) })) } };
       writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, seed: runSeed, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, detail, metrics, constraints, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
-      s2.candidates[id] = { id, from, planned: Object.keys(plan).length, metrics };
+      const constraintFails = ce.critical.filter((c) => !c.pass && !c.fails.some((f) => f.startsWith('infeasible'))).length + ce.decap.overMax.length;
+      s2.candidates[id] = { id, from, planned: Object.keys(plan).length, metrics, constraintFails };
       const prev = s2.best && s2.candidates[s2.best];
-      const accepted = !prev || better(rank(metrics, s2.target), rank(prev.metrics, s2.target));
+      const accepted = !prev || better(rank(metrics, s2.target, constraintFails), rank(prev.metrics, s2.target, prev.constraintFails ?? 0));
       if (accepted) s2.best = id;
       writeJson(file, s2);
       if (!feedback) delete metrics.margin;
@@ -239,7 +241,7 @@ export function createSession(dir) {
     status() {
       const s = state();
       return { board: s.board, placeCalls: s.placeCalls, best: s.best, submitted: s.submitted, humanTarget: shownTarget(s.target),
-        candidates: Object.values(s.candidates).slice(-12).map((c) => ({ id: c.id, from: c.from, planned: c.planned, clean: c.metrics.clean, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm, legal: legalOk(c.metrics) })) };
+        candidates: Object.values(s.candidates).slice(-12).map((c) => ({ id: c.id, from: c.from, planned: c.planned, clean: c.metrics.clean, constraintFails: c.constraintFails ?? 0, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm, legal: legalOk(c.metrics) })) };
     },
 
     submit({ candidate } = {}) {
