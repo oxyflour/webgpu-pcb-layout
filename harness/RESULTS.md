@@ -1453,7 +1453,7 @@ ppc-n3 is test only.
 - Only 31-57 % of the human small parts lie inside the region any weighting of their nets can reach
   (the per-axis span of their pins' breakpoints); the others sit off it (rows, channels, spacing).
 - Plain HPWL is already close in perfect context (median 0.5-2.7 mm, 20-57 % exactly optimal), and
-  the learned class weights are worse on every board (median +0.1 to +1.4 mm). The best class weights
+  the learned class weights are worse on every board (median +0.04 to +1.4 mm). The best class weights
   found in sample (coordinate search over 0.1-10 per class, scored on the training boards themselves)
   change the mean distance only from 2.362 to 2.359 mm: no class weighting beats unweighted HPWL.
 - The tool's start rule (weighted mean of partner pins) is 2.5-5.8 mm off in the same setting, 1.5-3x
