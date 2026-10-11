@@ -1,4 +1,4 @@
-// One agent session placing one board with the Cypress tool: dsh (DeepSeek Flash, headless; default)
+// One agent session placing one board with the pcb tool: dsh (DeepSeek Flash, headless; default)
 // or --agent claude (Claude Code `claude -p`, --model default claude-haiku-5-5)
 // or --agent codex (Codex `codex exec`, --model default gpt-6-luna).
 // node harness/agent/run-agent.mjs --board pico --prompt harness/prompts/v1.md --minutes 20 --places 8 --out DIR [--seed 1] [--agent claude|codex --model M]
@@ -46,7 +46,7 @@ const gateway = http.createServer(async (req, res) => {
     busy = true;
     try {
       const result = await callTool(sessionDir, command, input);
-      // A Cypress timeout/error (e.g. a busy GPU) does not use up the place budget.
+      // A failed place (no candidate) does not use up the place budget.
       if (costly && !result.candidate) { placeCalls--; result.note = 'this failed place did not count against the budget'; }
       // Sessions stopped after 8-10 of 20 minutes believing time was up (v7/v8 k60): report the real budget.
       if (result && typeof result === 'object' && !Array.isArray(result)) result.budget = { minutesUsed: Math.round((Date.now() - start) / 6000) / 10, minutesLeft: Math.max(0, Math.round((minutes * 60000 - (Date.now() - start)) / 6000) / 10), placeCallsLeft: places - placeCalls };
@@ -57,7 +57,7 @@ const gateway = http.createServer(async (req, res) => {
 await new Promise((r) => gateway.listen(0, '127.0.0.1', r));
 
 const base = fs.readFileSync(promptFile, 'utf8');
-const task = `${base}\n\n# This session\nBoard: ${board}. Budget: at most ${places} \`pcb place\` calls and ${minutes} minutes in total. Every shell command must finish within 3 minutes (one place takes about 10-60 s).\nRun the tool as \`.\\pcb.cmd <command> ...\` from the current directory. Write plan files into the current directory.\n`;
+const task = `${base}\n\n# This session\nBoard: ${board}. Budget: at most ${places} \`pcb place\` calls and ${minutes} minutes in total. Every shell command must finish within 3 minutes (one place takes about 35-90 s).\nRun the tool as \`.\\pcb.cmd <command> ...\` from the current directory. Write plan files into the current directory.\n`;
 // Claude Code runs its Bash tool in a POSIX shell: same tool as ./pcb.
 const taskText = agent === 'claude' ? task.replaceAll('.\\pcb.cmd', './pcb') : task;
 fs.writeFileSync(path.join(ws, 'TASK.md'), taskText);
@@ -155,6 +155,6 @@ for (const w of ['pcb.cmd', 'pcb']) fs.rmSync(path.join(out, 'agent-workspace', 
 const toolsFile = path.join(sessionDir, 'tools.jsonl'), tools = (fs.existsSync(toolsFile) ? fs.readFileSync(toolsFile, 'utf8') : '').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'result');
 const summary = { board, seed, stopReason: reason ?? 'agent finished', exitCode: code, minutes: (Date.now() - start) / 60000, placeCalls: state.placeCalls, maxShellToolS: maxToolS, maxPcbToolS: Math.max(0, ...tools.map((t) => t.seconds)),
   errors: tools.filter((t) => t.result?.error).map((t) => `${t.command}: ${t.result.error}`).slice(0, 20), target: state.target, final,
-  candidates: Object.values(state.candidates).map((c) => ({ id: c.id, from: c.from, planned: c.planned, cypress: c.cypress, clean: c.metrics.clean, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm })) };
+  candidates: Object.values(state.candidates).map((c) => ({ id: c.id, from: c.from, planned: c.planned, clean: c.metrics.clean, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm })) };
 fs.writeFileSync(path.join(out, 'summary.json'), JSON.stringify(summary, null, 1));
 console.log(JSON.stringify({ board, final: final && { clean: final.clean, vias: final.vias, hpwlMm: final.hpwlMm, legal: final.legal }, target: state.target, stop: summary.stopReason, places: state.placeCalls }));

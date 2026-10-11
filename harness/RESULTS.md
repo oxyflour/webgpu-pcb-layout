@@ -830,3 +830,231 @@ and never recovered (best 304 / 734 and 293 / 715), session 3 started well (304 
 candidate with fewer vias over one with more clean nets (c007 297 / 701 vs c009 304 / 734).
 Across the three agents the start floorplan decides the session: no agent recovers from a weak
 first IC placement within 12 calls.
+
+## Attraction test: which objective makes the human layout a local optimum? (2026-10-11)
+
+`experiments/attract.mjs`: one greedy local search on small parts (movable, < 8 pins) with
+interchangeable objectives. Moves: shift 0.4-2 mm, quarter / half turn, swap with a same-size part
+within 6 mm; legal moves only (0.1 mm body clearance on a shared side); a move is kept when the
+objective strictly drops. Router objectives use grid phases off the evaluation diagonal and pick
+parts near round-1 overflow cells; geometric objectives pick parts uniformly (30000 tries,
+converged). Test A: start = legalized human layout (must not get worse). Test B: start = human
+small-part positions + uniform noise in [-2, 2] or [-5, 5] mm (human rotation), legalized (vias
+should fall back toward the human value, parts should move back toward the human pose). Every row
+is evaluated with evaluateRobust (5 grid phases, native exact router). Channel deficit = sum over
+facing pad pairs (different parts and nets, shared layer, overlapping in the other axis) of
+max(0, 0.8 mm - gap): a 0.4-0.8 mm gap passes 0 or 1 track on the 0.4 mm routing grid depending on
+the grid phase (below). `experiments/attract-table.mjs` prints the tables.
+
+k60 (human legal: 318 clean, 346 vias, 5817 mm):
+
+| Search objective | Human legal start: vias after search (count, seeds 1/2/3) | Human +-2 mm start (vias 388 / 404 / 373): vias after | Human +-5 mm start (vias 516 / 546 / 505): vias after | Small-part drift from human after search, median (mm): human / +-2 / +-5 start, seed 1 | Router objectives, human start, seed 1: objective on its search phases, start -> end, vs the same quantity on the 5 evaluation phases (count) |
+|---|---|---|---|---|---|
+| HPWL | 348 / 350 / 350 | 365 / 356 / 366 | 406 / 421 / 400 | 0.39 / 1.66 / 3.31 | - |
+| HPWL + 5 mm per net crossing | 346 / 335 / 342 | 368 / 355 / 376 | 439 / 422 / 423 | 0.46 / 1.85 / 3.43 | - |
+| round-1 overflow (2 search phases) | 346 / 345 / 314 | 388 / 404 / 360 | 516 / 509 / 493 | 0.08 / 1.64 / 3.94 | 496.5 -> 390 vs 497 -> 446 |
+| vias (3 search phases) | 343 / 339 / 342 | 385 / 396 / 378 | 527 / 538 / 497 | 0.07 / 1.57 / 3.96 | 345 -> 319.3 vs 346 -> 343 |
+| HPWL + 2 x channel deficit | 343 / 342 / 322 | 314 / 339 / 363 | 405 / 394 / 386 | 0.49 / 1.69 / 2.96 | - |
+| HPWL + 5 x channel deficit | 339 / 327 / 336 | 336 / 346 / 372 | 427 / 416 / 400 | 0.48 / 1.67 / 3.18 | - |
+| HPWL + 10 x channel deficit | 333 / 338 / 331 | 345 / 343 / 369 | 429 / 411 / 396 | 0.48 / 1.78 / 3.24 | - |
+| HPWL + 2 x channel deficit, + relocate | - | - | 402 / 431 / 383 | - / - / 3.46 | - |
+| HPWL + 2 x channel deficit, annealed, + relocate | - | - | 419 / 420 / 424 | - / - / 4.54 | - |
+
+pic (human legal: 310 clean, 354 vias) and acc (6 layers; human legal: 617 clean, 2672 vias):
+
+| Board, search objective | Human legal start: vias after search (count, seeds 1/2/3) | Human +-2 mm start: vias before -> after (count) | Human +-5 mm start: vias before -> after (count) | Small-part drift from human after search, median (mm): human / +-2 / +-5 start, seed 1 |
+|---|---|---|---|---|
+| pic, HPWL | 332 / 335 / 335 | 395 / 377 / 385 -> 360 / 366 / 356 | 475 / 487 / 487 -> 387 / 401 / 394 | 0.71 / 1.83 / 3.66 |
+| pic, HPWL + 2 x channel deficit | 344 / 352 / 333 | 395 / 377 / 385 -> 345 / 355 / 351 | 475 / 487 / 487 -> 373 / 391 / 394 | 1.08 / 1.87 / 3.73 |
+| acc, HPWL | 2669 / 2660 / 2657 | 2726 / 2697 / 2702 -> 2694 / 2668 / 2652 | 2801 / 2782 / 2774 -> 2677 / 2703 / 2677 | 0.90 / 1.90 / 3.64 |
+| acc, HPWL + 2 x channel deficit | 2645 / 2650 / 2664 | 2726 / 2697 / 2702 -> 2676 / 2646 / 2629 | 2801 / 2782 / 2774 -> 2701 / 2720 / 2618 | 1.40 / 2.13 / 3.80 |
+
+Findings:
+- Every objective passes test A: small discrete moves do not damage the human layout (even HPWL
+  alone, which Cypress's continuous pass does: +17 vias, from-human.mjs).
+- No objective pulls parts back to the human pose (the median drift never falls at +-2 mm and
+  falls only 4 -> 3-3.5 mm at +-5 mm): the human layout is one of many equally good optima, not an
+  attractor. Judged by vias, HPWL + 2 x channel deficit is the best: from +-2 mm it returns to the
+  human level on all three boards (k60 314-363 vs 346, pic 345-355 vs 354, acc 2629-2676 vs 2672).
+- The router objectives fail test B. They are grid-exploitable: on the search phases round-1
+  overflow falls 497 -> 390 and vias 345 -> 319, on the evaluation phases 497 -> 446 and 346 ->
+  343; from +-2 mm they barely move vias. Round-1 overflow ranks layouts best (Pearson 0.97 with
+  vias over 34 k60 layouts, HPWL 0.77, RUDY overflow 0.88) but is not causal under local search.
+- Removing the grid exploit does not rescue the router objective. `--crn`: every try draws 4 fresh
+  random grid phases and routes the old and the new layout on the same phases (common random
+  numbers), kept when the mean round-1 overflow is lower (900 s, ~3400 tries): from +-2 mm the
+  overflow on the evaluation phases really falls (629 / 600 / 559 -> 607 / 560 / 502) but vias
+  rise (388 / 404 / 373 -> 423 / 420 / 419); from the annealed tool layouts both get worse (vias 419 /
+  406 / 422 -> 482 / 507 / 527, HPWL +500-650 mm): ~40 % of tries pass on noise and the layout
+  random-walks. Round-1 overflow is a symptom that ranks layouts, not a lever for local moves.
+- RUDY (bbox wire density in 1 mm bins) is not the missing term either: annealed tool layouts
+  have less RUDY overflow than the human layout (cap 1 mm/mm2: 1323-1413 vs 1516) and 60-120 more vias.
+- Annealing and the relocate move (jump next to the partners' mean) lower HPWL further but, from
+  +-5 mm, move parts away from the human pose (4.5 mm) without fewer vias (419-424 vs greedy
+  383-431): beyond ~2 mm the objective no longer ranks the human layout first.
+- Adding net crossings to the channel objective (HPWL + 2 x channel deficit + 1 or 3 mm per
+  crossing of spanning-tree segments) does not help: +-2 mm start 351 / 341 / 351 and 354 / 345 /
+  360 vias, +-5 mm 421 / 396 / 399 and 420 / 395 / 384 (without: 314 / 339 / 363, 405 / 394 / 386),
+  although crossings fall 1168 -> 683.
+- Where the human layout spends its extra wire (k60, human legal 5817 mm vs annealed tool layout
+  5071 mm, 346 vs 407 vias): IC + small-part nets with 3+ parts 1216 vs 877 mm (42 nets), with 2
+  parts 890 vs 711 mm (65 nets); IC-IC and fixed-part nets are equal. Human small parts sit farther
+  from their IC pins than the HPWL optimum, but a forced 1 mm ring around the ICs did not help
+  (ic-ring.mjs, 2026-10-09), so it is not plain distance from the IC.
+- Human rotations are not the missing information at tool level: tool layouts with every small
+  part's rotation set to the human one, then the same search: 434 / 459 / 442 vias (without: 446 /
+  440 / 435); the search turns 130 of 396 parts away from the human rotation.
+
+### Why the router is so sensitive to the grid phase (k60)
+
+Pads take every 0.4 mm cell they overlap, so a pad's blocked width is its width plus 0-0.4 mm
+depending on the phase, and a gap between two pads passes a track only if a whole cell fits in
+it: 0.4-0.8 mm gaps pass 0 or 1 track, 0.8-1.2 mm gaps 1 or 2. Facing pad pairs (different parts
+and nets, shared layer) by gap:
+
+| Layout | Gap 0.4-0.8 mm: 0 or 1 track by phase (pairs) | Gap 0.8-1.2 mm: 1 or 2 tracks (pairs) | Small parts: gap to nearest body, median / p90 (mm) | Small parts within 0.2 mm of a neighbour (share) |
+|---|---|---|---|---|
+| Human, legalized | 161 | 324 | 0.23 / 0.67 | 0.37 |
+| Tool (human IC poses + start layout + Cypress + legalizer), seed 1 | 598 | 77 | 0.11 / 0.14 | 0.95 |
+| Tool seed 1 + HPWL local search | 533 | 96 | - | - |
+
+The tool packs small parts at the legalizer's 0.1 mm and sits on the grid's resolution limit;
+the human layout leaves channels. A finer grid (0.2 mm cells, tracks and vias 2 x 2 cells,
+JS router `footprint: 2`) at 8 phases (offsets 0.025-0.375 mm):
+
+| Layout | 0.4 mm grid: vias, median (min-max) (count) | 0.4 mm grid: vias SD over phases (count) | 0.2 mm grid: vias, median (min-max) (count) | 0.2 mm grid: vias SD (count) | 0.2 mm grid: time per routing (s) |
+|---|---|---|---|---|---|
+| Human, legalized | 340 (325-357) | 10.0 | 330 (322-337) | 4.2 | 19 |
+| Tool seed 1 | 506 (486-537) | 18.6 | 457 (438-483) | 16.3 | 44 |
+| Tool seed 2 | 495 (468-516) | 15.4 | 456 (418-498) | 24.9 | 40 |
+| Tool seed 1 + annealed detail pass | 438 (407-446) | 15.8 | 402 (368-430) | 19.3 | 19 |
+
+The finer grid halves the noise of the human layout only; congested layouts stay as noisy
+(negotiation in congestion, not quantization) and the ranking is unchanged, at 7-20x the time.
+Net order is not the issue (it is a priority). So the evaluation stays at 0.4 mm with phase
+medians, and the optimizer must not use the router as its objective.
+
+### Detail pass in the tool (lib/detail.mjs)
+
+After the legalizer: the same search, objective HPWL + 2 x channel deficit, simulated annealing
+(T 3 -> 0.003 mm over the time budget) and a relocate move (15 % of tries); 30 s per place call
+(`PCB_DETAIL=0` off). `experiments/detail-check.mjs` on tool layouts (human IC poses + start
+layout + Cypress + legalizer, seeds 1/2/3) and on the v10 agent final layouts:
+
+| Board, layouts | Before: clean nets (count, 1/2/3) | Before: vias (count) | After 30 s detail pass: clean nets (count) | After: vias (count) | After: HPWL (mm) | Human legal: clean / vias (count) |
+|---|---|---|---|---|---|---|
+| k60, tool | 315 / 313 / 311 | 504 / 509 / 547 | 318 / 318 / 318 | 421 / 407 / 441 | 5090 / 5090 / 5020 | 318 / 346 |
+| k60, v10 dsh finals | 314 / 312 / 311 | 558 / 586 / 558 | 318 / 312 / 315 | 480 / 488 / 475 | 5382 / 5008 / 5119 | 318 / 346 |
+| pic, tool | 310 / 308 / 308 | 492 / 480 / 497 | 310 / 310 / 310 | 422 / 405 / 418 | 4770 / 4700 / 4719 | 310 / 354 |
+| acc, tool | 617 / 617 / 617 | 2853 / 2867 / 2840 | 617 / 617 / 617 | 2817 / 2808 / 2808 | 16540 / 16430 / 16562 | 617 / 2672 |
+
+k60 budget 10 / 30 / 60 s: 406-444 / 407-441 / 415-437 vias (saturated at 10-30 s); greedy only
+(30000 tries): 446 / 440 / 435. acc is budget-limited (90 s: 2779) but its gap to human is small.
+A 4 mm bucket grid for the neighbour queries made the pass 3-4x faster (k60 ~13k tries/s, acc
+~5.5k/s) without changing k60 (mean 423 vias). Settings on the three k60 tool layouts (30 s, mean
+vias over 3-6 runs): nu 1 / 2 / 4 -> 426 / 423 / 430; channel threshold 0.8 / 1.0 / 1.2 mm -> 423 /
+429 / 424; T0 1 / 3 / 6 -> 428 / 423 / 432; relocate 0 / 0.15 -> 413 / 423; nu 4 + 1.0 mm -> 413. All
+within the run-to-run spread (about +-20 vias on one layout); defaults kept. The pass is saturated:
+what is left is the objective beyond ~2 mm (see the +-5 mm rows), not the search.
+The pass also removes clearance warnings (k60 tool: 48 -> 3 pairs below 0.1 mm).
+
+Cypress before the pass no longer matters: start layout (human IC poses) + legalizer + 30 s pass,
+no Cypress (tree/*-ics-noglobal): k60 316 / 318 / 318 clean, 425 / 410 / 423 vias; pic 310 / 310 / 308,
+411 / 416 / 383; acc 617, 2818 / 2817 / 2768 (with Cypress: 421 / 407 / 441, 422 / 405 / 418, 2817 /
+2808 / 2808). Dropping Cypress would save 15-70 s per place call, but Cypress is the project's only
+placer by design, so it stays (open decision).
+
+The crossing pass (uncross.mjs, lambda 0.2) is not additive: after the annealed detail pass it
+lowers crossings 927 / 933 / 904 -> ~786 but vias go 417 / 407 / 423 -> 443 / 409 / 460 (clean 318 /
+318 / 316). The detail pass alone beats uncross alone (464 / 473 / 480 on the same tool layouts);
+use one of them, not both in sequence.
+
+Regression on the 13 non-ppc boards (webgpu-vs-cypress tool layouts: start layout + Cypress, no
+human information, seeds 1000 / 8919 / 16838; 30 s, native exact, 5 phases):
+
+| Board | Before: clean nets (count, seeds 1000 / 8919 / 16838) | After 30 s detail pass: clean nets (count) | Before: vias (count) | After: vias (count) | Before: HPWL (mm) | After: HPWL (mm) |
+|---|---|---|---|---|---|---|
+| acc | 617 / 617 / 617 | 617 / 617 / 617 | 3315 / 3200 / 3344 | 3071 / 3012 / 3199 | 19715 / 18984 / 19501 | 18926 / 18393 / 18858 |
+| edk | 124 / 124 / 124 | 124 / 124 / 124 | 108 / 110 / 114 | 101 / 111 / 113 | 3047 / 2860 / 2843 | 2956 / 2840 / 2829 |
+| edu-fpga | 108 / 108 / 103 | 108 / 108 / 108 | 250 / 96 / 292 | 167 / 88 / 219 | 2970 / 1725 / 3011 | 2454 / 1578 / 2658 |
+| edu-k60 | 150 / 151 / 150 | 157 / 157 / 157 | 457 / 420 / 392 | 224 / 242 / 231 | 5760 / 5806 / 5622 | 4908 / 4973 / 4869 |
+| edu-nxp | 163 / 163 / 163 | 163 / 163 / 163 | 341 / 332 / 350 | 210 / 227 / 212 | 5529 / 5606 / 5530 | 4748 / 4764 / 4695 |
+| fsl-mini | 162 / 162 / 162 | 162 / 162 / 162 | 295 / 318 / 336 | 268 / 271 / 290 | 6006 / 6004 / 6282 | 5668 / 5598 / 5867 |
+| k60 | 305 / 297 / 302 | 318 / 316 / 314 | 672 / 668 / 676 | 513 / 511 / 546 | 6450 / 6495 / 6502 | 5375 / 5466 / 5548 |
+| nxp | 370 / 370 / 370 | 370 / 370 / 370 | 799 / 771 / 775 | 730 / 716 / 702 | 8642 / 8645 / 8697 | 7569 / 7731 / 7725 |
+| pic | 221 / 213 / 219 | 253 / 259 / 276 | 886 / 915 / 900 | 637 / 615 / 573 | 6011 / 5998 / 6004 | 5008 / 4914 / 4740 |
+| pico | 86 / 86 / 86 | 86 / 86 / 86 | 73 / 80 / 74 | 59 / 58 / 67 | 947 / 991 / 974 | 848 / 867 / 876 |
+| rx | 400 / 400 / 400 | 400 / 400 / 400 | 798 / 803 / 801 | 723 / 755 / 748 | 8793 / 8893 / 8784 | 7576 / 7560 / 7465 |
+| safety | 186 / 186 / 186 | 186 / 186 / 186 | 386 / 365 / 387 | 304 / 288 / 302 | 5320 / 5216 / 5268 | 4628 / 4597 / 4546 |
+| z3r0 | 46 / 46 / 46 | 46 / 46 / 46 | 24 / 30 / 24 | 23 / 25 / 24 | 656 / 674 / 660 | 649 / 646 / 650 |
+
+Clean nets never fall (sum 8789 -> 8993; pic +32 to +57, k60 +13 to +19, edu-k60 +6 / +7, edu-fpga
++5 once); vias x0.802, HPWL x0.891 (geometric means over 39 layouts); the only via increase is edk
+seed 16838 110 -> 111. ppc-n3 (10 layers, ~2000 parts; the tool gives it ~20 s), v9s agent finals,
+20 s, ~110-190k tries: clean 1607 / 1607 / 1607 unchanged, vias 9643 / 9656 / 9430 -> 9587 / 9536 /
+9380 (-0.5 to -1.2 %), HPWL -4 to -6 % (human 8729 vias): on many layers small-part placement is not
+where the vias are.
+
+### Agents with the detail pass (prompt v11, dsh deepseek-flash, 20 min, 12 place calls, 3 sessions)
+
+Prompt v11 = v10 + one paragraph on the detail pass. Control: the same prompt with `PCB_DETAIL=0`.
+Final layouts scored by the runner (5 grid phases, native exact).
+
+| Board, configuration | Clean nets (count, sessions 1/2/3) | Vias (count) | HPWL (mm) | Phases converged (count of 5) | Minutes used (of 20) | Place calls used (of 12) |
+|---|---|---|---|---|---|---|
+| k60, v10 (before, 2026-10-10) | 318 / 314 / 310 | 563 / 571 / 570 | 6403 / 5691 / 5626 | 3 / 1 / 0 | 13.5 / 12.9 / 13.2 | 12 / 12 / 12 |
+| k60, v11, detail pass off | 316 / 279 / 297 | 524 / 735 / 709 | 5732 / 6170 / 5988 | 2 / 0 / 0 | 12.5 / 13.3 / 12.4 | 12 / 11 / 12 |
+| k60, v11, detail pass on | 312 / 318 / 318 | 539 / 464 / 471 | 5187 / 5001 / 5062 | 0 / 3 / 3 | 18.0 / 17.8 / 18.8 | 7 / 8 / 8 |
+| pic, v11, detail pass off | 310 / 310 / 310 | 491 / 510 / 507 | 5275 / 5544 / 5611 | 5 / 5 / 4 | 11.2 / 11.2 / 10.9 | 12 / 12 / 12 |
+| pic, v11, detail pass on | 310 / 310 / 310 | 386 / 378 / 400 | 4527 / 4594 / 4400 | 5 / 5 / 3 | 17.9 / 17.9 / 18.0 | 12 / 12 / 12 |
+
+Human: k60 legal 318 / 346 vias (runner target 310), pic legal 310 / 354 (runner target 342).
+With the pass, two of three k60 sessions route all nets with 464-471 vias, the best agent layouts
+so far (previous best 318 / 540, Codex). The longest place call took 104-111 s on k60 (control
+58-62 s, both while other experiments ran; v10 22-26 s) and 72-74 s on pic, all under 3 min; k60
+sessions used 7-8 calls in 18 of 20 minutes, pic sessions all 12. On pic every session routes all
+nets in both arms and the pass cuts vias 503 -> 388 (means, -23 %), 10-17 % above the runner's human
+target (342) and 7-13 % above the human legal layout (354).
+
+
+## v12 sweep over 14 boards without Cypress (2026-10-11): agent vs no agent vs human
+
+Cypress removed from `place` (user decision after the detail-pass results above): every candidate is
+start layout -> 0.1 mm legalizer -> detail pass (lib/detail.mjs, 30 s; 60 s on ppc-n3) -> router.
+`knobs` / `netWeights` and the `knobs` command are gone; prompt v12 = v11 without Cypress. 3 dsh
+sessions per board, 20 min, 12 place calls, 3 boards at a time (harness/results/sweep-v12.sh,
+v12s-<board>). No agent = start layout (empty plan) + legalizer + detail pass, seeds 1000 / 8919 /
+16838 (`experiments/noagent.mjs`). Scoring as for v9 (`experiments/sweep-eval.mjs --dir sweep-eval-v12
+--agent v12s`): exact native router at 8 independent grid offsets, median per layout; ppc-n3 tool
+routing at 3 phases; human rows reused from the v9 scoring. Place calls took 31 s (pico) to 78 s
+(ppc-n3).
+
+| Board | Human: clean nets / vias (count) | No agent, v9 (start + Cypress): clean nets / vias, mean of 3 seeds (count) | No agent, v12 (start + detail pass): clean nets / vias, mean (count) | Agent v9: clean nets / vias, mean of 3 sessions (count) | Agent v12: clean nets / vias, mean of 3 sessions (count) | Agent v9: vias / human (x) | Agent v12: vias / human (x) |
+|---|---|---|---|---|---|---|---|
+| z3r0 | 46 / 32 | 46.0 / 22 | 46.0 / 27 | 46.0 / 21 | 46.0 / 23 | 0.65 | 0.72 |
+| pico | 86 / 57 | 86.0 / 75 | 86.0 / 60 | 86.0 / 59 | 86.0 / 54 | 1.04 | 0.95 |
+| edk | 124 / 66 | 124.0 / 107 | 124.0 / 101 | 124.0 / 81 | 124.0 / 79 | 1.22 | 1.19 |
+| edu-fpga | 108 / 77 | 103.0 / 216 | 108.0 / 180 | 108.0 / 95 | 108.0 / 80 | 1.23 | 1.03 |
+| fsl-mini | 162 / 191 | 162.0 / 312 | 162.0 / 266 | 162.0 / 285 | 162.0 / 240 | 1.49 | 1.26 |
+| edu-k60 | 157 / 188 | 153.7 / 401 | 157.0 / 245 | 157.0 / 279 | 157.0 / 185 | 1.48 | 0.99 |
+| edu-nxp | 163 / 203 | 163.0 / 339 | 163.0 / 215 | 163.0 / 251 | 163.0 / 195 | 1.24 | 0.96 |
+| safety | 186 / 227 | 186.0 / 386 | 186.0 / 286 | 186.0 / 324 | 186.0 / 251 | 1.43 | 1.10 |
+| pic | 310 / 347 | 267.7 / 715 | 293.7 / 525 | 308.7 / 480 | 309.0 / 452 | 1.38 | 1.30 |
+| nxp | 369 / 587 | 370.0 / 780 | 370.0 / 713 | 370.0 / 758 | 370.0 / 689 | 1.29 | 1.17 |
+| rx | 399 / 625 | 400.0 / 804 | 400.0 / 758 | 400.0 / 813 | 400.0 / 732 | 1.30 | 1.17 |
+| k60 | 318 / 301 | 310.3 / 602 | 318.0 / 471 | 313.7 / 546 | 315.3 / 447 | 1.81 | 1.49 |
+| acc | 617 / 2576 | 617.0 / 3175 | 617.0 / 3096 | 617.0 / 2833 | 617.0 / 2737 | 1.10 | 1.06 |
+| ppc-n3 | 1607 / 8768 | - | 1607.0 / 9997 | 1607.0 / 9608 | 1607.0 / 9407 | 1.10 | 1.07 |
+
+Full v12 table: `node harness/experiments/sweep-eval.mjs --dir sweep-eval-v12 --agent v12s --name v12
+--tool-label "start + detail" --summary` (per-session values and converged counts).
+
+Agent vias / human, geometric mean over 14 boards: v9 1.239 -> v12 1.090; no agent over 13 boards:
+1.570 -> 1.306. Agent clean nets equal or higher than v9 on every board (pic: one session 307 / 624 vias from a
+weak floorplan, the other two 310 / 378 and 310 / 354). Agent vias lower than v9 on
+13 of 14 boards (z3r0 21 -> 23, within noise); at or below the human count on z3r0, pico, edu-k60,
+edu-nxp; biggest drops edu-k60 279 -> 185, safety 324 -> 251, k60 546 -> 447, edu-nxp 251 -> 195. Sessions
+converged at every grid phase: 35 of 42 (pico 0, k60 0, pic 2 of 3). No agent now routes every net on 13 of 14
+boards (k60 318 in all seeds; pic 293.7). fsl-mini: every agent layout keeps one overlap, U601 under
+the fixed shield can SH701 as in the human layout (also in all v9 sessions), so the runner marks them
+not legal.

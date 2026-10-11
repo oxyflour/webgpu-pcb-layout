@@ -15,5 +15,5 @@ for (const e of lines(path.join(dir, 'events.jsonl'))) {
 console.log('--- pcb calls');
 for (const e of lines(path.join(dir, 'session', 'tools.jsonl'))) if (e.type === 'result') {
   const r = e.result, m = r.metrics;
-  console.log(`${e.command} ${e.seconds.toFixed(1)}s ${r.error ? 'ERROR ' + r.error : m ? `${r.candidate} cypress=${r.cypress} clean=${m.clean}/${m.nets} vias=${m.vias} hpwl=${m.hpwlMm} drift=${JSON.stringify(r.plannedDriftMm ?? {})}` : cut(JSON.stringify(r), 200)}`);
+  console.log(`${e.command} ${e.seconds.toFixed(1)}s ${r.error ? 'ERROR ' + r.error : m ? `${r.candidate} clean=${m.clean}/${m.nets} vias=${m.vias} hpwl=${m.hpwlMm} drift=${JSON.stringify(r.plannedDriftMm ?? {})}` : cut(JSON.stringify(r), 200)}`);
 }

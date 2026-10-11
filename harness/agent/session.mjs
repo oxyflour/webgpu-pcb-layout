@@ -1,11 +1,12 @@
-// Agent tool commands over one board session. Every candidate is produced by Cypress
-// (warm-started from the agent's plan), then the shared 0.1 mm legalizer and the benchmark
-// router evaluate it. State lives in the session dir, outside the agent's workspace.
+// Agent tool commands over one board session. Every candidate is the start layout of the agent's
+// plan, the shared 0.1 mm legalizer and the detail pass (lib/detail.mjs); the benchmark router
+// evaluates it. Cypress was removed on 2026-10-11 (no gain after the detail pass, RESULTS.md).
+// State lives in the session dir, outside the agent's workspace.
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadBoard, legalize, evaluateRobust, legalOk, rotatedSize, worldPin, needsFastRouting, toolRouting } from '../lib/board.mjs';
-import { runCypress, KNOBS } from '../lib/cypress.mjs';
 import { startLayout } from '../lib/init.mjs';
+import { detailPlace } from '../lib/detail.mjs';
 import { lib } from '../lib/env.mjs';
 
 const { placementMasks, blockedCells, maskCellRect } = await lib('src/geometry/mask.js');
@@ -130,7 +131,7 @@ export function createSession(dir) {
       return { candidate: candidate ?? 'fixed parts only', cellMm: [r2(cell), r2(ch)], note: `column k covers x in [k*${r2(cell)}, (k+1)*${r2(cell)}) mm, row r covers y in [r*${r2(ch)}, (r+1)*${r2(ch)}) mm; through-hole fixed parts appear on both sides`, legend, ...sides };
     },
 
-    // Cheap feasibility check of a plan: legalize the start layout only (no Cypress, no routing).
+    // Cheap feasibility check of a plan: legalize the start layout only (no detail pass, no routing).
     check({ from = 'centroid', plan = {} } = {}) {
       const s = state();
       const base = from !== 'centroid' ? (s.candidates[from] ? layoutOf(from) : (() => { throw new Error(`unknown candidate ${from}`); })()) : null;
@@ -165,36 +166,38 @@ export function createSession(dir) {
       return { planned, note: 'shiftMm > 0: the wanted spot overlaps a fixed part, keepout, outline or another planned part (planned parts are legalized largest first). anchoredHpwlByRotation[r]: wirelength (mm) of the nets of this part to already-positioned parts if it had rotation r; lower is better.' };
     },
 
-    async place({ from = 'centroid', plan = {}, knobs = {}, netWeights = {}, seed } = {}, { signal } = {}) {
+    async place({ from = 'centroid', plan = {}, knobs, netWeights, seed } = {}) {
       const s = state();
       let base = null;
       if (from !== 'centroid') { if (!s.candidates[from]) throw new Error(`unknown candidate ${from}; use "centroid" or an existing id`); base = layoutOf(from); }
       if (typeof plan !== 'object' || Array.isArray(plan)) throw new Error('plan must be {ref: {x, y, rotation}}');
-      // The crossing term makes Cypress 3-10x slower (acc: > 150 s) and is not available to agents.
-      if (knobs.net_crossing_weight || knobs.deterministic !== undefined) throw new Error('knobs net_crossing_weight / deterministic are fixed by the harness');
+      if (knobs !== undefined || netWeights !== undefined) throw new Error('knobs / netWeights no longer exist (Cypress was removed): give only from, plan and seed');
       for (const ref of Object.keys(plan)) if (comps[idx.get(ref)]?.fixed) throw new Error(`${ref} is fixed and cannot be planned`);
       const runSeed = Number.isInteger(seed) ? seed : s.seed * 1000 + s.next;
       const init = startLayout(b, plan, { seed: runSeed, base });
       const id = `c${String(s.next).padStart(3, '0')}`;
-      const jobDir = path.join(dir, 'jobs', id);
-      // Time plan for one tool call (< 3 min end to end): Cypress, then routing until a
-      // deadline (one routing round on ppc can take 15-40 s, hence the margin).
+      // Time plan for one tool call (< 3 min end to end): detail pass (30 s; 60 s on > 1000 parts), then
+      // routing until a deadline (one routing round on ppc can take 15-40 s, hence the margin).
       const t0 = performance.now(), big = needsFastRouting(b);
-      const r = await runCypress(b, { jobDir, seed: runSeed, init, knobs, netWeights, budgetS: big ? 80 : 150 });
       const s2 = state(); s2.next++; s2.placeCalls++;
-      if (!r.layout) { writeJson(file, s2); return { candidate: null, status: r.status, error: r.error, wallS: r2(r.wallS) }; }
-      const leg = legalize(b, r.layout);
-      const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), deadlineS: Math.max(15, 125 - (performance.now() - t0) / 1000) });
+      let leg = legalize(b, init), detail = null;
+      // Detailed placement of the small parts (lib/detail.mjs: HPWL + routing-channel term, annealed local
+      // search; k60 tool layouts 504-547 -> ~420 vias). PCB_DETAIL=0 turns it off.
+      if (process.env.PCB_DETAIL !== '0') {
+        const d = detailPlace(b, leg.layout, { budgetS: big ? 60 : 30, seed: runSeed });
+        leg = legalize(b, d.layout); detail = { evals: d.evals, accepted: d.accepted, seconds: d.seconds };
+      }
+      const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), deadlineS: Math.max(15, 150 - (performance.now() - t0) / 1000) });
       const moved = comps.map((c, i) => [c.id, Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y)]).filter(([ref, d]) => !comps[idx.get(ref)].fixed && d > 0).sort((x, y) => y[1] - x[1]);
       const { perNet, overflowBins, fragileNets = [], ...metrics } = m;
-      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, knobs, netWeights, seed: runSeed, cypress: { status: r.status, wallS: r.wallS, finalOverflow: r.finalOverflow }, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, metrics, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
-      s2.candidates[id] = { id, from, planned: Object.keys(plan).length, cypress: r.status, metrics };
+      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, seed: runSeed, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, detail, metrics, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
+      s2.candidates[id] = { id, from, planned: Object.keys(plan).length, metrics };
       const prev = s2.best && s2.candidates[s2.best];
       const accepted = !prev || better(rank(metrics, s2.target), rank(prev.metrics, s2.target));
       if (accepted) s2.best = id;
       writeJson(file, s2);
       if (!feedback) delete metrics.margin;
-      return { candidate: id, best: s2.best, newBest: accepted, scoringNote: `clean/vias are medians over ${m.noise.shifts} routing-grid phases; metrics.noise gives their min-max. Two candidates whose clean/vias differ by less than that spread are equal within measurement noise.`, ...(m.margin?.timeLimited ? { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` } : {}), cypress: r.status, cypressSeconds: r2(r.wallS), metrics, humanTarget: shownTarget(s2.target),
+      return { candidate: id, best: s2.best, newBest: accepted, scoringNote: `clean/vias are medians over ${m.noise.shifts} routing-grid phases; metrics.noise gives their min-max. Two candidates whose clean/vias differ by less than that spread are equal within measurement noise.`, ...(m.margin?.timeLimited ? { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` } : {}), detailSeconds: detail?.seconds ?? 0, metrics, humanTarget: shownTarget(s2.target),
         ...(feedback ? { routingMargin: marginOf(m, s2), congestion: congestion(m, leg.layout, 4), fragileNets: { count: fragileNets.length, nets: fragileNets.slice(0, 12) } } : {}),
         failedNets: perNet.filter((n) => n.status !== 'clean').slice(0, 20).map((n) => n.net),
         mostViaNets: perNet.filter((n) => n.vias > 0).sort((x, y) => y.vias - x.vias).slice(0, 8).map((n) => `${n.net}:${n.vias}`),
@@ -207,7 +210,7 @@ export function createSession(dir) {
       if (!s.candidates[id]) throw new Error(`unknown candidate ${id}`);
       const c = readJson(path.join(dir, 'candidates', `${id}.json`)), L = c.layout;
       const { margin, ...shown } = c.metrics;
-      const out = { candidate: id, metrics: feedback ? c.metrics : shown, cypress: c.cypress, ...(feedback ? { routingMargin: marginOf(c.metrics, s) } : {}) };
+      const out = { candidate: id, metrics: feedback ? c.metrics : shown, ...(feedback ? { routingMargin: marginOf(c.metrics, s) } : {}) };
       if (cong && !feedback) throw new Error('unknown flag congestion');
       if (cong) { out.congestion = congestion({ overflowBins: c.overflowBins }, L, 10); out.fragileNets = c.fragileNets ?? []; }
       const want = refs === 'all' ? comps.map((x) => x.id) : refs;
@@ -226,7 +229,7 @@ export function createSession(dir) {
     status() {
       const s = state();
       return { board: s.board, placeCalls: s.placeCalls, best: s.best, submitted: s.submitted, humanTarget: shownTarget(s.target),
-        candidates: Object.values(s.candidates).slice(-12).map((c) => ({ id: c.id, from: c.from, planned: c.planned, cypress: c.cypress, clean: c.metrics.clean, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm, legal: legalOk(c.metrics) })) };
+        candidates: Object.values(s.candidates).slice(-12).map((c) => ({ id: c.id, from: c.from, planned: c.planned, clean: c.metrics.clean, vias: c.metrics.vias, hpwlMm: c.metrics.hpwlMm, legal: legalOk(c.metrics) })) };
     },
 
     submit({ candidate } = {}) {
@@ -236,7 +239,6 @@ export function createSession(dir) {
       return { submitted: candidate, metrics: s.candidates[candidate].metrics };
     },
 
-    knobs() { const { net_crossing_weight, deterministic, ...k } = KNOBS; return { knobs: k, note: 'Harness defaults: iterations 600, learning_rate 0.002, target_density 0.65, density_weight 0.001. Larger learning_rate/iterations let Cypress re-place globally (worse in tests).' }; },
   };
   return commands;
 }
@@ -247,7 +249,7 @@ export async function callTool(dir, command, input = {}, ctx = {}) {
   let result;
   try {
     const cmds = createSession(dir);
-    if (!cmds[command]) throw new Error(`unknown command ${command}; use info, check, place, inspect, status, knobs, submit`);
+    if (!cmds[command]) throw new Error(`unknown command ${command}; use info, map, check, place, inspect, status, submit`);
     result = await cmds[command](input, ctx);
   } catch (e) { result = { error: e.message }; }
   fs.appendFileSync(log, JSON.stringify({ type: 'result', command, seconds: (performance.now() - t) / 1000, result }) + '\n');

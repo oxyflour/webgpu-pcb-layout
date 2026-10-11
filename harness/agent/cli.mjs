@@ -8,10 +8,9 @@ const HELP = `pcb <command> [flags]
   pcb info --section parts [--page N]       movable parts (60 per page, most pins first)
   pcb info --section nets [--page N]        signal nets and their pins (ref.pinId)
   pcb info --section part --refs U1,U2      pads (local coords + net) and strongest neighbours
-  pcb knobs                                 Cypress knobs and their ranges
   pcb map [--candidate c003]                ASCII floorplan of both sides (keepouts, fixed parts, candidate)
-  pcb check --input plan.json               fast: are the planned spots free? (no Cypress)
-  pcb place --input plan.json               run Cypress -> legalize -> route; makes a candidate
+  pcb check --input plan.json               fast: are the planned spots free? (no detail pass, no routing)
+  pcb place --input plan.json               start layout -> legalize -> detail pass -> route; makes a candidate
   pcb inspect [--candidate c003] [--refs U1,R5 | --refs all] [--nets failed | --nets fragile | --nets N1,N2] [--congestion 1]
                                             --congestion 1: routing margin, 10 most congested areas and their parts, fragile nets
   pcb status                                candidates, best, target
@@ -20,13 +19,11 @@ const HELP = `pcb <command> [flags]
 plan.json for place (all fields optional):
   {"from": "centroid" | "c003",             start: connectivity centroid, or an existing candidate
    "plan": {"U1": {"x": 40, "y": 20, "rotation": 1}},   explicit start poses (mm, quarter turns)
-   "knobs": {"iterations": 300, "learning_rate": 0.002}, Cypress settings (see pcb knobs)
-   "netWeights": {"/USB_P": 3},             extra Cypress weight for nets (0..20)
    "seed": 7}`;
 
 const argv = process.argv.slice(2), command = argv[0];
 if (!command || command === 'help' || command === '--help') { console.log(HELP); process.exit(0); }
-const allowed = { info: ['section', 'page', 'refs'], knobs: [], map: ['candidate'], check: ['input'], place: ['input'], inspect: ['candidate', 'refs', 'nets', 'congestion'], status: [], submit: ['candidate'] };
+const allowed = { info: ['section', 'page', 'refs'], map: ['candidate'], check: ['input'], place: ['input'], inspect: ['candidate', 'refs', 'nets', 'congestion'], status: [], submit: ['candidate'] };
 if (!allowed[command]) { console.log(JSON.stringify({ error: `unknown command ${command}` }) + '\n' + HELP); process.exit(2); }
 const flags = {};
 for (let k = 1; k < argv.length; k += 2) {

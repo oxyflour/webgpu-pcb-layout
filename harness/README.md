@@ -1,10 +1,12 @@
-# Cypress PCB layout harness for dsh
+# PCB layout harness for dsh
 
 Goal (AGENTS.md): a dsh agent (DeepSeek Flash, `dsh --profile headless`) uses a CLI tool to
 bring the layout metrics of real KiCad boards — routed signal nets, vias, HPWL — close to the
-human layout. **NVIDIA Cypress is the only placer.** The agent decides the floorplan (IC
-positions/rotations, optional Cypress knobs and net weights); every candidate is
-`start layout -> Cypress (CUDA container) -> shared 0.1 mm legalizer -> benchmark router`.
+human layout. The agent decides the floorplan (IC positions/rotations); every candidate is
+`start layout -> shared 0.1 mm legalizer -> detail pass (small parts) -> benchmark router`.
+NVIDIA Cypress was the global placer until 2026-10-11; after the detail pass it no longer changed
+the result (RESULTS.md, "Attraction test"), so `place` no longer runs it. `lib/cypress.mjs` and the
+container remain for the experiments that use them.
 The WebGPU placer / LNS of webgpu-layout-code is not used.
 
 ## Layout
@@ -19,6 +21,7 @@ The WebGPU placer / LNS of webgpu-layout-code is not used.
 | `lib/cypress.mjs` | One Cypress job: Bookshelf export, warm start, net weights, hard timeout (150 s), import, final pin check (<= 0.025 mm). |
 | `cypress/run.py` | Container-side runner: copy of the adapter `run.py` + job-local log (parallel jobs), warm-start orientation (`hints.json`), per-net weights. |
 | `lib/start-layout.mjs`, `lib/init.mjs` | Start layout from a partial plan (see "Init" below). `start-layout.mjs` has no Node imports (geometry passed in) so the editor worker loads it too; `init.mjs` binds it for Node. |
+| `lib/detail.mjs` | Detail pass after the legalizer: annealed local search on small parts (< 8 pins) for HPWL + routing-channel deficit between facing pads (30 s per place; `PCB_DETAIL=0` turns it off). |
 | `agent/session.mjs` | Tool commands: `info`, `map`, `check`, `place`, `inspect`, `status`, `knobs`, `submit`. |
 | `agent/cli.mjs` | In-sandbox client `pcb` (strict flags, JSON over HTTP). |
 | `agent/run-agent.mjs` | One dsh session: gateway outside the sandbox, task prompt, audit, trajectory (`events.jsonl`, `session/tools.jsonl`), independent final re-evaluation. |
@@ -32,8 +35,7 @@ Results go to `harness/results/` (git-ignored).
 ## Run
 
 ```powershell
-docker start codex-cypress-official-20261004
-node harness/agent/batch.mjs --board k60 --prompt harness/prompts/v6.md --minutes 20 --places 12 --out harness/results/v6-k60
+node harness/agent/batch.mjs --board k60 --prompt harness/prompts/v12.md --minutes 20 --places 12 --out harness/results/v12-k60
 node harness/agent/trace.mjs harness/results/v6-k60/rep1
 ```
 
@@ -43,12 +45,12 @@ default `--model claude-haiku-5-5`, restricted mode: file tools confined to the 
 workspace-write sandbox with `windows.sandbox="unelevated"`, network on for the local gateway; without the
 unelevated sandbox every command is rejected "blocked by policy" on Windows).
 
-One board per batch: three k60 agents already share the GPU; six concurrent jobs pushed
-Cypress over its 150 s limit. A timed-out `place` is not charged to the agent's budget.
+A failed `place` is not charged to the agent's budget. Without Cypress there is no GPU limit; each
+place uses one core for the detail pass and up to 5 for the routing phases.
 
 ## Init (tool algorithm, derived from the netlist only)
 
-Parts not in the agent's plan start as follows, then Cypress refines:
+Parts not in the agent's plan start as follows, then the legalizer and the detail pass refine:
 
 1. each part at the weighted mean of the pins it connects to on positioned parts, weighted by
    1/(pin count of the partner part): humans put small parts next to the partner with fewer
@@ -56,7 +58,7 @@ Parts not in the agent's plan start as follows, then Cypress refines:
 2. each free part takes the quarter turn that points its pins at the pins they connect to;
 3. parts without signal nets (decaps) around a positioned IC sharing a non-ground supply net.
 
-## Cypress settings (harness defaults)
+## Cypress settings (experiments only since 2026-10-11)
 
 600 iterations, lr 0.002, crossing term off, non-deterministic kernels, orientations frozen at
 the warm start. Measured reasons:
@@ -71,8 +73,8 @@ the warm start. Measured reasons:
 
 ## Time limits (every tool call < 3 min)
 
-Cypress hard timeout = remaining job budget (150 s; 80 s on boards > 1000 parts), at most 3
-concurrent Cypress jobs × 6 threads (12-core host). Boards > 1000 parts (ppc) route with
+Detail pass 30 s (60 s on boards > 1000 parts), then routing until a deadline 150 s after the
+start of the call. Boards > 1000 parts (ppc) route with
 incremental PathFinder (<= 20 rounds) and stop after the round that passes a deadline; the
 result says when routing was cut short. The router deadline is a one-line runtime patch of
 the adapter's `board-router.js` (generated under `results/.cache`, the other repository is
