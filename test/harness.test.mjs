@@ -57,6 +57,13 @@ test('native detail pass is identical to the JS one (greedy and annealed, fixed 
     for (const T0 of [0, 3]) { const o = { T0, evals: 5000, budgetS: 1e9, seed: 2 };
       const js = detailPlace(b, L0, { ...o, engine: 'js' }), na = detailPlace(b, L0, { ...o, engine: 'native' });
       assert.equal(na.engine, 'native'); assert.equal(na.accepted, js.accepted); assert.deepEqual(na.layout, js.layout, `${name} T0 ${T0}`); } }
+  // Critical-net terms: pairs with keepout, length and mismatch limits.
+  for (const name of ['t-z3r0', 't-pico']) { const b = loadBoard(name), L0 = legalize(b, startLayout(b, {}, { seed: 1 })).layout, f = path.join(tmp(), 'c.json');
+    const pairs = loadConstraints(b, { file: f }).critical.filter((c) => c.kind === 'pair'); assert.ok(pairs.length, name);
+    fs.writeFileSync(f, JSON.stringify({ critical: pairs.map((c) => ({ pair: c.nets.map((ni) => b.p.nets[ni].id), keepoutMm: 0.4, maxLengthMm: 5, maxMismatchMm: 0.5 })) }));
+    const constraints = loadConstraints(b, { file: f }), o = { T0: 3, evals: 3000, budgetS: 1e9, seed: 3, constraints };
+    const js = detailPlace(b, L0, { ...o, engine: 'js' }), na = detailPlace(b, L0, { ...o, engine: 'native' });
+    assert.equal(na.accepted, js.accepted); assert.equal(na.costDelta, js.costDelta); assert.deepEqual(na.layout, js.layout, `${name} critical`); }
 });
 
 test('constraints: decaps by schematic sheet, template round trip, file overrides, bad refs rejected', () => {

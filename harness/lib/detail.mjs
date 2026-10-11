@@ -17,7 +17,7 @@ import { spawnSync } from 'node:child_process';
 import { rotatedSize, worldPin } from './board.mjs';
 import { HARNESS_ROOT } from './env.mjs';
 import { loadConstraints } from './constraints.mjs';
-import { padCentre, padBox as padBoxOf, spanningSegments } from './geometry.mjs';
+import { padCentre, padBox as padBoxOf } from './geometry.mjs';
 // Optional human-practice terms (RESULTS.md "New metrics against the human layout"):
 //   kappa (default 0.5) * distance (mm) of every decoupling capacitor's supply pad to the nearest supply pad of
 //   its assigned IC(s) (lib/constraints.mjs: constraint file, else same schematic sheet, else any IC on the
@@ -29,8 +29,7 @@ import { padCentre, padBox as padBoxOf, spanningSegments } from './geometry.mjs'
 //   straight path the router can take without vias. `constraints` overrides loadConstraints(b); chi: crystal nets count (1 + chi) x HPWL.
 const analyses = new WeakMap();
 // engine: 'js' | 'native' (native/detail.cpp: same random stream and move sequence, identical result with
-// T0 = 0 and a fixed number of tries; no critical-net terms) | 'auto' (native when built and no critical
-// nets with limits). Distances use sqrt(dx^2 + dy^2), not Math.hypot, so both engines round alike.
+// T0 = 0 and a fixed number of tries) | 'auto' (native when built). Distances use sqrt(dx^2 + dy^2), not Math.hypot, so both engines round alike.
 export const DETAIL_EXE = path.join(HARNESS_ROOT, 'native', process.platform === 'win32' ? 'detail.exe' : 'detail');
 export const nativeDetailAvailable = () => fs.existsSync(DETAIL_EXE);
 const dist = (dx, dy) => Math.sqrt(dx * dx + dy * dy);
@@ -89,7 +88,13 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
   const critOfComp = Array.from({ length: n }, () => new Set()); crit.forEach((c, k) => c.nets.forEach((ni) => p.nets[ni].pins.forEach((pi) => critOfComp[p.pins[pi].componentIndex].add(k))));
   // Layers of a net's pads (sides never change in the pass, so cached).
   const layerCache = new Map(), netLayers = (ni) => { if (!layerCache.has(ni)) { let m = 0; for (let pj = 0; pj < RP.length; pj++) if (RP[pj].net === ni) m |= padBox(pj)[4]; layerCache.set(ni, m); } return layerCache.get(ni); };
-  const segsOf = (ni) => spanningSegments(p.nets[ni].pins.map((pi) => worldPin(p, L, pi)));
+  // Spanning segments of a net (geometry.mjs spanningSegments, distances with dist() like the native pass).
+  const segsOf = (ni) => { const pts = p.nets[ni].pins.map((pi) => worldPin(p, L, pi)), out = []; if (!pts.length) return out;
+    const inT = pts.map(() => false), best = pts.map((q) => [dist(q[0] - pts[0][0], q[1] - pts[0][1]), 0]); inT[0] = true;
+    for (let it = 1; it < pts.length; it++) { let u = -1; for (let k = 0; k < pts.length; k++) if (!inT[k] && (u < 0 || best[k][0] < best[u][0])) u = k;
+      inT[u] = true; out.push([pts[best[u][1]], pts[u]]);
+      for (let k = 0; k < pts.length; k++) if (!inT[k]) { const d = dist(pts[k][0] - pts[u][0], pts[k][1] - pts[u][1]); if (d < best[k][0]) best[k] = [d, u]; } }
+    return out; };
   const segDist = (x, y, [a, c]) => { const dx = c[0] - a[0], dy = c[1] - a[1], l2 = dx * dx + dy * dy, u = l2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)) : 0; return dist(a[0] + u * dx - x, a[1] + u * dy - y); };
   const critBox = (c) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const ni of c.nets) for (const pi of p.nets[ni].pins) { const [x, y] = worldPin(p, L, pi); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return [x0 - c.hw - 1, y0 - c.hw - 1, x1 + c.hw + 1, y1 + c.hw + 1]; };
   const critCost = (k) => { const c = crit[k]; let s = 0;
@@ -105,10 +110,8 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
   const sig = p.nets.map((net) => new Set(net.pins.map((pi) => p.pins[pi].componentIndex)).size <= 30);
   const partnerMean = (i) => { let sx = 0, sy = 0, k = 0; for (const ni of netsOf[i]) { if (!sig[ni]) continue; for (const pi of p.nets[ni].pins) { if (p.pins[pi].componentIndex === i) continue; const [x, y] = worldPin(p, L, pi); sx += x; sy += y; k++; } } return k ? [sx / k, sy / k] : null; };
   const sizeKey = (i, r) => rotatedSize(C[i], r).map((v) => v.toFixed(2)).join();
-  if (engine === 'native' || (engine === 'auto' && !crit.length && nativeDetailAvailable())) {
-    if (crit.length) throw new Error('native detail pass: critical-net terms are not ported (engine js)');
-    return runNative({ b, L, small, sizeKey, wN, decaps, sig, RP, opts: { nu, T0, relocate, evals, budgetS, seed, gap, clearance, kappa, decapFreeMm } });
-  }
+  if (engine === 'native' || (engine === 'auto' && nativeDetailAvailable()))
+    return runNative({ b, L, small, sizeKey, wN, decaps, crit, sig, RP, opts: { nu, T0, relocate, evals, budgetS, seed, gap, clearance, kappa, decapFreeMm, rho } });
   let tried = 0, accepted = 0, delta = 0;
   while (tried < evals && (performance.now() - t0) / 1000 < budgetS) {
     const i = pickOf(small), old = { ...L[i] }, kind = rnd(); let j = -1, oldJ = null;
@@ -142,19 +145,20 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
 }
 
 // Binary input of native/detail.cpp (format documented there) and the result merged into the layout.
-function runNative({ b, L, small, sizeKey, wN, decaps, sig, RP, opts }) {
+function runNative({ b, L, small, sizeKey, wN, decaps, crit, sig, RP, opts }) {
   const p = b.p, C = p.components, n = C.length, parts = [], keys = new Map(), key = (s) => { if (!keys.has(s)) keys.set(s, keys.size); return keys.get(s); };
   const i32 = (a) => { const x = Buffer.alloc(a.length * 4); a.forEach((v, k) => x.writeInt32LE(v, k * 4)); parts.push(x); };
   const f64 = (a) => { const x = Buffer.alloc(a.length * 8); a.forEach((v, k) => x.writeDoubleLE(v, k * 8)); parts.push(x); };
   const isSmall = new Uint8Array(n); for (const i of small) isSmall[i] = 1;
   i32([n, p.nets.length, p.pins.length, RP.length, decaps.length, opts.seed * 2654435761 >>> 0 | 0]);
-  f64([p.canvas.width, p.canvas.height, opts.clearance, opts.nu, opts.T0, opts.relocate, opts.budgetS, opts.gap, opts.kappa, opts.decapFreeMm, opts.evals]);
+  f64([p.canvas.width, p.canvas.height, opts.clearance, opts.nu, opts.T0, opts.relocate, opts.budgetS, opts.gap, opts.kappa, opts.decapFreeMm, opts.evals, opts.rho]);
   C.forEach((c, i) => { f64([c.width, c.height, L[i].x, L[i].y]); i32([L[i].rotation, L[i].side ? 1 : 0, c.twoSided ? 1 : 0, c.rotatable === false ? 0 : 1, isSmall[i], key(sizeKey(i, 0)), key(sizeKey(i, 1))]); });
   p.pins.forEach((q) => { i32([q.componentIndex]); f64([q.x, q.y]); });
   p.nets.forEach((net, ni) => { i32([net.pins.length, sig[ni] ? 1 : 0]); f64([wN[ni]]); i32(net.pins); });
   RP.forEach((pad) => { const a = pad.rot * Math.PI / 180; i32([pad.comp, pad.net, pad.tht || pad.hole ? 1 : 0]);
     f64([pad.lx, pad.ly, 0.5 * (Math.abs(Math.cos(a)) * pad.w + Math.abs(Math.sin(a)) * pad.h), 0.5 * (Math.abs(Math.sin(a)) * pad.w + Math.abs(Math.cos(a)) * pad.h)]); });
   decaps.forEach((d) => { i32([d.comp, d.pad, d.maxMm != null ? 1 : 0]); f64([d.maxMm ?? 0]); i32([d.ic.length]); i32(d.ic); });
+  i32([crit.length]); crit.forEach((c) => { i32([c.nets.length, c.kind === 'pair' ? 1 : 0, c.maxLengthMm != null ? 1 : 0, c.maxMismatchMm != null ? 1 : 0]); f64([c.hw, c.maxLengthMm ?? 0, c.maxMismatchMm ?? 0]); i32(c.nets); });
   const file = path.join(os.tmpdir(), `detail-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`);
   fs.writeFileSync(file, Buffer.concat(parts));
   try {

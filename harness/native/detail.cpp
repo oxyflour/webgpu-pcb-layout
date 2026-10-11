@@ -1,16 +1,18 @@
-// Native port of the detail pass of harness/lib/detail.mjs (no critical-net terms): same random
+// Native port of the detail pass of harness/lib/detail.mjs (all cost terms): same random
 // stream, same move sequence, same cost terms summed in the same order, so with T0 = 0 and a fixed
 // number of tries the result is identical to the JS version (test/harness.test.mjs checks it). With
 // T0 > 0 the temperature follows the wall clock, like the JS version.
 //
-// Input (binary, little endian), path in argv[1] (written by harness/lib/native-detail.mjs):
+// Input (binary, little endian), path in argv[1] (written by harness/lib/detail.mjs):
 //   int32  n, netCount, pinCount, padCount, decapCount, seed
-//   double W, H, clearance, nu, T0, relocate, budgetS, gap, kappa, decapFreeMm, evals (may be +inf)
+//   double W, H, clearance, nu, T0, relocate, budgetS, gap, kappa, decapFreeMm, evals (may be +inf), rho
 //   per component: double width, height, x, y; int32 rotation, side, twoSided, rotatable, small, key0, key1
 //   per pin: int32 comp; double x, y
 //   per net: int32 count, sig; double weight; int32 pins[count]
 //   per pad: int32 comp, net, throughOrHole; double lx, ly, hx, hy   (hx, hy: half extents at rotation 0)
 //   per decap: int32 comp, pad, hasMax; double maxMm; int32 icCount; int32 icPads[icCount]
+//   int32 critCount; per critical constraint: int32 netCount, isPair, hasMaxLen, hasMaxMismatch;
+//     double hw, maxLengthMm, maxMismatchMm; int32 nets[netCount]
 // Output (stdout, JSON): {"evals", "accepted", "costDelta", "seconds", "layout": [[x, y, rotation], ...]}
 #include <cstdio>
 #include <cstdlib>
@@ -28,6 +30,7 @@ struct Comp { double w, h, x, y; int rot, side, twoSided, rotatable, small, key[
 struct Pin { int comp; double x, y; };
 struct Pad { int comp, net, tho; double lx, ly, hx, hy; };
 struct Decap { int comp, pad, hasMax; double maxMm; vector<int> ic; };
+struct Crit { int pair, hasLen, hasMis; double hw, maxLen, maxMis; vector<int> nets; };
 
 int main(int argc, char** argv) {
   const auto t0 = std::chrono::steady_clock::now();
@@ -35,7 +38,7 @@ int main(int argc, char** argv) {
   if (argc < 2 || !(in = fopen(argv[1], "rb"))) { fprintf(stderr, "usage: detail input.bin\n"); return 2; }
   const int n = rd<int32_t>(), netCount = rd<int32_t>(), pinCount = rd<int32_t>(), padCount = rd<int32_t>(), decapCount = rd<int32_t>();
   uint32_t s = (uint32_t)rd<int32_t>();
-  const double W = rd<double>(), H = rd<double>(), clearance = rd<double>(), nu = rd<double>(), T0 = rd<double>(), relocate = rd<double>(), budgetS = rd<double>(), gap = rd<double>(), kappa = rd<double>(), decapFreeMm = rd<double>(), evals = rd<double>();
+  const double W = rd<double>(), H = rd<double>(), clearance = rd<double>(), nu = rd<double>(), T0 = rd<double>(), relocate = rd<double>(), budgetS = rd<double>(), gap = rd<double>(), kappa = rd<double>(), decapFreeMm = rd<double>(), evals = rd<double>(), rho = rd<double>();
   vector<Comp> C(n);
   for (auto& c : C) { c.w = rd<double>(); c.h = rd<double>(); c.x = rd<double>(); c.y = rd<double>(); c.rot = rd<int32_t>(); c.side = rd<int32_t>(); c.twoSided = rd<int32_t>(); c.rotatable = rd<int32_t>(); c.small = rd<int32_t>(); c.key[0] = rd<int32_t>(); c.key[1] = rd<int32_t>(); }
   vector<Pin> P(pinCount);
@@ -46,6 +49,8 @@ int main(int argc, char** argv) {
   for (auto& q : RP) { q.comp = rd<int32_t>(); q.net = rd<int32_t>(); q.tho = rd<int32_t>(); q.lx = rd<double>(); q.ly = rd<double>(); q.hx = rd<double>(); q.hy = rd<double>(); }
   vector<Decap> D(decapCount);
   for (auto& d : D) { d.comp = rd<int32_t>(); d.pad = rd<int32_t>(); d.hasMax = rd<int32_t>(); d.maxMm = rd<double>(); const int c = rd<int32_t>(); d.ic.resize(c); for (auto& v : d.ic) v = rd<int32_t>(); }
+  vector<Crit> CR(rd<int32_t>());
+  for (auto& c : CR) { const int m = rd<int32_t>(); c.pair = rd<int32_t>(); c.hasLen = rd<int32_t>(); c.hasMis = rd<int32_t>(); c.hw = rd<double>(); c.maxLen = rd<double>(); c.maxMis = rd<double>(); c.nets.resize(m); for (auto& v : c.nets) v = rd<int32_t>(); }
   fclose(in);
   const double readS = elapsed();
 
@@ -138,6 +143,41 @@ int main(int argc, char** argv) {
     for (int t = 0; t < np; t++) for (int k : decapsBy[parts[t]]) if (std::find(ks.begin(), ks.end(), k) == ks.end()) ks.push_back(k);
     double sum = 0; for (int k : ks) sum += decapDist(k); return sum; };
 
+
+  // Critical nets with limits (JS critCost / critTouched; ks in insertion order).
+  const int nc = (int)CR.size();
+  vector<vector<int>> critOfComp(n);
+  for (int k = 0; k < nc; k++) for (int ni : CR[k].nets) for (int pi : netPins[ni]) { auto& v = critOfComp[P[pi].comp]; if (std::find(v.begin(), v.end(), k) == v.end()) v.push_back(k); }
+  vector<int> netLayers(netCount, 0); if (nc) for (int pk = 0; pk < padCount; pk++) if (RP[pk].net >= 0) netLayers[RP[pk].net] |= padBox(pk).layers;
+  vector<double> px, py; vector<char> inT; vector<double> bestD; vector<int> bestU; vector<double> seg;
+  // geometry.mjs spanningSegments (Prim from the first pin; distances with sqrt like detail.mjs).
+  auto segsOf = [&](int ni) { const auto& ps = netPins[ni]; const int m = (int)ps.size(); px.resize(m); py.resize(m); seg.clear();
+    for (int k = 0; k < m; k++) worldPin(ps[k], px[k], py[k]); if (!m) return;
+    inT.assign(m, 0); bestD.resize(m); bestU.assign(m, 0); for (int k = 0; k < m; k++) bestD[k] = std::sqrt((px[k] - px[0]) * (px[k] - px[0]) + (py[k] - py[0]) * (py[k] - py[0])); inT[0] = 1;
+    for (int it = 1; it < m; it++) { int u = -1; for (int k = 0; k < m; k++) if (!inT[k] && (u < 0 || bestD[k] < bestD[u])) u = k;
+      inT[u] = 1; const int a = bestU[u]; seg.insert(seg.end(), { px[a], py[a], px[u], py[u] });
+      for (int k = 0; k < m; k++) if (!inT[k]) { const double d = std::sqrt((px[k] - px[u]) * (px[k] - px[u]) + (py[k] - py[u]) * (py[k] - py[u])); if (d < bestD[k]) { bestD[k] = d; bestU[k] = u; } } } };
+  auto segDist = [](double x, double y, const double* g) { const double dx = g[2] - g[0], dy = g[3] - g[1], l2 = dx * dx + dy * dy, u = l2 ? std::max(0.0, std::min(1.0, ((x - g[0]) * dx + (y - g[1]) * dy) / l2)) : 0;
+    const double ex = g[0] + u * dx - x, ey = g[1] + u * dy - y; return std::sqrt(ex * ex + ey * ey); };
+  auto critCost = [&](int k) { const Crit& c = CR[k]; double s = 0;
+    for (int ni : c.nets) { const int lm = netLayers[ni]; segsOf(ni); const vector<double> sg = seg;
+      for (size_t t = 0; t < sg.size(); t += 4) { const double* g = &sg[t];
+        const double q[4] = { std::min(g[0], g[2]) - c.hw - 1, std::min(g[1], g[3]) - c.hw - 1, std::max(g[0], g[2]) + c.hw + 1, std::max(g[1], g[3]) + c.hw + 1 }; int cr[4]; cellRange(q, cr); stamp++;
+        for (int y = cr[1]; y <= cr[3]; y++) for (int x = cr[0]; x <= cr[2]; x++) for (int j : buckets[y * gw + x]) { if (mark[j] == stamp) continue; mark[j] = stamp;
+          for (int pj : padsOf[j]) { if (RP[pj].net == ni) continue; const Box bx = padBox(pj); if (!(bx.layers & lm)) continue; const double r = std::max(bx.b[2] - bx.b[0], bx.b[3] - bx.b[1]) / 2;
+            if (segDist((bx.b[0] + bx.b[2]) / 2, (bx.b[1] + bx.b[3]) / 2, g) < c.hw + r) s += rho; } } }
+      if (c.hasLen) s += 10 * std::max(0.0, hp(ni) - c.maxLen); }
+    if (c.pair && c.hasMis) s += std::max(0.0, std::abs(hp(c.nets[0]) - hp(c.nets[1])) - c.maxMis);
+    return s; };
+  auto critBox = [&](int k, double o[4]) { const Crit& c = CR[k]; double x0 = INFINITY, y0 = INFINITY, x1 = -INFINITY, y1 = -INFINITY;
+    for (int ni : c.nets) for (int pi : netPins[ni]) { double x, y; worldPin(pi, x, y); x0 = std::min(x0, x); x1 = std::max(x1, x); y0 = std::min(y0, y); y1 = std::max(y1, y); }
+    o[0] = x0 - c.hw - 1; o[1] = y0 - c.hw - 1; o[2] = x1 + c.hw + 1; o[3] = y1 + c.hw + 1; };
+  vector<int> cks;
+  auto critTouched = [&](const int* parts, int np) { for (int t = 0; t < np; t++) { const int i = parts[t];
+      for (int k : critOfComp[i]) if (std::find(cks.begin(), cks.end(), k) == cks.end()) cks.push_back(k);
+      double a[4]; boxOf(i, a); for (int k = 0; k < nc; k++) { if (std::find(cks.begin(), cks.end(), k) != cks.end()) continue; double c[4]; critBox(k, c); if (a[0] < c[2] && c[0] < a[2] && a[1] < c[3] && c[1] < a[3]) cks.push_back(k); } } };
+  auto critOf = [&]() { double s = 0; for (int k : cks) s += critCost(k); return s; };
+
   auto partnerMean = [&](int i, double& mx, double& my) { double sx = 0, sy = 0; int k = 0;
     for (int ni : netsOf[i]) { if (!sig[ni]) continue; for (int pi : netPins[ni]) { if (P[pi].comp == i) continue; double x, y; worldPin(pi, x, y); sx += x; sy += y; k++; } }
     if (!k) return false; mx = sx / k; my = sy / k; return true; };
@@ -174,19 +214,19 @@ int main(int argc, char** argv) {
     C[i] = old; if (j >= 0) C[j] = oldJ;
     ta = tick(); const double g0 = nu ? chanOf(parts, np) : 0;
     C[i] = nwI; if (j >= 0) C[j] = nwJ;
-    const double g1 = nu ? chanOf(parts, np) : 0; tm[1] += tick() - ta; ta = tick(); const double c1 = decapOf(parts, np);
-    C[i] = old; if (j >= 0) C[j] = oldJ; const double c0 = decapOf(parts, np); tm[2] += tick() - ta;
-    C[i] = nwI; if (j >= 0) C[j] = nwJ; ta = tick();
+    const double g1 = nu ? chanOf(parts, np) : 0; tm[1] += tick() - ta; ta = tick(); const double c1 = decapOf(parts, np); cks.clear(); if (nc) critTouched(parts, np);
+    C[i] = old; if (j >= 0) C[j] = oldJ; const double c0 = decapOf(parts, np); if (nc) critTouched(parts, np); const double k0 = cks.empty() ? 0 : critOf();
+    C[i] = nwI; if (j >= 0) C[j] = nwJ; const double k1 = cks.empty() ? 0 : critOf(); tm[2] += tick() - ta; ta = tick();
     A.clear(); for (int t = 0; t < np; t++) for (int k : netsOf[parts[t]]) if (std::find(A.begin(), A.end(), k) == A.end()) A.push_back(k);
     oldH.clear(); for (int k : A) oldH.push_back(hpN[k]);
     double dh = 0; for (int k : A) { const double v = hp(k); dh += (v - hpN[k]) * wN[k]; hpN[k] = v; }
     tm[3] += tick() - ta;
-    const double d = dh + nu * (g1 - g0) + kappa * (c1 - c0) + (0.0 - 0.0);
+    const double d = dh + nu * (g1 - g0) + kappa * (c1 - c0) + (k1 - k0);
     const double T = T0 ? T0 * std::pow(1e-3, std::min(1.0, std::max(std::isfinite(evals) ? tried / evals : 0.0, elapsed() / budgetS))) : 0;
     if (d < -1e-6 || (T > 0 && rnd() < std::exp(-d / T))) { accepted++; delta += d; for (int t = 0; t < np; t++) { remove(parts[t]); insert(parts[t]); invalidate(parts[t]); } }
     else { for (size_t t = 0; t < A.size(); t++) hpN[A[t]] = oldH[t]; C[i] = old; if (j >= 0) C[j] = oldJ; }
   }
-  if (prof) fprintf(stderr, "{\"legal\":%.3f,\"channel\":%.3f,\"decap\":%.3f,\"hpwl\":%.3f,\"total\":%.3f}\n", tm[0], tm[1], tm[2], tm[3], elapsed());
+  if (prof) fprintf(stderr, "{\"legal\":%.3f,\"channel\":%.3f,\"decapCrit\":%.3f,\"hpwl\":%.3f,\"total\":%.3f}\n", tm[0], tm[1], tm[2], tm[3], elapsed());
   out(tried, accepted, delta);
   return 0;
 }
