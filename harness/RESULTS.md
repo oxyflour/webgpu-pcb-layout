@@ -1396,3 +1396,27 @@ read the constraints, and within a session the failing count changes from candid
 (k60 0-3, pic 0-1 per candidate, many at 0), but the session's best candidate is ranked by legality,
 clean nets and vias only (agent/session.mjs rank) and the agents submit by the same order, so a
 submitted layout can fail a pair that an equally good candidate passed.
+
+
+### Ranking by failing constraints (prompt v14, k60 / pic, 2026-10-11)
+
+v14 = v13 + the tool's best candidate ranked by legality, clean nets, then failing feasible constraints
+(`constraints.critical.failingFeasible`), then vias + HPWL (agent/session.mjs `rank`; the prompt asks
+agents to submit by the same order). Same example constraint files, 3 dsh sessions per board
+(results/v14c-<board>), scored like v13c (example router rules, 5 grid phases, results/v14c-eval.json):
+
+| Board, arm | Clean nets (count, sessions 1/2/3) | Vias (count) | Constrained USB pairs passing (count of k60 2 / pic 3) | Routed length of the pairs (mm) | Decaps to the assigned IC, median (mm) | Submitted with a failing feasible constraint (in-session, sessions) |
+|---|---|---|---|---|---|---|
+| k60, human | 318 | 332 | 2 | 174 | 3.3 | - |
+| k60, v13c | 318 / 316 / 316 | 485 / 501 / 508 | 2 / 1 / 1 | 167 / 149 / 171 | 2.1 / 2.3 / 2.2 | 2 of 3 |
+| k60, v14c | 308 / 276 / 318 | 552 / 785 / 476 | 2 / 1 / 2 | 188 / 127 / 57 | 2.3 / 1.5 / 1.9 | 1 of 3 (session 2: no candidate passed) |
+| pic, human | 310 | 359 | 3 | 154 | 8.7 | - |
+| pic, v13c | 310 / 310 / 310 | 389 / 369 / 394 | 3 / 3 / 2 | 154 / 139 / 123 | 1.4 / 1.5 / 1.5 | 1 of 3 |
+| pic, v14c | 310 / 310 / 310 | 386 / 392 / 355 | 3 / 3 / 3 | 159 / 116 / 134 | 1.5 / 1.6 / 1.8 | 0 of 3 |
+
+The ranking does what it should: pairs passing 12 -> 14 of 15, every pic session passes all pairs,
+and the only failing v14 submission came from a session with no passing candidate. The price is a
+few vias where it trades: k60 session 3 submitted c007 (0 failing, 477 vias) over c005 (1 failing,
+463). The k60 v14 drop (sessions 1 / 2: 308 / 276 clean) is not the ranking, which only reorders
+candidates with equal clean nets: their best candidates reached only 308 and 276 clean (weak IC
+floorplans; the same session spread as before, e.g. v12d 306 / 580). pic vias 384 vs 378 (means), equal.
