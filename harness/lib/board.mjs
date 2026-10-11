@@ -32,6 +32,9 @@ const LOCAL = (() => { const f = path.join(HARNESS_ROOT, 'boards.json'); return 
 export const BOARDS = { ...Object.fromEntries(KICAD_CASES.map(([k, v]) => [k, BOARDS_ROOT ? path.join(BOARDS_ROOT, v) : null])), ...Object.fromEntries(Object.entries(LOCAL).filter(([k]) => !k.startsWith('_')).map(([k, v]) => [k, path.resolve(REPO_ROOT, v)])) };
 export const EVAL_BOARDS = [...new Set(['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'safety', 'pic', 'nxp', 'rx', 'k60', 'acc', 'ppc-n3', ...Object.keys(LOCAL).filter((k) => !k.startsWith('_'))])];
 
+// Register a board file (.kicad_pcb or IR .json) under a name in this process (tests, tools).
+export function registerBoard(name, file) { BOARDS[name] = path.resolve(file); parsed.delete(name); }
+
 // locks: {ref: {x,y,rotation,side}} extra components held fixed.
 // only: Set of refs -> sub-board with just these footprints (same outline, rules and adapter path;
 // nets keep only the pins of these parts), e.g. one module.
@@ -157,7 +160,7 @@ export async function evaluateRobust(b, layout, { shifts = defaultShifts(b), ...
   const { Worker } = await import('node:worker_threads');
   const { onRound, ...plain } = opts;
   const runs = await Promise.all(Array.from({ length: shifts }, (_, k) => new Promise((resolve, reject) => {
-    const w = new Worker(new URL('./eval-worker.mjs', import.meta.url), { execArgv: [], workerData: { name: b.name, layout, opts: { ...plain, shift: k, ...(k ? { offset: [k * 0.4 / shifts, k * 0.4 / shifts] } : {}) } } });
+    const w = new Worker(new URL('./eval-worker.mjs', import.meta.url), { execArgv: [], workerData: { name: b.name, file: b.file, layout, opts: { ...plain, shift: k, ...(k ? { offset: [k * 0.4 / shifts, k * 0.4 / shifts] } : {}) } } });
     w.once('message', resolve); w.once('error', reject);
     w.once('exit', (c) => { if (c) reject(new Error(`eval worker exit ${c}`)); });
   })));

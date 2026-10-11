@@ -191,9 +191,9 @@ export function createSession(dir) {
       const s2 = state(); s2.next++; s2.placeCalls++;
       let leg = legalize(b, init), detail = null;
       // Detailed placement of the small parts (lib/detail.mjs: HPWL + routing-channel term, annealed local
-      // search; k60 tool layouts 504-547 -> ~420 vias). PCB_DETAIL=0 turns it off.
+      // search; k60 tool layouts 504-547 -> ~420 vias). PCB_DETAIL=0 turns it off, PCB_DETAIL_BUDGET sets its seconds.
       if (process.env.PCB_DETAIL !== '0') {
-        const d = detailPlace(b, leg.layout, { budgetS: big ? 60 : 30, seed: runSeed });
+        const d = detailPlace(b, leg.layout, { budgetS: Number(process.env.PCB_DETAIL_BUDGET ?? (big ? 60 : 30)), seed: runSeed });
         leg = legalize(b, d.layout); detail = { evals: d.evals, accepted: d.accepted, seconds: d.seconds };
       }
       const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), ...(rules.length ? { netRules: rules } : {}), deadlineS: Math.max(15, 150 - (performance.now() - t0) / 1000) });

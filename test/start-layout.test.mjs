@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { UI_BOARDS, required } from '../harness/lib/env.mjs';
+import { UI_BOARDS } from '../harness/lib/env.mjs';
 import path from 'node:path';
 import { createStartLayout } from '../harness/lib/start-layout.mjs';
 
 import { irToProblem } from '../core/src/ir/to-problem.js';
 import { normalizeProblem, worldPin, rotatedSize } from '../core/src/problem.js';
-const boardFile = path.join(required(UI_BOARDS, 'uiBoards', 'UI_BOARDS', 'the web editor sample boards (edk.board.json)'), 'edk.board.json');
-const skip = !fs.existsSync(boardFile) && 'sample board missing';
+// The web editor's sample board (uiBoards / UI_BOARDS); skipped when not configured.
+const boardFile = UI_BOARDS && path.join(UI_BOARDS, 'edk.board.json');
+const skip = !(boardFile && fs.existsSync(boardFile)) && 'uiBoards / UI_BOARDS not set or edk.board.json missing';
 
 test('editor worker start layout: fixed parts kept, movable parts inside the board, deterministic per seed', { skip }, () => {
   // As in ui/editor-worker.js load(), mode 'auto'.
