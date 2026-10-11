@@ -1,0 +1,479 @@
+{
+ "board": "nxp",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C64": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C66": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C65": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C50": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C90": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C62": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C61": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C6": "U1",
+  "C54": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C55": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C56": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C45": {
+   "candidates": [
+    "U20",
+    "U13",
+    "U12"
+   ],
+   "source": "sheet"
+  },
+  "C57": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C58": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C48": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C47": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C87": "U16",
+  "C86": "U16",
+  "C59": "U16",
+  "C63": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C20": {
+   "candidates": [
+    "U20",
+    "U13",
+    "U12"
+   ],
+   "source": "sheet"
+  },
+  "C53": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C19": {
+   "candidates": [
+    "U20",
+    "U13",
+    "U12"
+   ],
+   "source": "sheet"
+  },
+  "C52": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C51": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C35": "U11",
+  "C15": "U1",
+  "C4": "U1",
+  "C22": {
+   "candidates": [
+    "U7",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C23": "U6",
+  "C29": {
+   "candidates": [
+    "U7",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C32": "U10",
+  "C33": "U10",
+  "C73": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C74": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C75": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C76": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C49": {
+   "candidates": [
+    "U14",
+    "U15",
+    "U16",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "sheet"
+  },
+  "C46": "U18",
+  "C21": {
+   "candidates": [
+    "U7",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C28": {
+   "candidates": [
+    "U7",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C60": "U16",
+  "C34": "U11",
+  "C18": {
+   "candidates": [
+    "U1",
+    "U6",
+    "U14",
+    "U15",
+    "U20",
+    "U16",
+    "U13",
+    "U12",
+    "U19",
+    "P8",
+    "U17"
+   ],
+   "source": "supply"
+  },
+  "C5": "U1",
+  "C31": "U10",
+  "C98": {
+   "candidates": [
+    "K4",
+    "K1",
+    "K2",
+    "K3"
+   ],
+   "source": "sheet"
+  },
+  "C94": {
+   "candidates": [
+    "K4",
+    "K1",
+    "K2",
+    "K3"
+   ],
+   "source": "sheet"
+  },
+  "C96": {
+   "candidates": [
+    "K4",
+    "K1",
+    "K2",
+    "K3"
+   ],
+   "source": "sheet"
+  },
+  "C99": {
+   "candidates": [
+    "K4",
+    "K1",
+    "K2",
+    "K3"
+   ],
+   "source": "sheet"
+  },
+  "C95": {
+   "candidates": [
+    "K4",
+    "K1",
+    "K2",
+    "K3"
+   ],
+   "source": "sheet"
+  },
+  "C100": {
+   "candidates": [
+    "K4",
+    "K1",
+    "K2",
+    "K3"
+   ],
+   "source": "sheet"
+  },
+  "C97": {
+   "candidates": [
+    "K4",
+    "K1",
+    "K2",
+    "K3"
+   ],
+   "source": "sheet"
+  },
+  "C89": {
+   "candidates": [
+    "K4",
+    "K1",
+    "K2",
+    "K3"
+   ],
+   "source": "sheet"
+  },
+  "C17": {
+   "candidates": [
+    "K4",
+    "K1",
+    "K2",
+    "K3",
+    "U7",
+    "U10",
+    "U5",
+    "P3"
+   ],
+   "source": "supply"
+  }
+ },
+ "critical": [
+  {
+   "name": "class RS485-CAN",
+   "kind": "class",
+   "class": "RS485-CAN",
+   "traceWidth": 0.254,
+   "clearance": 0.254
+  },
+  {
+   "name": "class USB",
+   "kind": "class",
+   "class": "USB",
+   "traceWidth": 0.381,
+   "clearance": 0.2032
+  },
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "/CPU/XTAL2",
+    "/CPU/XTAL1",
+    "/CPU/RTCX1",
+    "/CPU/RTCX2",
+    "/CPU/FT_XTOUT",
+    "/CPU/FT_XTIN"
+   ]
+  },
+  {
+   "name": "pair /CPU/USB_AUX_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_AUX_DP",
+    "/CPU/USB_AUX_DM"
+   ]
+  },
+  {
+   "name": "pair /CPU/USB_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_DP",
+    "/CPU/USB_DM"
+   ]
+  },
+  {
+   "name": "pair /CPU/USB_JTAG_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_JTAG_DP",
+    "/CPU/USB_JTAG_DM"
+   ]
+  }
+ ]
+}

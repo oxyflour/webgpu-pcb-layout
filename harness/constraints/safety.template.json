@@ -1,0 +1,98 @@
+{
+ "board": "safety",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C8": "U5",
+  "C9": "U5",
+  "C10": "U7",
+  "C14": "U7",
+  "C17": "U7",
+  "C26": "U8",
+  "C27": "U8",
+  "C28": "U8",
+  "C29": "U8",
+  "C35": "U8",
+  "C36": "U8",
+  "C38": "U8",
+  "C39": "U8",
+  "C41": "U8",
+  "C45": "U8",
+  "C46": "U8",
+  "C47": "U8",
+  "C50": "U8",
+  "C51": "U8",
+  "C53": "U8",
+  "C55": "U8",
+  "C56": "U8",
+  "C62": "U8",
+  "C63": "U8",
+  "C65": "U8",
+  "C76": "U9",
+  "C84": "U13",
+  "C86": "U13",
+  "C94": "U14",
+  "C87": "U13",
+  "C82": "U13",
+  "C30": "U8",
+  "C25": "U8",
+  "C32": "U8",
+  "C7": "U5",
+  "C31": "U8",
+  "C33": "U8",
+  "C37": "U8",
+  "C42": "U8",
+  "C49": "U8",
+  "C54": "U8",
+  "C15": "U7",
+  "C40": "U8",
+  "C34": "U8",
+  "C43": "U8",
+  "C95": "U14",
+  "C44": "U8",
+  "C52": "U8",
+  "C58": "U8",
+  "C57": "U8",
+  "C61": "U8",
+  "C64": "U8",
+  "C66": "U8",
+  "C73": "U9",
+  "C74": "U9",
+  "C67": "U8",
+  "C68": "U8",
+  "C69": "U9",
+  "C78": "U8",
+  "C48": "U8",
+  "C96": "U8",
+  "C97": "U8"
+ },
+ "critical": [
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "/CPU/OSCIN",
+    "/CPU/OSCOUT",
+    "Net-(C81-Pad2)",
+    "Net-(C85-Pad2)",
+    "Net-(C92-Pad1)",
+    "Net-(C93-Pad1)"
+   ]
+  },
+  {
+   "name": "pair /ETHERNET/TD+",
+   "kind": "pair",
+   "pair": [
+    "/ETHERNET/TD+",
+    "/ETHERNET/TD-"
+   ]
+  },
+  {
+   "name": "pair /ETHERNET/RD+",
+   "kind": "pair",
+   "pair": [
+    "/ETHERNET/RD+",
+    "/ETHERNET/RD-"
+   ]
+  }
+ ]
+}

@@ -23,6 +23,7 @@ The WebGPU placer / LNS of webgpu-layout-code is not used.
 | `lib/start-layout.mjs`, `lib/init.mjs` | Start layout from a partial plan (see "Init" below). `start-layout.mjs` has no Node imports (geometry passed in) so the editor worker loads it too; `init.mjs` binds it for Node. |
 | `lib/detail.mjs` | Detail pass after the legalizer: annealed local search on small parts (< 8 pins) for HPWL + routing-channel deficit between facing pads + 0.5 x decoupling-capacitor distance to the IC supply pins (30 s per place; `PCB_DETAIL=0` turns it off). |
 | `lib/human-metrics.mjs` | Metrics against the human layout: decoupling-capacitor distance to IC supply pins, critical-net (crystal, clock, reset, differential pair) lengths and vias. |
+| `lib/constraints.mjs`, `constraints/` | Design constraints: decap -> IC assignment (schematic sheet or `constraints/<board>.json`) and critical nets (net classes, crystal, pairs, file limits); `<board>.template.json` = defaults to copy and edit. |
 | `lib/uncross.mjs` | Crossing removal (180 deg turns of 2-pin parts, same-size swaps); used by the editor's auto layout, not by `place` (not additive after the detail pass). |
 | `agent/session.mjs` | Tool commands: `info`, `map`, `check`, `place`, `inspect`, `status`, `knobs`, `submit`. |
 | `agent/cli.mjs` | In-sandbox client `pcb` (strict flags, JSON over HTTP). |

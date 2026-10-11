@@ -1,0 +1,338 @@
+{
+ "board": "pic",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C4": "U1",
+  "C9": "U1",
+  "C15": "U1",
+  "C17": {
+   "candidates": [
+    "K1",
+    "K4",
+    "K3",
+    "K2",
+    "U10",
+    "U5"
+   ],
+   "source": "supply"
+  },
+  "C18": {
+   "candidates": [
+    "U1",
+    "U6",
+    "U7",
+    "U14",
+    "U16",
+    "U17",
+    "U19",
+    "U20",
+    "U21",
+    "U24",
+    "U12",
+    "U13"
+   ],
+   "source": "supply"
+  },
+  "C19": {
+   "candidates": [
+    "U20",
+    "U24",
+    "U12",
+    "U13"
+   ],
+   "source": "sheet"
+  },
+  "C20": {
+   "candidates": [
+    "U20",
+    "U24",
+    "U12",
+    "U13"
+   ],
+   "source": "sheet"
+  },
+  "C21": "U5",
+  "C22": "U5",
+  "C23": {
+   "candidates": [
+    "U6",
+    "U7"
+   ],
+   "source": "sheet"
+  },
+  "C28": {
+   "candidates": [
+    "U6",
+    "U7"
+   ],
+   "source": "sheet"
+  },
+  "C29": {
+   "candidates": [
+    "U6",
+    "U7"
+   ],
+   "source": "sheet"
+  },
+  "C31": "U10",
+  "C32": "U10",
+  "C33": "U10",
+  "C34": "U11",
+  "C35": "U11",
+  "C45": {
+   "candidates": [
+    "U20",
+    "U24",
+    "U12",
+    "U13"
+   ],
+   "source": "sheet"
+  },
+  "C46": "U18",
+  "C47": "U16",
+  "C48": "U16",
+  "C49": "U16",
+  "C50": "U16",
+  "C51": "U16",
+  "C52": "U16",
+  "C53": "U16",
+  "C54": "U16",
+  "C55": "U16",
+  "C56": "U16",
+  "C57": "U16",
+  "C58": "U16",
+  "C59": {
+   "candidates": [
+    "U11",
+    "U16"
+   ],
+   "source": "supply"
+  },
+  "C60": {
+   "candidates": [
+    "U11",
+    "U16"
+   ],
+   "source": "supply"
+  },
+  "C61": {
+   "candidates": [
+    "U14",
+    "U17",
+    "U19"
+   ],
+   "source": "sheet"
+  },
+  "C62": {
+   "candidates": [
+    "U14",
+    "U17",
+    "U19"
+   ],
+   "source": "sheet"
+  },
+  "C63": "U1",
+  "C66": "U21",
+  "C73": {
+   "candidates": [
+    "U14",
+    "U17",
+    "U19"
+   ],
+   "source": "sheet"
+  },
+  "C74": {
+   "candidates": [
+    "U14",
+    "U17",
+    "U19"
+   ],
+   "source": "sheet"
+  },
+  "C75": {
+   "candidates": [
+    "U14",
+    "U17",
+    "U19"
+   ],
+   "source": "sheet"
+  },
+  "C76": {
+   "candidates": [
+    "U14",
+    "U17",
+    "U19"
+   ],
+   "source": "sheet"
+  },
+  "C82": "U16",
+  "C83": {
+   "candidates": [
+    "K1",
+    "K4",
+    "K3",
+    "K2"
+   ],
+   "source": "sheet"
+  },
+  "C85": "U16",
+  "C86": {
+   "candidates": [
+    "U11",
+    "U16"
+   ],
+   "source": "supply"
+  },
+  "C87": {
+   "candidates": [
+    "U11",
+    "U16"
+   ],
+   "source": "supply"
+  },
+  "C89": {
+   "candidates": [
+    "K1",
+    "K4",
+    "K3",
+    "K2"
+   ],
+   "source": "sheet"
+  },
+  "C90": {
+   "candidates": [
+    "U14",
+    "U17",
+    "U19"
+   ],
+   "source": "sheet"
+  },
+  "C94": {
+   "candidates": [
+    "K1",
+    "K4",
+    "K3",
+    "K2"
+   ],
+   "source": "sheet"
+  },
+  "C98": {
+   "candidates": [
+    "U14",
+    "U17",
+    "U19"
+   ],
+   "source": "sheet"
+  },
+  "C99": {
+   "candidates": [
+    "U14",
+    "U17",
+    "U19"
+   ],
+   "source": "sheet"
+  },
+  "C100": {
+   "candidates": [
+    "K1",
+    "K4",
+    "K3",
+    "K2"
+   ],
+   "source": "sheet"
+  },
+  "C101": {
+   "candidates": [
+    "K1",
+    "K4",
+    "K3",
+    "K2"
+   ],
+   "source": "sheet"
+  },
+  "C102": {
+   "candidates": [
+    "K1",
+    "K4",
+    "K3",
+    "K2"
+   ],
+   "source": "sheet"
+  },
+  "C103": {
+   "candidates": [
+    "K1",
+    "K4",
+    "K3",
+    "K2"
+   ],
+   "source": "sheet"
+  },
+  "C104": {
+   "candidates": [
+    "K1",
+    "K4",
+    "K3",
+    "K2"
+   ],
+   "source": "sheet"
+  }
+ },
+ "critical": [
+  {
+   "name": "class RS485-CAN",
+   "kind": "class",
+   "class": "RS485-CAN",
+   "traceWidth": 0.254,
+   "clearance": 0.254
+  },
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "Net-(C79-Pad2)",
+    "Net-(C81-Pad2)"
+   ]
+  },
+  {
+   "name": "pair /Ethernet/RX+",
+   "kind": "pair",
+   "pair": [
+    "/Ethernet/RX+",
+    "/Ethernet/RX-"
+   ]
+  },
+  {
+   "name": "pair /Ethernet/TX+",
+   "kind": "pair",
+   "pair": [
+    "/Ethernet/TX+",
+    "/Ethernet/TX-"
+   ]
+  },
+  {
+   "name": "pair /USB OTG/USB+",
+   "kind": "pair",
+   "pair": [
+    "/USB OTG/USB+",
+    "/USB OTG/USB-"
+   ]
+  },
+  {
+   "name": "pair /JTAG/USB_JTAG_DP",
+   "kind": "pair",
+   "pair": [
+    "/JTAG/USB_JTAG_DP",
+    "/JTAG/USB_JTAG_DM"
+   ]
+  },
+  {
+   "name": "pair /CPU/USB_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_DP",
+    "/CPU/USB_DM"
+   ]
+  }
+ ]
+}

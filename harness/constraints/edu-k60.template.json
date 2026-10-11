@@ -1,0 +1,144 @@
+{
+ "board": "edu-k60",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C2": "U1",
+  "C43": "U10",
+  "C9": "U5",
+  "C26": "U9",
+  "C51": "U10",
+  "C23": {
+   "candidates": [
+    "U8",
+    "J4",
+    "U6",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C10": "U5",
+  "C41": "U10",
+  "C40": "U10",
+  "C39": "U10",
+  "C42": "U10",
+  "C33": "U10",
+  "C27": "U9",
+  "C22": {
+   "candidates": [
+    "U8",
+    "J4",
+    "U6",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C17": "U5",
+  "C16": "U5",
+  "C19": {
+   "candidates": [
+    "U8",
+    "J4",
+    "U6",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C15": "U5",
+  "C20": {
+   "candidates": [
+    "U8",
+    "J4",
+    "U6",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C5": {
+   "candidates": [
+    "U9",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C6": "U10",
+  "C21": {
+   "candidates": [
+    "U8",
+    "J4",
+    "U6",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C38": "U10",
+  "C3": "U1",
+  "C1": "U1",
+  "C50": "U10",
+  "C18": {
+   "candidates": [
+    "U8",
+    "J4",
+    "U6",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C34": "U10",
+  "C35": "U10",
+  "C37": "U10",
+  "C4": {
+   "candidates": [
+    "U9",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C7": {
+   "candidates": [
+    "U10",
+    "U8",
+    "J4",
+    "U6",
+    "U5"
+   ],
+   "source": "supply"
+  }
+ },
+ "critical": [
+  {
+   "name": "class USB diff90",
+   "kind": "class",
+   "class": "USB diff90",
+   "traceWidth": 0.3175,
+   "clearance": 0.2032
+  },
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "Net-(C49-Pad1)",
+    "Net-(C52-Pad1)",
+    "Net-(U10-Pad41)",
+    "Net-(U10-Pad40)",
+    "Net-(C8-Pad1)",
+    "Net-(C53-Pad1)"
+   ]
+  },
+  {
+   "name": "pair /CPU/USB_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_DP",
+    "/CPU/USB_DM"
+   ]
+  },
+  {
+   "name": "pair /JTAG/USB_JTAG_DP",
+   "kind": "pair",
+   "pair": [
+    "/JTAG/USB_JTAG_DP",
+    "/JTAG/USB_JTAG_DM"
+   ]
+  }
+ ]
+}

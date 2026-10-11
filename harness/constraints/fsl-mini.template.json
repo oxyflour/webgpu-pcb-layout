@@ -1,0 +1,185 @@
+{
+ "board": "fsl-mini",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C201": {
+   "candidates": [
+    "P201",
+    "U201"
+   ],
+   "source": "sheet"
+  },
+  "C202": {
+   "candidates": [
+    "P201",
+    "U201"
+   ],
+   "source": "sheet"
+  },
+  "C203": {
+   "candidates": [
+    "P201",
+    "U201"
+   ],
+   "source": "sheet"
+  },
+  "C204": "U201",
+  "C205": "U201",
+  "C206": "U201",
+  "C209": {
+   "candidates": [
+    "P201",
+    "U201"
+   ],
+   "source": "sheet"
+  },
+  "C210": {
+   "candidates": [
+    "P201",
+    "U201"
+   ],
+   "source": "sheet"
+  },
+  "C215": "U201",
+  "C301": "U301",
+  "C302": "U301",
+  "C303": "U301",
+  "C403": {
+   "candidates": [
+    "U402",
+    "U401",
+    "U403"
+   ],
+   "source": "sheet"
+  },
+  "C404": {
+   "candidates": [
+    "U402",
+    "U401",
+    "U403"
+   ],
+   "source": "sheet"
+  },
+  "C405": {
+   "candidates": [
+    "U402",
+    "U401",
+    "U403"
+   ],
+   "source": "sheet"
+  },
+  "C501": {
+   "candidates": [
+    "P701",
+    "U301",
+    "SH701",
+    "P702"
+   ],
+   "source": "supply"
+  },
+  "C502": "U601",
+  "C503": {
+   "candidates": [
+    "P103",
+    "U402",
+    "U401",
+    "U403",
+    "SH701",
+    "U201",
+    "U601"
+   ],
+   "source": "supply"
+  },
+  "C602": "U601",
+  "C603": "U601",
+  "C604": "U601",
+  "C606": "U601",
+  "C607": "U601",
+  "C608": "U601",
+  "C609": "U601",
+  "C610": "U601",
+  "C611": "U601",
+  "C612": "U601",
+  "C618": "U601"
+ },
+ "critical": [
+  {
+   "name": "class Diff_ETH",
+   "kind": "class",
+   "class": "Diff_ETH",
+   "traceWidth": 0.3556,
+   "clearance": 0.2032
+  },
+  {
+   "name": "class USB",
+   "kind": "class",
+   "class": "USB",
+   "traceWidth": 0.4318,
+   "clearance": 0.1778
+  },
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "Net-(C605-Pad1)",
+    "Net-(C601-Pad1)"
+   ]
+  },
+  {
+   "name": "pair /CPU/PGA1_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/PGA1_DP",
+    "/CPU/PGA1_DM"
+   ]
+  },
+  {
+   "name": "pair PoE_MB_+",
+   "kind": "pair",
+   "pair": [
+    "PoE_MB_+",
+    "PoE_MB_-"
+   ]
+  },
+  {
+   "name": "pair PoE_MA_+",
+   "kind": "pair",
+   "pair": [
+    "PoE_MA_+",
+    "PoE_MA_-"
+   ]
+  },
+  {
+   "name": "pair /Ethernet/TX_P",
+   "kind": "pair",
+   "pair": [
+    "/Ethernet/TX_P",
+    "/Ethernet/TX_N"
+   ]
+  },
+  {
+   "name": "pair /Ethernet/RX_P",
+   "kind": "pair",
+   "pair": [
+    "/Ethernet/RX_P",
+    "/Ethernet/RX_N"
+   ]
+  },
+  {
+   "name": "pair /USB OTG/USB_D_OTG_P",
+   "kind": "pair",
+   "pair": [
+    "/USB OTG/USB_D_OTG_P",
+    "/USB OTG/USB_D_OTG_N"
+   ]
+  },
+  {
+   "name": "pair /CPU/USBD_P",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USBD_P",
+    "/CPU/USBD_N"
+   ]
+  }
+ ]
+}

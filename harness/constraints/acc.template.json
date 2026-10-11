@@ -1,0 +1,2694 @@
+{
+ "board": "acc",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C1": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C2": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C3": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C5": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C6": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C8": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C9": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C10": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C11": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C12": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C13": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C14": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C15": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C16": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C17": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C18": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C19": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C20": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C21": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C22": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C23": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C24": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C25": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C26": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C27": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C28": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C29": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C30": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C32": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C33": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C35": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C36": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C37": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C38": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C39": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C40": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C41": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C42": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C43": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C44": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C45": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C46": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C47": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C48": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C49": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C50": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C51": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C52": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C53": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C54": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C55": "U4",
+  "C56": "U4",
+  "C59": "U4",
+  "C60": "U4",
+  "C61": "U4",
+  "C62": "U4",
+  "C65": {
+   "candidates": [
+    "U5",
+    "U9"
+   ],
+   "source": "sheet"
+  },
+  "C66": {
+   "candidates": [
+    "U5",
+    "U9"
+   ],
+   "source": "sheet"
+  },
+  "C69": "U4",
+  "C76": "U1",
+  "C78": "U1",
+  "C79": "U1",
+  "C80": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C81": {
+   "candidates": [
+    "U4",
+    "U9"
+   ],
+   "source": "sheet"
+  },
+  "C82": "U9",
+  "C83": "U4",
+  "C86": {
+   "candidates": [
+    "U5",
+    "U9"
+   ],
+   "source": "sheet"
+  },
+  "C93": {
+   "candidates": [
+    "U5",
+    "U9"
+   ],
+   "source": "sheet"
+  },
+  "C102": "U9",
+  "C109": "U11",
+  "C110": "U11",
+  "C111": "U11",
+  "C115": {
+   "candidates": [
+    "J5",
+    "U1",
+    "U26",
+    "U27",
+    "U33",
+    "U34"
+   ],
+   "source": "supply"
+  },
+  "C116": {
+   "candidates": [
+    "J3",
+    "J2",
+    "U5",
+    "U9",
+    "U43"
+   ],
+   "source": "supply"
+  },
+  "C119": {
+   "candidates": [
+    "J5",
+    "U17",
+    "U18",
+    "J6"
+   ],
+   "source": "sheet"
+  },
+  "C120": {
+   "candidates": [
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37"
+   ],
+   "source": "sheet"
+  },
+  "C121": {
+   "candidates": [
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37"
+   ],
+   "source": "sheet"
+  },
+  "C129": {
+   "candidates": [
+    "J5",
+    "U17",
+    "U18",
+    "J6"
+   ],
+   "source": "sheet"
+  },
+  "C131": "J8",
+  "C132": "U22",
+  "C133": {
+   "candidates": [
+    "U20",
+    "U21",
+    "U22"
+   ],
+   "source": "sheet"
+  },
+  "C134": {
+   "candidates": [
+    "U20",
+    "U21"
+   ],
+   "source": "sheet"
+  },
+  "C135": {
+   "candidates": [
+    "U20",
+    "U21",
+    "U22"
+   ],
+   "source": "sheet"
+  },
+  "C136": {
+   "candidates": [
+    "U20",
+    "U21"
+   ],
+   "source": "sheet"
+  },
+  "C137": {
+   "candidates": [
+    "U20",
+    "U21",
+    "U22"
+   ],
+   "source": "sheet"
+  },
+  "C146": {
+   "candidates": [
+    "U26",
+    "U27"
+   ],
+   "source": "sheet"
+  },
+  "C147": {
+   "candidates": [
+    "U26",
+    "U27"
+   ],
+   "source": "sheet"
+  },
+  "C148": {
+   "candidates": [
+    "U26",
+    "U27"
+   ],
+   "source": "sheet"
+  },
+  "C149": {
+   "candidates": [
+    "U26",
+    "U27"
+   ],
+   "source": "sheet"
+  },
+  "C150": {
+   "candidates": [
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37"
+   ],
+   "source": "sheet"
+  },
+  "C151": {
+   "candidates": [
+    "U33",
+    "U34"
+   ],
+   "source": "sheet"
+  },
+  "C152": {
+   "candidates": [
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37"
+   ],
+   "source": "sheet"
+  },
+  "C153": {
+   "candidates": [
+    "U33",
+    "U34"
+   ],
+   "source": "sheet"
+  },
+  "C154": {
+   "candidates": [
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37"
+   ],
+   "source": "sheet"
+  },
+  "C159": {
+   "candidates": [
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37"
+   ],
+   "source": "sheet"
+  },
+  "C161": "U1",
+  "C162": "U1",
+  "C163": "U1",
+  "C166": "U1",
+  "C167": "U1",
+  "C170": "U1",
+  "C174": "U1",
+  "C180": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C199": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C203": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C208": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C216": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C218": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C221": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C231": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C237": {
+   "candidates": [
+    "U46",
+    "J17",
+    "U41",
+    "J18",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C238": {
+   "candidates": [
+    "U46",
+    "U41",
+    "RP1",
+    "U45",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C239": {
+   "candidates": [
+    "U46",
+    "U41",
+    "RP1",
+    "U45",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C240": {
+   "candidates": [
+    "U46",
+    "U41",
+    "RP1",
+    "U45",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C243": {
+   "candidates": [
+    "U46",
+    "U41",
+    "RP1",
+    "U45",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C244": "J16",
+  "C248": {
+   "candidates": [
+    "U46",
+    "U41",
+    "RP1",
+    "U45",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C249": {
+   "candidates": [
+    "U46",
+    "U41",
+    "RP1",
+    "U45",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C250": "U45",
+  "C251": "U45",
+  "C253": "U45",
+  "C254": "U45",
+  "C255": "U45",
+  "C256": {
+   "candidates": [
+    "U46",
+    "U41",
+    "RP1",
+    "U45",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C257": "U45",
+  "C258": "U45",
+  "C259": {
+   "candidates": [
+    "U46",
+    "J17",
+    "U41",
+    "J18",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C261": {
+   "candidates": [
+    "U46",
+    "J17",
+    "U41",
+    "J18",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C262": {
+   "candidates": [
+    "U46",
+    "U41",
+    "RP1",
+    "U45",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C263": {
+   "candidates": [
+    "U46",
+    "J17",
+    "U41",
+    "J18",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C265": "U45",
+  "C220": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C222": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C224": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C226": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C228": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C230": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C232": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C234": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C164": "U1",
+  "C168": "U1",
+  "C172": "U1",
+  "C176": "U1",
+  "C177": "U1",
+  "C179": "U1",
+  "C181": "U1",
+  "C183": "U1",
+  "C185": "U1",
+  "C187": "U1",
+  "C189": "U1",
+  "C191": "U1",
+  "C192": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C193": "U1",
+  "C195": "U1",
+  "C196": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C198": "U1",
+  "C200": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C201": "U1",
+  "C202": "U1",
+  "C213": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C215": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C217": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C219": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C235": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C236": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C241": "U43",
+  "C276": {
+   "candidates": [
+    "U5",
+    "U9"
+   ],
+   "source": "sheet"
+  },
+  "C157": {
+   "candidates": [
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37"
+   ],
+   "source": "sheet"
+  },
+  "C158": {
+   "candidates": [
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37"
+   ],
+   "source": "sheet"
+  },
+  "C266": {
+   "candidates": [
+    "U46",
+    "J17",
+    "J5",
+    "U1",
+    "U41",
+    "J18",
+    "U4",
+    "U11",
+    "U12",
+    "U17",
+    "U18",
+    "U20",
+    "U21",
+    "U22",
+    "U26",
+    "U27",
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37",
+    "U48",
+    "J6"
+   ],
+   "source": "supply"
+  },
+  "C114": "U12",
+  "C117": {
+   "candidates": [
+    "J3",
+    "J2",
+    "U5",
+    "U9",
+    "U43"
+   ],
+   "source": "supply"
+  },
+  "C4": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C7": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C31": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C34": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2"
+   ],
+   "source": "sheet"
+  },
+  "C57": "U4",
+  "C58": "U4",
+  "C68": "U4",
+  "C70": "U4",
+  "C77": {
+   "candidates": [
+    "U5",
+    "U9"
+   ],
+   "source": "sheet"
+  },
+  "C90": {
+   "candidates": [
+    "J5",
+    "U1",
+    "U26",
+    "U27",
+    "U33",
+    "U34"
+   ],
+   "source": "supply"
+  },
+  "C123": "U1",
+  "C124": "U1",
+  "C125": "U1",
+  "C126": "U1",
+  "C127": "U1",
+  "C155": "U1",
+  "C156": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C160": "U1",
+  "C165": "U1",
+  "C169": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C171": "U1",
+  "C173": "U1",
+  "C175": "U1",
+  "C178": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C182": "U1",
+  "C184": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C186": {
+   "candidates": [
+    "U46",
+    "J17",
+    "J5",
+    "U1",
+    "U41",
+    "J18",
+    "U4",
+    "U11",
+    "U12",
+    "U17",
+    "U18",
+    "U20",
+    "U21",
+    "U22",
+    "U26",
+    "U27",
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37",
+    "U48",
+    "J6"
+   ],
+   "source": "supply"
+  },
+  "C188": {
+   "candidates": [
+    "U46",
+    "J17",
+    "J5",
+    "U1",
+    "U41",
+    "J18",
+    "U4",
+    "U11",
+    "U12",
+    "U17",
+    "U18",
+    "U20",
+    "U21",
+    "U22",
+    "U26",
+    "U27",
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37",
+    "U48",
+    "J6"
+   ],
+   "source": "supply"
+  },
+  "C190": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C194": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U2",
+    "U4",
+    "U9"
+   ],
+   "source": "supply"
+  },
+  "C197": {
+   "candidates": [
+    "J5",
+    "U1",
+    "U26",
+    "U27",
+    "U33",
+    "U34"
+   ],
+   "source": "supply"
+  },
+  "C204": {
+   "candidates": [
+    "J5",
+    "U1",
+    "U26",
+    "U27",
+    "U33",
+    "U34"
+   ],
+   "source": "supply"
+  },
+  "C205": {
+   "candidates": [
+    "U46",
+    "J17",
+    "J5",
+    "U1",
+    "U41",
+    "J18",
+    "U4",
+    "U11",
+    "U12",
+    "U17",
+    "U18",
+    "U20",
+    "U21",
+    "U22",
+    "U26",
+    "U27",
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37",
+    "U48",
+    "J6"
+   ],
+   "source": "supply"
+  },
+  "C206": {
+   "candidates": [
+    "U46",
+    "J17",
+    "J5",
+    "U1",
+    "U41",
+    "J18",
+    "U4",
+    "U11",
+    "U12",
+    "U17",
+    "U18",
+    "U20",
+    "U21",
+    "U22",
+    "U26",
+    "U27",
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37",
+    "U48",
+    "J6"
+   ],
+   "source": "supply"
+  },
+  "C207": {
+   "candidates": [
+    "U46",
+    "U1",
+    "U41",
+    "RP1",
+    "U9",
+    "U22",
+    "U45",
+    "U48"
+   ],
+   "source": "supply"
+  },
+  "C209": {
+   "candidates": [
+    "U46",
+    "J17",
+    "U41",
+    "J18",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C210": {
+   "candidates": [
+    "U46",
+    "U41",
+    "RP1",
+    "U45",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C211": "U45",
+  "C212": {
+   "candidates": [
+    "U46",
+    "J17",
+    "U41",
+    "J18",
+    "U48"
+   ],
+   "source": "sheet"
+  },
+  "C214": "U45",
+  "C227": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C229": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C233": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C246": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C247": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C252": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C260": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C264": {
+   "candidates": [
+    "U1",
+    "U45"
+   ],
+   "source": "supply"
+  },
+  "C277": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C278": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C279": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C280": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C281": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C282": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C283": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C284": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C285": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C286": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C287": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C288": {
+   "candidates": [
+    "U1",
+    "U20",
+    "U21"
+   ],
+   "source": "supply"
+  },
+  "C245": "J16",
+  "C128": {
+   "candidates": [
+    "J5",
+    "U17",
+    "U18",
+    "J6"
+   ],
+   "source": "sheet"
+  },
+  "C130": {
+   "candidates": [
+    "J5",
+    "U17",
+    "U18",
+    "J6"
+   ],
+   "source": "sheet"
+  }
+ },
+ "critical": [
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "Net-(C112-Pad2)",
+    "Net-(C113-Pad2)",
+    "Net-(U17-Pad4)",
+    "Net-(U17-Pad5)"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_501/MDI4_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_501/MDI4_P",
+    "/Principal/BANK_501/MDI4_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_501/MDI3_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_501/MDI3_P",
+    "/Principal/BANK_501/MDI3_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_501/MDI2_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_501/MDI2_P",
+    "/Principal/BANK_501/MDI2_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_501/MDI1_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_501/MDI1_P",
+    "/Principal/BANK_501/MDI1_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_17_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_17_P",
+    "/Principal/BANKS_HP/FMC_HB_17_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_32_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_32_P",
+    "/Principal/BANKS_HR/FMC_LA_32_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_20_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_20_P",
+    "/Principal/BANKS_HP/FMC_HB_20_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_18_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_18_P",
+    "/Principal/BANKS_HP/FMC_HB_18_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_33_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_33_P",
+    "/Principal/BANKS_HR/FMC_LA_33_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_21_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_21_P",
+    "/Principal/BANKS_HP/FMC_HB_21_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_14_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_14_P",
+    "/Principal/BANKS_HP/FMC_HB_14_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_30_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_30_P",
+    "/Principal/BANKS_HR/FMC_LA_30_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_16_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_16_P",
+    "/Principal/BANKS_HP/FMC_HB_16_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_15_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_15_P",
+    "/Principal/BANKS_HP/FMC_HB_15_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_31_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_31_P",
+    "/Principal/BANKS_HR/FMC_LA_31_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_19_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_19_P",
+    "/Principal/BANKS_HP/FMC_HB_19_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_10_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_10_P",
+    "/Principal/BANKS_HP/FMC_HB_10_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_28_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_28_P",
+    "/Principal/BANKS_HR/FMC_LA_28_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_12_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_12_P",
+    "/Principal/BANKS_HP/FMC_HB_12_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_11_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_11_P",
+    "/Principal/BANKS_HP/FMC_HB_11_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_29_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_29_P",
+    "/Principal/BANKS_HR/FMC_LA_29_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_13_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_13_P",
+    "/Principal/BANKS_HP/FMC_HB_13_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_6_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_6_P",
+    "/Principal/BANKS_HP/FMC_HB_6_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_24_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_24_P",
+    "/Principal/BANKS_HR/FMC_LA_24_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_8_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_8_P",
+    "/Principal/BANKS_HP/FMC_HB_8_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_7_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_7_P",
+    "/Principal/BANKS_HP/FMC_HB_7_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_25_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_25_P",
+    "/Principal/BANKS_HR/FMC_LA_25_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_9_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_9_P",
+    "/Principal/BANKS_HP/FMC_HB_9_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_26_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_26_P",
+    "/Principal/BANKS_HR/FMC_LA_26_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_27_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_27_P",
+    "/Principal/BANKS_HR/FMC_LA_27_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_112/DP0_C2M_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_112/DP0_C2M_P",
+    "/Principal/BANK_112/DP0_C2M_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_0_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_0_P",
+    "/Principal/BANKS_HP/FMC_HB_0_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_21_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_21_P",
+    "/Principal/BANKS_HR/FMC_LA_21_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_4_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_4_P",
+    "/Principal/BANKS_HP/FMC_HB_4_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_1_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_1_P",
+    "/Principal/BANKS_HP/FMC_HB_1_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_22_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_22_P",
+    "/Principal/BANKS_HR/FMC_LA_22_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_5_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_5_P",
+    "/Principal/BANKS_HP/FMC_HB_5_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_23_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_23_P",
+    "/Principal/BANKS_HR/FMC_LA_23_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_23_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_23_P",
+    "/Principal/BANKS_HP/FMC_HA_23_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_19_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_19_P",
+    "/Principal/BANKS_HR/FMC_LA_19_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_2_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_2_P",
+    "/Principal/BANKS_HP/FMC_HB_2_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_18_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_18_P",
+    "/Principal/BANKS_HR/FMC_LA_18_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_112/DP1_C2M_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_112/DP1_C2M_P",
+    "/Principal/BANK_112/DP1_C2M_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_22_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_22_P",
+    "/Principal/BANKS_HP/FMC_HA_22_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_20_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_20_P",
+    "/Principal/BANKS_HR/FMC_LA_20_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HB_3_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HB_3_P",
+    "/Principal/BANKS_HP/FMC_HB_3_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_17_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_17_P",
+    "/Principal/BANKS_HR/FMC_LA_17_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_21_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_21_P",
+    "/Principal/BANKS_HP/FMC_HA_21_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_15_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_15_P",
+    "/Principal/BANKS_HR/FMC_LA_15_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_19_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_19_P",
+    "/Principal/BANKS_HP/FMC_HA_19_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_18_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_18_P",
+    "/Principal/BANKS_HP/FMC_HA_18_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_16_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_16_P",
+    "/Principal/BANKS_HR/FMC_LA_16_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_20_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_20_P",
+    "/Principal/BANKS_HP/FMC_HA_20_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_14_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_14_P",
+    "/Principal/BANKS_HR/FMC_LA_14_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_13_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_13_P",
+    "/Principal/BANKS_HR/FMC_LA_13_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_17_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_17_P",
+    "/Principal/BANKS_HP/FMC_HA_17_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_11_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_11_P",
+    "/Principal/BANKS_HR/FMC_LA_11_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_15_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_15_P",
+    "/Principal/BANKS_HP/FMC_HA_15_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_14_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_14_P",
+    "/Principal/BANKS_HP/FMC_HA_14_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_12_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_12_P",
+    "/Principal/BANKS_HR/FMC_LA_12_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_16_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_16_P",
+    "/Principal/BANKS_HP/FMC_HA_16_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_9_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_9_P",
+    "/Principal/BANKS_HR/FMC_LA_9_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_10_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_10_P",
+    "/Principal/BANKS_HR/FMC_LA_10_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_10_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_10_P",
+    "/Principal/BANKS_HP/FMC_HA_10_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_7_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_7_P",
+    "/Principal/BANKS_HR/FMC_LA_7_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_12_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_12_P",
+    "/Principal/BANKS_HP/FMC_HA_12_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_11_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_11_P",
+    "/Principal/BANKS_HP/FMC_HA_11_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_8_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_8_P",
+    "/Principal/BANKS_HR/FMC_LA_8_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_13_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_13_P",
+    "/Principal/BANKS_HP/FMC_HA_13_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_5_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_5_P",
+    "/Principal/BANKS_HR/FMC_LA_5_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_6_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_6_P",
+    "/Principal/BANKS_HP/FMC_HA_6_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_4_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_4_P",
+    "/Principal/BANKS_HR/FMC_LA_4_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_8_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_8_P",
+    "/Principal/BANKS_HP/FMC_HA_8_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_6_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_6_P",
+    "/Principal/BANKS_HR/FMC_LA_6_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_7_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_7_P",
+    "/Principal/BANKS_HP/FMC_HA_7_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_3_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_3_P",
+    "/Principal/BANKS_HR/FMC_LA_3_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_9_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_9_P",
+    "/Principal/BANKS_HP/FMC_HA_9_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_1_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_1_P",
+    "/Principal/BANKS_HR/FMC_LA_1_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_2_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_2_P",
+    "/Principal/BANKS_HP/FMC_HA_2_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_2_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_2_P",
+    "/Principal/BANKS_HR/FMC_LA_2_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_4_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_4_P",
+    "/Principal/BANKS_HP/FMC_HA_4_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_3_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_3_P",
+    "/Principal/BANKS_HP/FMC_HA_3_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_LA_0_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_LA_0_P",
+    "/Principal/BANKS_HR/FMC_LA_0_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_5_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_5_P",
+    "/Principal/BANKS_HP/FMC_HA_5_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_112/DP2_M2C_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_112/DP2_M2C_P",
+    "/Principal/BANK_112/DP2_M2C_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_112/DP0_M2C_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_112/DP0_M2C_P",
+    "/Principal/BANK_112/DP0_M2C_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_CLK1_M2C_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_CLK1_M2C_P",
+    "/Principal/BANKS_HP/FMC_CLK1_M2C_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_CLK0_M2C_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_CLK0_M2C_P",
+    "/Principal/BANKS_HR/FMC_CLK0_M2C_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_0_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_0_P",
+    "/Principal/BANKS_HP/FMC_HA_0_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/MGTREFCLK1_B_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/MGTREFCLK1_B_P",
+    "/Principal/BANKS_HR/MGTREFCLK1_B_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_CLK1_C2M_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_CLK1_C2M_P",
+    "/Principal/BANKS_HP/FMC_CLK1_C2M_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/FMC_CLK0_C2M_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/FMC_CLK0_C2M_P",
+    "/Principal/BANKS_HR/FMC_CLK0_C2M_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/FMC_HA_1_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/FMC_HA_1_P",
+    "/Principal/BANKS_HP/FMC_HA_1_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_112/DP2_C2M_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_112/DP2_C2M_P",
+    "/Principal/BANK_112/DP2_C2M_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_112/DP1_M2C_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_112/DP1_M2C_P",
+    "/Principal/BANK_112/DP1_M2C_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/TMDS_D2_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/TMDS_D2_P",
+    "/Principal/BANKS_HR/TMDS_D2_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/TMDS_D1_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/TMDS_D1_P",
+    "/Principal/BANKS_HR/TMDS_D1_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/TMDS_D0_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/TMDS_D0_P",
+    "/Principal/BANKS_HR/TMDS_D0_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_112/MGTXRX0_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_112/MGTXRX0_P",
+    "/Principal/BANK_112/MGTXRX0_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/TMDS_CLK_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/TMDS_CLK_P",
+    "/Principal/BANKS_HR/TMDS_CLK_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_112/MGTXTX0_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_112/MGTXTX0_P",
+    "/Principal/BANK_112/MGTXTX0_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_502/DDR_DQS3_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_502/DDR_DQS3_P",
+    "/Principal/BANK_502/DDR_DQS3_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_112/MGTREFCLK0_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_112/MGTREFCLK0_P",
+    "/Principal/BANK_112/MGTREFCLK0_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_502/DDR_DQS2_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_502/DDR_DQS2_P",
+    "/Principal/BANK_502/DDR_DQS2_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_502/DDR_CLK_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_502/DDR_CLK_P",
+    "/Principal/BANK_502/DDR_CLK_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HR/MGTREFCLK1_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HR/MGTREFCLK1_P",
+    "/Principal/BANKS_HR/MGTREFCLK1_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_502/DDR_DQS1_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_502/DDR_DQS1_P",
+    "/Principal/BANK_502/DDR_DQS1_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_502/DDR_DQS0_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_502/DDR_DQS0_P",
+    "/Principal/BANK_502/DDR_DQS0_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANKS_HP/SYSCLK_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANKS_HP/SYSCLK_P",
+    "/Principal/BANKS_HP/SYSCLK_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_3CK_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_3CK_P",
+    "/Principal/OneBank/BTM_3CK_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_0CK_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_0CK_P",
+    "/Principal/OneBank/BTM_0CK_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_3RX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_3RX_P",
+    "/Principal/OneBank/BTM_3RX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_0RX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_0RX_P",
+    "/Principal/OneBank/BTM_0RX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_3TX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_3TX_P",
+    "/Principal/OneBank/BTM_3TX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_0TX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_0TX_P",
+    "/Principal/OneBank/BTM_0TX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/OB_USB0_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/OB_USB0_P",
+    "/Principal/OneBank/OB_USB0_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_2CK_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_2CK_P",
+    "/Principal/OneBank/BTM_2CK_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_1CK_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_1CK_P",
+    "/Principal/OneBank/BTM_1CK_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_2RX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_2RX_P",
+    "/Principal/OneBank/BTM_2RX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_1RX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_1RX_P",
+    "/Principal/OneBank/BTM_1RX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_2TX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_2TX_P",
+    "/Principal/OneBank/BTM_2TX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/BTM_1TX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/BTM_1TX_P",
+    "/Principal/OneBank/BTM_1TX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/OB_USB1_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/OB_USB1_P",
+    "/Principal/OneBank/OB_USB1_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_501/USB_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_501/USB_P",
+    "/Principal/BANK_501/USB_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/MGTXTX0_B_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/MGTXTX0_B_P",
+    "/Principal/OneBank/MGTXTX0_B_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/TOP_3TX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/TOP_3TX_P",
+    "/Principal/OneBank/TOP_3TX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/TOP_3RX_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/TOP_3RX_P",
+    "/Principal/OneBank/TOP_3RX_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/OneBank/TOP_3CK_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/OneBank/TOP_3CK_P",
+    "/Principal/OneBank/TOP_3CK_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_0/DBG_USB_B_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_0/DBG_USB_B_P",
+    "/Principal/BANK_0/DBG_USB_B_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_501/USB_B_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_501/USB_B_P",
+    "/Principal/BANK_501/USB_B_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_500/CAN_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_500/CAN_P",
+    "/Principal/BANK_500/CAN_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_500/RS485_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_500/RS485_P",
+    "/Principal/BANK_500/RS485_N"
+   ]
+  },
+  {
+   "name": "pair /Principal/BANK_0/DBG_USB_P",
+   "kind": "pair",
+   "pair": [
+    "/Principal/BANK_0/DBG_USB_P",
+    "/Principal/BANK_0/DBG_USB_N"
+   ]
+  }
+ ]
+}

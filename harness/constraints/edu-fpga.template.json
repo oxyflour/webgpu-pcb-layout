@@ -1,0 +1,360 @@
+{
+ "board": "edu-fpga",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C3": "J4",
+  "C6": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C57": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C33": "U3",
+  "C1": "J1",
+  "C2": "J4",
+  "C5": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C16": "U4",
+  "C17": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C18": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C19": "U4",
+  "C20": "U4",
+  "C21": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C22": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C23": "U4",
+  "C24": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C25": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C26": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C27": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C28": {
+   "candidates": [
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "sheet"
+  },
+  "C29": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C30": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C31": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C32": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C36": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C37": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C38": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C39": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C40": "U3",
+  "C41": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C42": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C43": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C44": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C45": "U3",
+  "C48": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C49": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C50": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C51": {
+   "candidates": [
+    "J5",
+    "J6",
+    "U3",
+    "J4",
+    "U4",
+    "U5",
+    "U6"
+   ],
+   "source": "supply"
+  },
+  "C52": "U3",
+  "C53": "U3",
+  "C54": "U3",
+  "C55": "U3",
+  "C56": "U3",
+  "C58": {
+   "candidates": [
+    "J5",
+    "J6",
+    "J4"
+   ],
+   "source": "sheet"
+  },
+  "C59": {
+   "candidates": [
+    "J5",
+    "J6",
+    "J4"
+   ],
+   "source": "sheet"
+  }
+ },
+ "critical": [
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "/FTDI_config/OSCI_ftdi"
+   ]
+  },
+  {
+   "name": "pair /FTDI_config/USB_DP",
+   "kind": "pair",
+   "pair": [
+    "/FTDI_config/USB_DP",
+    "/FTDI_config/USB_DM"
+   ]
+  }
+ ]
+}

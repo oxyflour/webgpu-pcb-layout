@@ -1,0 +1,154 @@
+{
+ "board": "edk",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C1": {
+   "candidates": [
+    "U2",
+    "U1",
+    "U3",
+    "U4",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C2": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U4",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C3": {
+   "candidates": [
+    "U2",
+    "U1",
+    "U3",
+    "U4",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C6": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U4",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C7": {
+   "candidates": [
+    "U2",
+    "U1",
+    "U3",
+    "U4",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C8": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U4",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C9": {
+   "candidates": [
+    "U2",
+    "U1",
+    "U3",
+    "U4",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C10": {
+   "candidates": [
+    "U1",
+    "U3",
+    "U4",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C11": {
+   "candidates": [
+    "U2",
+    "U1",
+    "U3",
+    "U4",
+    "U5"
+   ],
+   "source": "sheet"
+  },
+  "C12": "U2",
+  "C13": "U8",
+  "C14": "U8",
+  "C16": {
+   "candidates": [
+    "J3",
+    "U10"
+   ],
+   "source": "sheet"
+  },
+  "C17": "U10",
+  "C18": {
+   "candidates": [
+    "J3",
+    "U10"
+   ],
+   "source": "sheet"
+  },
+  "C19": {
+   "candidates": [
+    "P1",
+    "P3"
+   ],
+   "source": "supply"
+  },
+  "C20": {
+   "candidates": [
+    "J3",
+    "P1",
+    "U2",
+    "P3",
+    "U1",
+    "U3",
+    "U4",
+    "U5",
+    "U10"
+   ],
+   "source": "supply"
+  },
+  "C21": {
+   "candidates": [
+    "P1",
+    "U8",
+    "P3",
+    "U1",
+    "U3",
+    "U4",
+    "U5",
+    "U10"
+   ],
+   "source": "supply"
+  }
+ },
+ "critical": [
+  {
+   "name": "pair /CPU/USB_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_DP",
+    "/CPU/USB_DM"
+   ]
+  }
+ ]
+}

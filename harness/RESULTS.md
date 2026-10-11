@@ -1225,3 +1225,65 @@ human-metrics-v12d.jsonl):
 With agents the decaps reach (k60) or pass (pic) the human distance, and routing stays within the
 session spread (k60 mean 312 clean / 475 vias vs 315 / 447; pic 310 / 400 vs 309 / 452; one weak
 floorplan per arm). Kept as the default.
+
+
+## Design constraints: decap assignment and critical nets (2026-10-11)
+
+`lib/constraints.mjs`: per board, which IC each decoupling capacitor serves and which nets are
+critical. Defaults from the KiCad files, overridable with harness/constraints/<board>.json
+(harness/constraints/<board>.template.json = the defaults in that format, written for the 14 boards):
+- decaps: the ICs on the capacitor's supply in the same schematic sheet (footprint `path`), else
+  every IC on the supply; a file entry gives one IC (`"C201": "U201"`, optional `maxMm`) or candidates;
+- critical: KiCad net classes other than Default / power classes (KiCad <= 5 in the .kicad_pcb, >= 6
+  in the .kicad_pro), crystal nets, differential pairs by name; a file entry gives nets / pair / class
+  and limits (maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority).
+
+Sheet inference against the human layout (the human's nearest IC is among the assigned ones):
+z3r0 7/7, pico 9/9, edk 14/14, edu-fpga 17/17, fsl-mini 23/26, edu-k60 28/28, edu-nxp 28/28, safety
+56/62, pic 30/50, nxp 45/53, rx 43/45, k60 48/51, acc 116/124 (sheet-assigned decaps); ppc-n3 has no
+sheet paths (fallback: any IC on the supply).
+
+v12 sweep layouts (before the decap term) against the constraints (`experiments/constraints-eval.mjs`,
+rows in results/constraints-v12.jsonl; same scoring as human-metrics):
+
+| Board | Decoupling capacitors (count) / assigned by schematic sheet (count) | Distance to the assigned IC, median: human / no agent / agent (mm) | Within 3 mm of the assigned IC: human / no agent / agent (share) |
+|---|---|---|---|
+| z3r0 | 7 / 7 | 4.9 / 6.9 / 6.4 | 0.43 / 0.05 / 0.00 |
+| pico | 9 / 9 | 1.6 / 16.3 / 12.3 | 0.78 / 0.04 / 0.04 |
+| edk | 18 / 14 | 3.4 / 21.4 / 25.1 | 0.22 / 0.04 / 0.04 |
+| edu-fpga | 45 / 17 | 5.8 / 14.3 / 15.0 | 0.09 / 0.03 / 0.03 |
+| fsl-mini | 29 / 26 | 5.3 / 29.3 / 26.5 | 0.10 / 0.02 / 0.01 |
+| edu-k60 | 32 / 28 | 5.7 / 25.5 / 24.1 | 0.28 / 0.00 / 0.01 |
+| edu-nxp | 31 / 28 | 6.2 / 17.6 / 12.9 | 0.32 / 0.01 / 0.02 |
+| safety | 62 / 62 | 5.2 / 28.0 / 31.9 | 0.08 / 0.01 / 0.02 |
+| pic | 56 / 50 | 8.7 / 18.1 / 22.1 | 0.13 / 0.05 / 0.03 |
+| nxp | 55 / 53 | 4.1 / 15.9 / 12.3 | 0.36 / 0.07 / 0.06 |
+| rx | 47 / 45 | 3.2 / 10.7 / 11.1 | 0.45 / 0.05 / 0.09 |
+| k60 | 55 / 51 | 3.3 / 33.4 / 36.6 | 0.45 / 0.00 / 0.01 |
+| acc | 235 / 124 | 0.9 / 15.7 / 9.6 | 0.85 / 0.12 / 0.17 |
+| ppc-n3 | 553 / 0 | 2.7 / 15.1 / 10.6 | 0.52 / 0.07 / 0.10 |
+
+| Board | Critical constraints (count): net classes / crystal / pairs | Not routed: human / no agent / agent (count of constraints) | Routed length, sum: human / no agent / agent (mm) | Vias, sum: human / no agent / agent (count) | Pair length mismatch, median: human / no agent / agent (mm) | Constraints with more vias than the human: no agent / agent (count) |
+|---|---|---|---|---|---|---|
+| z3r0 | 0 / 0 / 2 | 0.0 / 0.0 / 0.0 | 36 / 18 / 19 | 4 / 5 / 3 | 0.8 / 1.6 / 1.5 | 0.3 / 0.0 |
+| pico | 0 / 1 / 1 | 0.0 / 0.0 / 0.0 | 47 / 47 / 45 | 11 / 8 / 8 | 0.4 / 3.9 / 3.2 | 0.0 / 0.0 |
+| edk | 0 / 0 / 1 | 0.0 / 0.0 / 0.0 | 88 / 81 / 82 | 2 / 3 / 3 | 1.2 / 3.6 / 2.8 | 0.3 / 0.3 |
+| edu-fpga | 0 / 1 / 1 | 0.0 / 0.0 / 0.0 | 69 / 88 / 89 | 4 / 2 / 4 | 1.2 / 1.2 / 1.9 | 0.7 / 0.3 |
+| fsl-mini | 2 / 1 / 7 | 0.0 / 0.0 / 0.0 | 692 / 709 / 690 | 24 / 44 / 38 | 1.6 / 2.4 / 3.3 | 6.0 / 5.0 |
+| edu-k60 | 1 / 1 / 2 | 0.0 / 0.0 / 0.0 | 518 / 518 / 434 | 18 / 23 / 17 | 0.8 / 0.7 / 0.9 | 1.7 / 0.7 |
+| edu-nxp | 2 / 1 / 2 | 0.0 / 0.0 / 0.0 | 519 / 486 / 571 | 22 / 30 / 17 | 0.0 / 1.1 / 0.3 | 1.0 / 1.0 |
+| safety | 0 / 1 / 2 | 0.0 / 0.0 / 0.0 | 179 / 168 / 115 | 2 / 14 / 10 | 3.6 / 2.5 / 6.0 | 2.7 / 3.0 |
+| pic | 1 / 1 / 5 | 0.0 / 0.0 / 0.0 | 321 / 261 / 303 | 14 / 18 / 22 | 3.2 / 1.9 / 1.7 | 2.3 / 3.3 |
+| nxp | 2 / 1 / 3 | 0.0 / 0.0 / 0.0 | 368 / 457 / 483 | 26 / 48 / 41 | 1.2 / 1.3 / 1.3 | 5.0 / 3.7 |
+| rx | 2 / 1 / 3 | 0.0 / 0.0 / 0.0 | 408 / 449 / 481 | 25 / 37 / 34 | 0.8 / 1.9 / 0.7 | 3.3 / 3.0 |
+| k60 | 1 / 1 / 2 | 0.0 / 0.0 / 0.7 | 337 / 368 / 363 | 8 / 20 / 17 | 1.6 / 2.7 / 1.5 | 3.0 / 2.7 |
+| acc | 0 / 1 / 133 | 0.0 / 0.0 / 0.0 | 9236 / 11479 / 8720 | 1278 / 1395 / 1266 | 1.2 / 1.6 / 1.5 | 57.0 / 49.0 |
+| ppc-n3 | 0 / 1 / 56 | 0.0 / 0.0 / 0.0 | 5640 / 4025 / 3503 | 704 / 755 / 740 | 1.2 / 3.1 / 2.8 | 14.7 / 17.7 |
+
+Detail pass with the assignment (`lib/detail.mjs`: the decap term measures the distance to the
+assigned ICs, + 10 x kappa per mm beyond a decap's maxMm; the relocate move jumps a decap next to a
+supply pad of its IC). 13 boards x 3 seeds, same starts, kappa 0 vs default 0.5
+(results/detail-assigned.jsonl): decaps within 3 mm of their assigned IC 0.03 -> 0.63 (median
+distance e.g. k60 33-38 -> 2.2-2.5 mm, pico 14-19 -> 0.5, acc 16 -> 0.6-0.7; safety 28-32 -> 13-14 and
+fsl-mini 24-32 -> 16-18 stay far), vias x1.026, clean nets equal on 11 boards, k60 +2, pic -25 (-20 on
+one seed: the most congested board).

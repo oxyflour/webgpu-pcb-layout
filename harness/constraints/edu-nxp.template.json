@@ -1,0 +1,273 @@
+{
+ "board": "edu-nxp",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C19": "U4",
+  "C29": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C18": "U4",
+  "C50": "U9",
+  "C49": {
+   "candidates": [
+    "U9",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C34": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C31": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C30": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C28": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C27": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C26": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C25": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C21": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C20": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C32": "U4",
+  "C48": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C2": "U1",
+  "C47": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C46": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C45": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C44": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C4": "U9",
+  "C22": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C23": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C24": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C40": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "sheet"
+  },
+  "C6": {
+   "candidates": [
+    "U5",
+    "U6",
+    "U4",
+    "U7",
+    "P3"
+   ],
+   "source": "supply"
+  },
+  "C3": "U9",
+  "C33": "U4",
+  "C1": "U1",
+  "C5": {
+   "candidates": [
+    "U9",
+    "U1"
+   ],
+   "source": "supply"
+  }
+ },
+ "critical": [
+  {
+   "name": "class Pistas 0.35",
+   "kind": "class",
+   "class": "Pistas 0.35",
+   "traceWidth": 0.35,
+   "clearance": 0.2032
+  },
+  {
+   "name": "class USB diff90",
+   "kind": "class",
+   "class": "USB diff90",
+   "traceWidth": 0.3175,
+   "clearance": 0.2032
+  },
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "/CPU/FT_XTIN",
+    "/CPU/FT_XTOUT",
+    "/CPU/XTAL1",
+    "/CPU/XTAL2",
+    "/CPU/RTCX1",
+    "/CPU/RTCX2"
+   ]
+  },
+  {
+   "name": "pair /CPU/USB_JTAG_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_JTAG_DP",
+    "/CPU/USB_JTAG_DM"
+   ]
+  },
+  {
+   "name": "pair /CPU/USB_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_DP",
+    "/CPU/USB_DM"
+   ]
+  }
+ ]
+}

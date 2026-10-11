@@ -1,0 +1,35 @@
+{
+ "board": "pico",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C5": "U2",
+  "C13": "U2",
+  "C14": "U2",
+  "C24": "U5",
+  "C25": "U5",
+  "C26": "U5",
+  "C27": "U5",
+  "C4": "U2",
+  "C1": "P1"
+ },
+ "critical": [
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "Net-(C21-Pad1)",
+    "Net-(C20-Pad1)",
+    "Net-(C6-Pad1)",
+    "Net-(C7-Pad1)"
+   ]
+  },
+  {
+   "name": "pair /Debugger/USB_P",
+   "kind": "pair",
+   "pair": [
+    "/Debugger/USB_P",
+    "/Debugger/USB_N"
+   ]
+  }
+ ]
+}

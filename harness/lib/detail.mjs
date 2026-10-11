@@ -11,10 +11,11 @@
 // 4 mm bucket grid of part bodies.
 // experiments/attract.mjs (obj hpwlg) is the offline version; RESULTS.md "Attraction test".
 import { rotatedSize, worldPin } from './board.mjs';
-import { boardAnalysis } from './human-metrics.mjs';
+import { loadConstraints } from './constraints.mjs';
 // Optional human-practice terms (RESULTS.md "New metrics against the human layout"):
-//   kappa (default 0.5) * distance (mm) of every decoupling capacitor's supply pad to the nearest pad of an IC on
-//   the same supply beyond decapFreeMm (lib/human-metrics.mjs definitions); chi: crystal nets count (1 + chi) x HPWL.
+//   kappa (default 0.5) * distance (mm) of every decoupling capacitor's supply pad to the nearest supply pad of
+//   its assigned IC(s) (lib/constraints.mjs: constraint file, else same schematic sheet, else any IC on the
+//   supply) beyond decapFreeMm, + 10 x kappa per mm beyond a decap's maxMm; chi: crystal nets count (1 + chi) x HPWL.
 const analyses = new WeakMap();
 
 export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals = Infinity, budgetS = 30, seed = 1, gap = 0.8, clearance = 0.1, kappa = 0.5, decapFreeMm = 0, chi = 0 } = {}) {
@@ -42,12 +43,13 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
     for (const pi of ps) { const [x, y] = worldPin(p, L, pi); if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return x1 - x0 + y1 - y0; };
   const hpN = p.nets.map((_, ni) => hp(ni));
   // Decoupling and crystal terms.
-  const HA = kappa || chi ? (analyses.get(b) ?? (analyses.set(b, boardAnalysis(b)), analyses.get(b))) : null;
+  const CN = kappa || chi ? (analyses.get(b) ?? (analyses.set(b, loadConstraints(b)), analyses.get(b))) : null, HA = CN?.analysis;
   const wN = new Float64Array(p.nets.length).fill(1); if (chi) for (const ni of HA.groups.crystal) wN[ni] = 1 + chi;
-  const decaps = kappa ? HA.decaps.map((d) => ({ ...d, ic: HA.icPadsOn[d.net].filter((q) => HA.padOf[q].comp !== d.comp) })).filter((d) => d.ic.length) : [];
+  const decaps = kappa ? CN.decaps.map((d) => { const ics = new Set(d.ics); return { ...d, ic: HA.icPadsOn[d.net].filter((q) => ics.has(HA.padOf[q].comp)) }; }).filter((d) => d.ic.length) : [];
+  const decapOwn = new Int32Array(n).fill(-1); decaps.forEach((d, k) => { decapOwn[d.comp] = k; });
   const decapsBy = Array.from({ length: n }, () => []); decaps.forEach((d, k) => { decapsBy[d.comp].push(k); for (const q of new Set(d.ic.map((q) => HA.padOf[q].comp))) decapsBy[q].push(k); });
   const centre = (rp) => { const q = L[rp.comp], [rx, ry] = rq(q.side ? -rp.lx : rp.lx, rp.ly, q.rotation); return [q.x + rx, q.y + ry]; };
-  const decapDist = (k) => { const d = decaps[k], [x, y] = centre(HA.padOf[d.pad].rp); let best = Infinity; for (const q of d.ic) { const [u, v] = centre(HA.padOf[q].rp), e = Math.hypot(u - x, v - y); if (e < best) best = e; } return Math.max(0, best - decapFreeMm); };
+  const decapDist = (k) => { const d = decaps[k], [x, y] = centre(HA.padOf[d.pad].rp); let best = Infinity; for (const q of d.ic) { const [u, v] = centre(HA.padOf[q].rp), e = Math.hypot(u - x, v - y); if (e < best) best = e; } return Math.max(0, best - decapFreeMm) + (d.maxMm != null ? 10 * Math.max(0, best - d.maxMm) : 0); };
   const decapOf = (parts) => { if (!kappa) return 0; const ks = new Set(parts.flatMap((i) => decapsBy[i])); let s = 0; for (const k of ks) s += decapDist(k); return s; };
   // Channel deficit (router pad geometry, as src/router/board-router.js rasterizes it).
   const RP = b.a.routing.pads, padsOf = Array.from({ length: n }, () => []); RP.forEach((pad, pi) => padsOf[pad.comp].push(pi));
@@ -72,7 +74,8 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
   let tried = 0, accepted = 0, delta = 0;
   while (tried < evals && (performance.now() - t0) / 1000 < budgetS) {
     const i = pickOf(small), old = { ...L[i] }, kind = rnd(); let j = -1, oldJ = null;
-    if (kind < relocate) { const m = partnerMean(i); if (!m) continue; L[i] = { ...old, x: m[0] + (rnd() * 2 - 1) * 1.5, y: m[1] + (rnd() * 2 - 1) * 1.5 }; }
+    // relocate: next to the partners' mean; a decoupling capacitor jumps next to a supply pad of its IC.
+    if (kind < relocate) { const own = decapOwn[i], m = own >= 0 ? centre(HA.padOf[pickOf(decaps[own].ic)].rp) : partnerMean(i); if (!m) continue; L[i] = { ...old, x: m[0] + (rnd() * 2 - 1) * 1.5, y: m[1] + (rnd() * 2 - 1) * 1.5 }; }
     else if (kind < relocate + (1 - relocate) * 0.55) { const st = pickOf([0.4, 0.8, 1.2, 2]), dir = pickOf([[1, 0], [-1, 0], [0, 1], [0, -1]]); L[i] = { ...old, x: old.x + dir[0] * st, y: old.y + dir[1] * st }; }
     else if (kind < relocate + (1 - relocate) * 0.8) { if (C[i].rotatable === false) continue; L[i] = { ...old, rotation: (old.rotation + pickOf([1, 2, 3])) % 4 }; }
     else { const sz = sizeKey(i, old.rotation);

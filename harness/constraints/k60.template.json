@@ -1,0 +1,325 @@
+{
+ "board": "k60",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C1106": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803",
+    "U403",
+    "U501",
+    "U401"
+   ],
+   "source": "supply"
+  },
+  "C1102": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803",
+    "U403",
+    "U501",
+    "U401"
+   ],
+   "source": "supply"
+  },
+  "C405": {
+   "candidates": [
+    "U403",
+    "U401"
+   ],
+   "source": "sheet"
+  },
+  "C231": "U201",
+  "C502": "U501",
+  "C313": {
+   "candidates": [
+    "U302",
+    "U303",
+    "J301"
+   ],
+   "source": "sheet"
+  },
+  "C909": "U901",
+  "C401": {
+   "candidates": [
+    "U403",
+    "U401"
+   ],
+   "source": "sheet"
+  },
+  "C1103": {
+   "candidates": [
+    "U1001",
+    "U1301",
+    "U402",
+    "U1302",
+    "U302",
+    "U1303",
+    "U303",
+    "U1002",
+    "U1003",
+    "J1303",
+    "U201",
+    "J301"
+   ],
+   "source": "supply"
+  },
+  "C1303": "U1302",
+  "C1201": "U1201",
+  "C1313": "U1302",
+  "C1104": "U201",
+  "C1305": "U1302",
+  "C205": "U201",
+  "C1314": {
+   "candidates": [
+    "U1301",
+    "U1302",
+    "U1303",
+    "J1303"
+   ],
+   "source": "sheet"
+  },
+  "C1312": "U1302",
+  "C209": "U201",
+  "C1315": {
+   "candidates": [
+    "U1301",
+    "U1302",
+    "U1303",
+    "J1303"
+   ],
+   "source": "sheet"
+  },
+  "C1316": {
+   "candidates": [
+    "U1301",
+    "U1302",
+    "U1303",
+    "J1303"
+   ],
+   "source": "sheet"
+  },
+  "C1317": {
+   "candidates": [
+    "U1301",
+    "U1302",
+    "U1303",
+    "J1303"
+   ],
+   "source": "sheet"
+  },
+  "C214": "U201",
+  "C1301": {
+   "candidates": [
+    "U1301",
+    "U1302",
+    "U1303",
+    "J1303"
+   ],
+   "source": "sheet"
+  },
+  "C1302": {
+   "candidates": [
+    "U1301",
+    "U1302",
+    "U1303",
+    "J1303"
+   ],
+   "source": "sheet"
+  },
+  "C1311": "U1302",
+  "C217": "U201",
+  "C218": "U201",
+  "C221": "U201",
+  "C223": "U201",
+  "C224": "U201",
+  "C227": "U201",
+  "C212": "U201",
+  "C1318": {
+   "candidates": [
+    "U1301",
+    "U1302",
+    "U1303",
+    "J1303"
+   ],
+   "source": "sheet"
+  },
+  "C201": "U201",
+  "C501": "U501",
+  "C402": {
+   "candidates": [
+    "U403",
+    "U401"
+   ],
+   "source": "sheet"
+  },
+  "C910": "U901",
+  "C808": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803"
+   ],
+   "source": "sheet"
+  },
+  "C804": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803"
+   ],
+   "source": "sheet"
+  },
+  "C409": {
+   "candidates": [
+    "U403",
+    "U401"
+   ],
+   "source": "sheet"
+  },
+  "C807": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803"
+   ],
+   "source": "sheet"
+  },
+  "C803": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803"
+   ],
+   "source": "sheet"
+  },
+  "C806": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803"
+   ],
+   "source": "sheet"
+  },
+  "C802": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803"
+   ],
+   "source": "sheet"
+  },
+  "C805": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803"
+   ],
+   "source": "sheet"
+  },
+  "C801": {
+   "candidates": [
+    "K804",
+    "K801",
+    "K802",
+    "K803"
+   ],
+   "source": "sheet"
+  },
+  "C406": "U402",
+  "C1001": {
+   "candidates": [
+    "U1001",
+    "U1002",
+    "U1003"
+   ],
+   "source": "sheet"
+  },
+  "C1002": {
+   "candidates": [
+    "U1001",
+    "U1002",
+    "U1003"
+   ],
+   "source": "sheet"
+  },
+  "C1003": {
+   "candidates": [
+    "U1001",
+    "U1002",
+    "U1003"
+   ],
+   "source": "sheet"
+  },
+  "C230": "U201",
+  "C503": "U501",
+  "C301": {
+   "candidates": [
+    "U302",
+    "U303",
+    "J301"
+   ],
+   "source": "sheet"
+  },
+  "C302": {
+   "candidates": [
+    "U302",
+    "U303",
+    "J301"
+   ],
+   "source": "sheet"
+  },
+  "C312": {
+   "candidates": [
+    "U302",
+    "U303",
+    "J301"
+   ],
+   "source": "sheet"
+  }
+ },
+ "critical": [
+  {
+   "name": "class USB",
+   "kind": "class",
+   "class": "USB",
+   "traceWidth": 0.254,
+   "clearance": 0.1778
+  },
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "N-00000104",
+    "N-00000105"
+   ]
+  },
+  {
+   "name": "pair /JTAG/USB_JTAG_DP",
+   "kind": "pair",
+   "pair": [
+    "/JTAG/USB_JTAG_DP",
+    "/JTAG/USB_JTAG_DM"
+   ]
+  },
+  {
+   "name": "pair /CPU/USB_DP",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_DP",
+    "/CPU/USB_DM"
+   ]
+  }
+ ]
+}

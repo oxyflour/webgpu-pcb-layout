@@ -1,0 +1,80 @@
+{
+ "board": "z3r0",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C2": {
+   "candidates": [
+    "J2",
+    "J5",
+    "U1"
+   ],
+   "source": "sheet"
+  },
+  "C3": {
+   "candidates": [
+    "J2",
+    "J5",
+    "U1"
+   ],
+   "source": "sheet"
+  },
+  "C4": {
+   "candidates": [
+    "J2",
+    "J5",
+    "U1"
+   ],
+   "source": "sheet"
+  },
+  "C5": {
+   "candidates": [
+    "J2",
+    "J5",
+    "U1"
+   ],
+   "source": "sheet"
+  },
+  "C6": {
+   "candidates": [
+    "J2",
+    "J5",
+    "U1"
+   ],
+   "source": "sheet"
+  },
+  "C8": {
+   "candidates": [
+    "J2",
+    "J5",
+    "U1"
+   ],
+   "source": "sheet"
+  },
+  "C10": {
+   "candidates": [
+    "J2",
+    "J5",
+    "U1"
+   ],
+   "source": "sheet"
+  }
+ },
+ "critical": [
+  {
+   "name": "pair /B_USB+",
+   "kind": "pair",
+   "pair": [
+    "/B_USB+",
+    "/B_USB-"
+   ]
+  },
+  {
+   "name": "pair /USB+",
+   "kind": "pair",
+   "pair": [
+    "/USB+",
+    "/USB-"
+   ]
+  }
+ ]
+}
