@@ -1420,3 +1420,44 @@ few vias where it trades: k60 session 3 submitted c007 (0 failing, 477 vias) ove
 463). The k60 v14 drop (sessions 1 / 2: 308 / 276 clean) is not the ranking, which only reorders
 candidates with equal clean nets: their best candidates reached only 308 and 276 clean (weak IC
 floorplans; the same session spread as before, e.g. v12d 306 / 580). pic vias 384 vs 378 (means), equal.
+
+
+## Weighted HPWL learned from the human boards (perfect-context diagnostic, 2026-10-11)
+
+Question: can per-net-class weights in HPWL make the human small-part positions optimal?
+`experiments/hpwl-weights.mjs` (results/hpwl-weights.json): every other part at its human pose, one small
+part (movable, < 8 pins) at a time with its human rotation; its weighted HPWL is separable in x / y,
+convex and piecewise linear, so its minimizers form a box, and the score is the distance of the human
+centre to that box (0 = human optimal). Net classes: size (2 / 3-5 / 6-30 parts) x large parts on it
+(none / IC / connector / both), crystal, differential pair. Weights learned with a ranking loss (the
+human position must not lose to x / y shifts of 0.5-5 mm), leave one board out over 13 boards;
+ppc-n3 is test only.
+
+| Board | Small parts (count) | Human centre reachable by some weighting (share) | Unweighted HPWL: distance of the human centre to the optimum, median (mm) | Unweighted: human at the optimum (share) | Learned class weights, leave one board out: distance, median (mm) | Learned: human at the optimum (share) | Tool start rule: distance to the human centre, median (mm) |
+|---|---|---|---|---|---|---|---|
+| z3r0 | 14 | 0.57 | 0 | 0.57 | 1.36 | 0.29 | 2.45 |
+| pico | 41 | 0.32 | 1.55 | 0.29 | 1.7 | 0.2 | 3.24 |
+| edk | 41 | 0.49 | 0.94 | 0.41 | 1.91 | 0.32 | 2.94 |
+| edu-fpga | 69 | 0.39 | 1.95 | 0.3 | 2.27 | 0.23 | 4.05 |
+| fsl-mini | 87 | 0.43 | 1.84 | 0.36 | 1.88 | 0.34 | 4.54 |
+| edu-k60 | 126 | 0.53 | 1.01 | 0.42 | 1.71 | 0.36 | 4.03 |
+| edu-nxp | 136 | 0.48 | 1.43 | 0.4 | 1.78 | 0.35 | 4.36 |
+| safety | 199 | 0.31 | 2.7 | 0.2 | 3.08 | 0.17 | 5.77 |
+| pic | 335 | 0.44 | 1.93 | 0.28 | 2.29 | 0.22 | 4.07 |
+| nxp | 330 | 0.46 | 2.03 | 0.24 | 2.38 | 0.21 | 4.54 |
+| rx | 349 | 0.46 | 1.78 | 0.3 | 2.15 | 0.24 | 4.3 |
+| k60 | 341 | 0.43 | 1.74 | 0.28 | 1.85 | 0.22 | 3.15 |
+| acc | 291 | 0.43 | 0.93 | 0.35 | 1.17 | 0.29 | 3.2 |
+| ppc-n3 (test only) | 1466 | 0.51 | 0.5 | 0.43 | 1.25 | 0.35 | 3.71 |
+
+- Only 31-57 % of the human small parts lie inside the region any weighting of their nets can reach
+  (the per-axis span of their pins' breakpoints); the others sit off it (rows, channels, spacing).
+- Plain HPWL is already close in perfect context (median 0.5-2.7 mm, 20-57 % exactly optimal), and
+  the learned class weights are worse on every board (median +0.1 to +1.4 mm). The best class weights
+  found in sample (coordinate search over 0.1-10 per class, scored on the training boards themselves)
+  change the mean distance only from 2.362 to 2.359 mm: no class weighting beats unweighted HPWL.
+- The tool's start rule (weighted mean of partner pins) is 2.5-5.8 mm off in the same setting, 1.5-3x
+  the HPWL optimum; the detail pass already minimizes HPWL afterwards, so this matters only as a start.
+
+So learning net weights for HPWL is a dead end for small parts: the remaining gap is positions HPWL
+cannot express at all, not a weighting of what it expresses. Not pursued further.
