@@ -1385,5 +1385,7 @@ IC (2.1-2.3 mm on k60 vs human 3.3; the nearest-IC term of v12d left them 13-14 
 one) and the constrained pairs are shorter (k60 149-171 mm vs 200-214, human 174), while clean nets
 and vias stay within the session spread (k60 mean 316.7 / 498 vs 313.3 / 496; pic 310 / 384 vs 310 /
 406). It does not make more pairs via-free (k60 4 of 6 vs 4 of 6; pic 8 of 9 vs 9 of 9): the agents
-read the constraints but their lever is still the IC floorplan, and a failing pair in a session was
-not fixed by a later candidate.
+read the constraints, and within a session the failing count changes from candidate to candidate
+(k60 0-3, pic 0-1 per candidate, many at 0), but the session's best candidate is ranked by legality,
+clean nets and vias only (agent/session.mjs rank) and the agents submit by the same order, so a
+submitted layout can fail a pair that an equally good candidate passed.
