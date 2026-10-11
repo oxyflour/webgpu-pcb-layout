@@ -1,5 +1,12 @@
 # Results log (2026-10-05)
 
+> Repository layout (2026-10-11): the adapter code is in `core/`, scripts of earlier sections are in
+> `harness/experiments/archive/`, and the Cypress-based tooling and experiments (lib/cypress.mjs,
+> coarse, from-human, keyinfo, modules, tree, templates, start-regression, webgpu-vs-cypress, ...)
+> were removed; they remain in the git history before the commit "Refactor 1". Results below are
+> unchanged records.
+
+
 All numbers use the same protocol: repository KiCad cases, original sides, mechanical +
 through-hole parts fixed, 0.1 mm shared legalizer, PathFinder routing on the board's two
 layers at 0.4 mm / 40 rounds, unweighted signal HPWL. Cypress image `cypress:20261004`,
@@ -120,7 +127,7 @@ grid-rounding overlaps of 3-16 um; fixed for v6).
 ## Router noise and robust scoring (2026-10-07)
 
 Same layout, routed again after moving the 0.4 mm grid phase (shift) or every movable part by
-<= 0.01 mm (jitter); `experiments/router-noise.mjs`.
+<= 0.01 mm (jitter); `experiments/archive/router-noise.mjs`.
 
 | Board, layout | Perturbation (runs) | Clean nets (count, min-max) | Vias, layer steps (count, min-max) |
 |---|---|---|---|
@@ -131,7 +138,7 @@ Same layout, routed again after moving the 0.4 mm grid phase (shift) or every mo
 
 `evaluateRobust` (lib/board.mjs) routes 5 grid phases (3 on boards > 1000 parts) in worker
 threads and reports the median and the min-max; the tool, the human target and the final
-evaluation use it. Standard deviation over 8 (ppc: 4) jittered copies (`experiments/robust-check.mjs`):
+evaluation use it. Standard deviation over 8 (ppc: 4) jittered copies (`experiments/archive/robust-check.mjs`):
 
 | Board, layout | Single routing: clean SD (count) | Median of phases: clean SD (count) | Single routing: vias SD (count) | Median of phases: vias SD (count) |
 |---|---|---|---|---|
@@ -144,7 +151,7 @@ evaluation use it. Standard deviation over 8 (ppc: 4) jittered copies (`experime
 layer-step count (a through via on 10-layer ppc counts up to 9). ppc-n3 viaSites ~4400-4700 vs
 4629 through vias in the human KiCad file.
 
-FreeRouting 2.5.0 (`experiments/freerouting.mjs`, DSN of the same pads/nets, board rules):
+FreeRouting 2.5.0 (`experiments/archive/freerouting.mjs`, DSN of the same pads/nets, board rules):
 human pico 83/86 routed in 200 s (harness router 86/86 in < 1 s), human k60 not finished in 590 s.
 Not usable inside a < 3 min tool call.
 
@@ -186,7 +193,7 @@ consistent; same path cost, different ties, so not bit-identical).
 | Native + layer heuristic + incremental rip-up | 6.9 | 2.4 | 1.5 |
 
 Ranking check on 16 ppc-n3 layouts (human, agent v6, module experiments), median of 3 phases,
-reference = exact (`experiments/rank-check.mjs`): native + layer heuristic + incremental gives the
+reference = exact (`experiments/archive/rank-check.mjs`): native + layer heuristic + incremental gives the
 same clean count on all 16, Spearman 0.974 on vias (layer steps), 0.926 on physical vias; physical
 vias are 20-48 % higher (the cost counts layer steps only, so via stacking is decided by ties) and
 are not a reliable objective in this mode.
@@ -213,7 +220,7 @@ candidates differ by less than the routing noise.
 ## Via gap of the v7 agent layouts (ppc-n3)
 
 `experiments/export-review.mjs` (KiCad files with the router's routing, per-net CSV) and
-`experiments/via-gap.mjs`: the v7 runs have ~980 more layer-step vias than the human layout (exact
+`experiments/archive/via-gap.mjs`: the v7 runs have ~980 more layer-step vias than the human layout (exact
 router, phase 0). By net kind: IC + small parts 552, small parts only 228, IC + fixed part 137,
 IC-IC 60. 367 nets are > 20 mm longer (HPWL) than in the human layout and carry ~500 of the gap.
 U1 (CPU, 462 pins) anchors 313.
@@ -278,7 +285,7 @@ boards, vias 6 better / 7 worse). Starting WebGPU's global stage from it is best
 start + Cypress on 11 / 13 boards; k60 318/318 clean, pic 308/310). Remaining gap is vias (k60 557 vs
 human 345, pic 492 vs 363).
 
-### Editor whole-board layout with the tool start layout (`experiments/editor-init.mjs`)
+### Editor whole-board layout with the tool start layout (`experiments/archive/editor-init.mjs`)
 
 The editor's 自动布局 (its problem: `irToProblem` sides 'ir', THT not pinned; its options: `--quality
 --modules auto --cohesion 3`, budget same) with and without the start layout as the global start. Same
@@ -312,7 +319,7 @@ After the 40 PathFinder rounds every net that is not clean is ripped up; the cle
 hard obstacles and the ripped nets are rerouted one by one on free cells only, in 4 orders (span
 ascending, descending, 2 shuffles), keeping the order with most nets routed. Nets that still fail
 keep a soft route for vias / length and count as not clean. With cleanup 0 the router is still
-bit-identical to the JS router (native-check, k60). `experiments/cleanup-check.mjs`: each layout
+bit-identical to the JS router (native-check, k60). `experiments/archive/cleanup-check.mjs`: each layout
 routed at 8 random sub-cell grid offsets (4 on ppc-n3; independent phases, unlike evaluateRobust's
 shifts, where shift 4 repeats shift 1 exactly: k60 290 / 980 both), exact native router (ppc-n3:
 tool routing), legalized layouts. Values: median (min-max) over the offsets.
@@ -336,9 +343,9 @@ Vias rise 0-11 % (recovered nets detour). Boards that already route clean are un
 ### Human passive arrays: injection and reverse ablation
 
 `lib/modules.mjs findArrays`: >= 3 same-size 2-pin parts bridging the same pair of big parts over
-small signal nets. `experiments/array-inject.mjs` copies the human arrangement (arrays, or whole
+small signal nets. `experiments/archive/array-inject.mjs` copies the human arrangement (arrays, or whole
 buildModules modules) into an agent layout relative to the anchor IC (mirrored when the IC is on
-the other side), then the legalizer; `experiments/array-shuffle.mjs` permutes array parts over
+the other side), then the legalizer; `experiments/archive/array-shuffle.mjs` permutes array parts over
 their own slots in the HUMAN layout (geometry and legality unchanged, only the order). No cleanup.
 
 | Board | Layout | Original: vias, layer steps (count, median (min-max) of 4 offsets) | + human arrays: vias (count) | + human modules: vias (count) | Original / + arrays / + modules: HPWL (mm) |
@@ -413,7 +420,7 @@ also stopped after 8-10 of 20 minutes believing time was up.
 
 ### Small parts in the congested areas: key information, start-layout fix, relieve (k60 / 13 boards)
 
-`experiments/hotspot-inject.mjs`: tool layouts with the HUMAN IC poses (place with the human IC
+`experiments/archive/hotspot-inject.mjs`: tool layouts with the HUMAN IC poses (place with the human IC
 plan, 3 seeds), then human poses for chosen small parts, legalized, 5 grid phases:
 
 | Small parts given their human pose | Parts (count) | Clean nets (count, seed 1 / 2 / 3) | Vias (count) | Overflow cells after round 1 (count) | Phases converged (count of 5) |
@@ -570,7 +577,7 @@ Prompt v10 = v9 without the relieve parts (v9 kept as the record of the runs abo
 
 Hypothesis: humans place outward from the main chip one part at a time, so the placement follows a
 tree (or a pruned graph) of the netlist. Analysis of the 15 human layouts
-(`experiments/tree-structure.mjs`, `tree-clusters.mjs`, `tree-anchors.mjs`; part graph = signal
+(`experiments/archive/tree-structure.mjs`, `experiments/archive/tree-clusters.mjs`, `experiments/archive/tree-anchors.mjs`; part graph = signal
 nets with 2-30 parts, edge length = shortest human pin-to-pin distance):
 
 - The netlist is not a tree: cycle rank 0.8-1.4 x parts (k60: 382 parts, 893 links, 512); in BFS
@@ -616,7 +623,7 @@ Not passed to the agent.
 
 Start: the tool layouts of the section above (human IC poses + init + Cypress, seeds 1-3); small
 parts (movable, < 8 pins, 396) get parts of their human pose, legalized, 5 grid phases
-(`experiments/pose-ablation.mjs`).
+(`experiments/archive/pose-ablation.mjs`).
 
 | Small parts given... | Parts (count) | Vias (count, seeds 1/2/3) | Clean nets (count of 318) |
 |---|---|---|---|
@@ -637,13 +644,13 @@ gap; no board region dominates. In the plot (human vs tool) humans lay out repea
 identical copies aligned with their connector / IC pins and use the whole board; the tool piles
 them into a few clusters.
 
-Net crossings (`experiments/crossings.mjs`, straight MST segments of every signal net): human legal
+Net crossings (`experiments/archive/crossings.mjs`, straight MST segments of every signal net): human legal
 885, tool 1023-1069, human +-1 mm 900-949, +-2 mm 942-961; the tool's spanning-tree length is
-shorter (4557-4636 mm vs 4788). Crowding of the 0-1 mm ring around the ICs (`ic-bands.mjs`: area
+shorter (4557-4636 mm vs 4788). Crowding of the 0-1 mm ring around the ICs (`experiments/archive/ic-bands.mjs`: area
 covered 0.34-0.36 vs human 0.22, pins/cm2 17-19 vs 9) is not causal: legalizing with the ICs
-inflated by 1 mm (`ic-ring.mjs`) gave 517 vias (from 504).
+inflated by 1 mm (`experiments/archive/ic-ring.mjs`) gave 517 vias (from 504).
 
-Crossing removal is causal for part of the gap (`experiments/uncross.mjs`: greedy 180 deg turns
+Crossing removal is causal for part of the gap (`experiments/archive/uncross.mjs`: greedy 180 deg turns
 of 2-pin parts and swaps of same-size parts on one side within 10 mm, cost = crossings + 0.2 x
 spanning-tree mm; legal by construction, k60 2 s, acc 10 s incl. evaluation):
 
@@ -662,7 +669,7 @@ the rest of the gap is not straight-line crossings.
 ## Crossing removal in the tool pipeline (lib/uncross.mjs, 2026-10-09)
 
 `place` is now start layout -> Cypress -> legalize -> **uncross** -> route. uncross = the greedy pass
-of experiments/uncross.mjs (180 deg turns of movable 2-pin parts, swaps of same-size parts on one
+of experiments/archive/uncross.mjs (180 deg turns of movable 2-pin parts, swaps of same-size parts on one
 side within 10 mm; cost = straight crossings of signal-net spanning trees + 0.2 x tree mm), with
 segments in a 5 mm grid, the agent's planned parts kept, a 10 s deadline, and no re-legalizing when
 the result passes legalOk (it always did; the legalizer is not idempotent: re-legalizing an already
@@ -703,7 +710,7 @@ All candidates of the sessions (36 per arm, in-session scoring: tool routing, 5 
 | pic | v10 + uncross | 307.8 | 439 | 5624 |
 
 The k60 arms differ by session trajectory, not by the pass: applied offline to the same 36
-no-uncross candidates (`experiments/uncross-paired.mjs`, tool routing, paired):
+no-uncross candidates (`experiments/archive/uncross-paired.mjs`, tool routing, paired):
 
 | Board | Candidates (count) | Clean nets without -> with uncross (count, mean) | Candidates with more / fewer / equal clean nets (count) | Vias without -> with (count, mean) | Candidates with fewer vias (count of 36) | Median via change (count) | HPWL without -> with (mm, mean) | Crossings without -> with (count, mean) |
 |---|---|---|---|---|---|---|---|---|
@@ -737,16 +744,16 @@ noise (human rotation), then the harness Cypress pass, legalizer, 5 grid phases.
 
 The tool is as good as "human +-5 mm": its coarse placement is right, the gap is the arrangement
 below ~2 mm, and the Cypress pass does not repair it (noise in = noise out). Rigid shifts of whole
-human clusters (small parts linked by pins <= 3 mm apart; `pose-ablation.mjs gjit<S>`): +-2 mm
+human clusters (small parts linked by pins <= 3 mm apart; `experiments/archive/pose-ablation.mjs gjit<S>`): +-2 mm
 382 / 395 / 377, +-5 mm 433 / 499 / 439 (independent +-5 mm 514 / 540 / 484), so the arrangement
-relative to the surroundings matters, not only inside clusters. Not the cause (`alignment.mjs`):
+relative to the surroundings matters, not only inside clusters. Not the cause (`experiments/archive/alignment.mjs`):
 rows/columns (human 0.69-0.80 of small parts share x or y with a neighbour, tool 0.46) and gaps
 (nearest-neighbour p50 human 0.28 mm, tool 0.12): the human layout after Cypress has 0.49 / 0.13 mm
 and still 340 vias.
 
 Round-1 overflow (cells claimed by > 1 net after one routing pass) vs vias over 126 k60 layouts of
 these experiments: Pearson 0.981 (HPWL 0.42). But optimizing it directly does not transfer
-(`ovf-search.mjs`, greedy shifts / turns / swaps of small parts near overflow cells, legal moves,
+(`experiments/archive/ovf-search.mjs`, greedy shifts / turns / swaps of small parts near overflow cells, legal moves,
 cost = mean round-1 overflow over 4 grid phases disjoint from the evaluation's, 0.4 s per eval):
 tool seed 1, 400 evals: search overflow 788 -> 688, evaluation round-1 overflow 769 -> 717, vias
 504 -> 526. Full routing as the objective costs 1.9 s per phase and one phase is noisy (same
@@ -796,7 +803,7 @@ attached). Signal nets whose pads are all joined by the tracks: pico 85/86, edk 
 161/161, safety 185/186, pic 303/309, nxp 358/369, rx 388/399, k60 305/315, acc 601/612, ppc-n3
 1566/1603 (z3r0 6/45, edu-k60 70/156, edu-nxp 77/162 not usable).
 
-Do small parts sit on the routes of their nets? (`experiments/track-trunk.mjs`; trunk = human track
+Do small parts sit on the routes of their nets? (`experiments/archive/track-trunk.mjs`; trunk = human track
 paths joining the net's other pads; on trunk = track stub < 0.5 x distance to the nearest other
 pad; straight-line version = distance to the straight spanning tree of the other pads.)
 
@@ -810,7 +817,7 @@ pad; straight-line version = distance to the straight spanning tree of the other
 Humans do not put single-net parts on the straight trunk more than the tool; a few tool series
 parts are far off their path (p90), but there are only 20-36 series parts per board.
 
-Corridors (`experiments/corridor-keepout.mjs`): the human tracks of the backbone nets (no small
+Corridors (`experiments/archive/corridor-keepout.mjs`): the human tracks of the backbone nets (no small
 part; k60 28 nets, 1169 of 6194 mm of signal track) as same-side blockers while legalizing the
 tool layout (ICs held): 56 parts moved 0.25 mm on average, 504 -> 524 vias (with the ICs not held
 the legalizer pushed the ICs: 993 vias).
@@ -827,7 +834,7 @@ legalized human poses (0.1 mm spiral).
 | legalizer only | 0.07 / 0.99 | 0.90 | 0 | 346 | 5817 |
 | harness Cypress + legalizer | 0.55 / 1.67 | 0.80 | 0 | 343 | 5683 |
 | benchmark Cypress (1000 iterations, lr 0.01) + legalizer | 2.16 / 5.17 | 0.18 | 0 | 363 | 5582 |
-| legalizer + crossing pass (uncross.mjs) | flips / swaps | - | 38 flips | 344 | 5841 |
+| legalizer + crossing pass (experiments/archive/uncross.mjs) | flips / swaps | - | 38 flips | 344 | 5841 |
 | loo (rule position + rule rotation) | 4.28 / 31.0 | 0.11 | 266 | 437 | 5876 |
 | loo, human rotation | 4.00 / 30.8 | 0.11 | 0 | 447 | 5920 |
 | loo + slot | 3.70 / 31.0 | 0.22 | 266 | 472 | 6159 |
@@ -835,9 +842,9 @@ legalized human poses (0.1 mm spiral).
 
 Cypress, legalizer and crossing pass keep the human quality (Cypress pulls towards shorter wires,
 +0-20 vias). The loss is in the start-layout rule even with perfect context: its position is
-4.3 mm off and its rotation rule is a coin flip on the axis (`rot-rule.mjs`, k60 at the human
+4.3 mm off and its rotation rule is a coin flip on the axis (`experiments/archive/rot-rule.mjs`, k60 at the human
 position: 2-pad 2-signal parts 87 same / 4 flipped / 58 other axis, 2-pad 1-signal 59 / 3 / 63).
-Axis rules with perfect context (`axis-rules.mjs`, agreement with the human axis of 2-pad parts):
+Axis rules with perfect context (`experiments/archive/axis-rules.mjs`, agreement with the human axis of 2-pad parts):
 
 | Board | 2-pad parts (count) | Pins rule (current) | Fit (axis that overlaps least) | Rows (majority of 2-pad neighbours < 3 mm) | Radial to the nearest IC edge (< 5 mm) | Fit, then pins |
 |---|---|---|---|---|---|---|
@@ -848,7 +855,7 @@ Axis rules with perfect context (`axis-rules.mjs`, agreement with the human axis
 | rx | 343 | 0.50 | 0.67 | 0.72 | 0.33 | 0.83 |
 | safety | 202 | 0.39 | 0.80 | 0.84 | 0.84 | 0.90 |
 
-The axis pass on tool layouts (`axis-pass.mjs`: after legalizing, re-pick each 2-pad part's axis
+The axis pass on tool layouts (`experiments/archive/axis-pass.mjs`: after legalizing, re-pick each 2-pad part's axis
 by fit -> rows -> pins, legalize again): k60 vias 504 / 509 / 541 -> 499 / 475 / 516 (rows first:
 501 / 496 / 515); it cannot help while the positions are 4-5 mm off.
 
@@ -961,7 +968,7 @@ Findings:
   5071 mm, 346 vs 407 vias): IC + small-part nets with 3+ parts 1216 vs 877 mm (42 nets), with 2
   parts 890 vs 711 mm (65 nets); IC-IC and fixed-part nets are equal. Human small parts sit farther
   from their IC pins than the HPWL optimum, but a forced 1 mm ring around the ICs did not help
-  (ic-ring.mjs, 2026-10-09), so it is not plain distance from the IC.
+  (experiments/archive/ic-ring.mjs, 2026-10-09), so it is not plain distance from the IC.
 - Human rotations are not the missing information at tool level: tool layouts with every small
   part's rotation set to the human one, then the same search: 434 / 459 / 442 vias (without: 446 /
   440 / 435); the search turns 130 of 396 parts away from the human rotation.
@@ -1025,7 +1032,7 @@ no Cypress (tree/*-ics-noglobal): k60 316 / 318 / 318 clean, 425 / 410 / 423 via
 2808 / 2808). Dropping Cypress would save 15-70 s per place call, but Cypress is the project's only
 placer by design, so it stays (open decision).
 
-The crossing pass (uncross.mjs, lambda 0.2) is not additive: after the annealed detail pass it
+The crossing pass (experiments/archive/uncross.mjs, lambda 0.2) is not additive: after the annealed detail pass it
 lowers crossings 927 / 933 / 904 -> ~786 but vias go 417 / 407 / 423 -> 443 / 409 / 460 (clean 318 /
 318 / 316). The detail pass alone beats uncross alone (464 / 473 / 480 on the same tool layouts);
 use one of them, not both in sequence.
