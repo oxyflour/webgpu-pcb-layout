@@ -3,7 +3,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { lib, CONTAINER, HARNESS_ROOT } from './env.mjs';
+import { lib, CONTAINER as CONTAINER_SETTING, HARNESS_ROOT, required } from './env.mjs';
+
+const CONTAINER = CONTAINER_SETTING ?? 'cypress-unset'; // checked in runCypress
 import { worldPin } from './board.mjs';
 
 const { exportBookshelf, importCypressPlacement } = await lib('bench/cypress/bookshelf.mjs');
@@ -79,6 +81,7 @@ const docker = (args, opts = {}) => spawnSync('docker', args, { encoding: 'utf8'
 // or -inf logits) were measured to make warm-started parts drift ~9 mm on pico.
 // budgetS: wall time allowed for waiting + solving, so that a whole tool call stays < 3 min.
 export async function runCypress(b, { jobDir, seed = 1000, init = null, knobs = {}, netWeights = {}, budgetS = 155 }) {
+  required(CONTAINER_SETTING, 'cypressContainer', 'CYPRESS_CONTAINER', 'runCypress needs the Cypress CUDA container (older experiments only)');
   fs.mkdirSync(jobDir, { recursive: true });
   // The exporter reads fixed pin positions from the start layout: keep fixed poses exact.
   const start = (init ?? randomLayout(b.p, seed)).map((q, i) => b.p.components[i].fixed ? { ...b.p.components[i].fixed } : q);

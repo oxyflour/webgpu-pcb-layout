@@ -6,3 +6,4 @@ harness/native/*.obj
 harness/native/build.log
 node_modules/
 *.tmp
+harness/local.json

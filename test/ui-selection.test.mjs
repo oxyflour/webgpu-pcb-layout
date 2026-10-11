@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { UI_BOARDS, required } from '../harness/lib/env.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { lib } from '../harness/lib/env.mjs';
@@ -10,7 +11,7 @@ const { irToProblem } = await lib('src/ir/to-problem.js');
 const { exportBookshelf } = await lib('bench/cypress/bookshelf.mjs');
 const { normalizeProblem, worldPin } = await lib('src/problem.js');
 // The editor's sample boards (webgpu-layout web/boards); override with UI_BOARDS.
-const boardFile = path.join(process.env.UI_BOARDS ?? 'C:/Projects/webgpu-layout/web/boards', 'edk.board.json');
+const boardFile = path.join(required(UI_BOARDS, 'uiBoards', 'UI_BOARDS', 'the web editor sample boards (edk.board.json)'), 'edk.board.json');
 const skip = !fs.existsSync(boardFile) && 'sample board missing';
 
 // What the editor worker sends: irToProblem(ir, {preplace: true, sides: 'ir'}) and its layout.

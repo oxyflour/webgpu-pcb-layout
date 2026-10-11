@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { UI_BOARDS, required } from '../harness/lib/env.mjs';
 import path from 'node:path';
 import { lib } from '../harness/lib/env.mjs';
 import { createStartLayout } from '../harness/lib/start-layout.mjs';
 
 const { irToProblem } = await lib('src/ir/to-problem.js');
 const { normalizeProblem, worldPin, rotatedSize } = await lib('src/problem.js');
-const boardFile = path.join(process.env.UI_BOARDS ?? 'C:/Projects/webgpu-layout/web/boards', 'edk.board.json');
+const boardFile = path.join(required(UI_BOARDS, 'uiBoards', 'UI_BOARDS', 'the web editor sample boards (edk.board.json)'), 'edk.board.json');
 const skip = !fs.existsSync(boardFile) && 'sample board missing';
 
 test('editor worker start layout: fixed parts kept, movable parts inside the board, deterministic per seed', { skip }, () => {

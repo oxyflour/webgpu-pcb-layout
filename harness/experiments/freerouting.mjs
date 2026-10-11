@@ -8,12 +8,12 @@ import { spawnSync } from 'node:child_process';
 import { loadBoard, legalize } from '../lib/board.mjs';
 import { exportDsn } from '../lib/dsn.mjs';
 import { scoreSes } from '../lib/ses.mjs';
-import { HARNESS_ROOT } from '../lib/env.mjs';
+import { HARNESS_ROOT, FREEROUTING_DIR, required } from '../lib/env.mjs';
 
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; };
 const board = arg('board'), src = arg('layout', 'human'), out = arg('out'), passes = Number(arg('passes', 100)), threads = Number(arg('threads', 4));
 const timeoutS = Number(arg('timeout', 1800)), seed = Number(arg('seed', 0)), jitter = Number(arg('jitter', 0));
-const FR_DIR = process.env.FREEROUTING_DIR ?? 'C:/Projects/cypress-layout/tools/freerouting', JAR = process.env.FREEROUTING_JAR ?? 'freerouting-2.5.0.jar';
+const FR_DIR = required(FREEROUTING_DIR, 'freeroutingDir', 'FREEROUTING_DIR', 'directory of the FreeRouting jar'), JAR = process.env.FREEROUTING_JAR ?? 'freerouting-2.5.0.jar';
 const IMAGE = process.env.FREEROUTING_IMAGE ?? 'eclipse-temurin:25-jre';
 
 const b = loadBoard(board);

@@ -7,6 +7,11 @@ description: 为一块新 PCB（KiCad 文件或 kicadToIR 输出的 IR JSON）�
 
 评测管线在 `harness/`：`start layout -> 0.1 mm 合法化 -> detail pass（小器件局部搜索：HPWL + 布线通道 + 去耦电容到其 IC + 关键网络）-> native 布线器`。不再使用 Cypress，无需 GPU / 容器。算法与历史结果见 `harness/README.md`、`harness/RESULTS.md`。
 
+## 0. 环境
+
+本分支自包含：适配层代码已放在 `vendor/webgpu-layout-code`。本机路径写在 `harness/local.json`（不提交，从 `harness/local.example.json` 复制）或环境变量里：`placerRoot` 只在用已登记的 KiCad 基准板时需要；`boards.json` 里登记的板子自带路径。不需要 Cypress、Docker 或 GPU。首次运行前编译 native 布线器：`cmd /c harness
+ativeuild.cmd`（不编译时用 JS 布线器，结果相同但慢）。
+
 ## 1. 准备板子文件
 
 两种输入都可以：

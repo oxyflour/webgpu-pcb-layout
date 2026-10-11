@@ -13,7 +13,7 @@ The WebGPU placer / LNS of webgpu-layout-code is not used.
 
 | Path | Role |
 |---|---|
-| `lib/env.mjs` | Paths: adapter checkout (`CYPRESS_LAYOUT_ROOT`, default the `codex/cypress-official-refresh` worktree), boards (`CYPRESS_PLACER_ROOT`), container (`CYPRESS_CONTAINER`). |
+| `lib/env.mjs` | Locations from env variables or `harness/local.json`: adapter code (default `vendor/webgpu-layout-code`), KiCad boards checkout, UI boards, Cypress container / FreeRouting (optional). No machine paths in the code. |
 | `lib/board.mjs` | Load a registered KiCad case like `bench/cypress/compare.mjs` (THT fixed, original sides; `only` = sub-board); `legalize`; `evaluate` = repository geometry + PathFinder routing at 0.4 mm, board layers, 40 rounds, with per-net status; `evaluateRobust` = median over grid phases; `toolRouting` / `exactRouting`. |
 | `native/router.cpp`, `lib/native-router.mjs` | Native routing loop (bit-identical to the JS router; optional layer-aware A*). Build: `cmd /c harness/native/build.cmd` from PowerShell (MSVC 2022). |
 | `lib/tracks.mjs` | Human routing (KiCad track segments / arcs per problem net, per-net graph with the pads attached) for key-information experiments. |
@@ -34,6 +34,18 @@ The WebGPU placer / LNS of webgpu-layout-code is not used.
 | `experiments/*.mjs` | Key-information experiments without an agent. |
 
 Results go to `harness/results/` (git-ignored).
+
+## Setup
+
+Self-contained: the adapter code (problem model, KiCad/IR import, legalizer, router source) is vendored
+in `vendor/webgpu-layout-code` (see its VENDOR.md). Machine-specific locations go in
+`harness/local.json` (git-ignored; copy `harness/local.example.json`) or environment variables
+(`harness/lib/env.mjs`): `placerRoot` (checkout with the registered KiCad benchmark boards; boards in
+`harness/boards.json` need nothing), `uiBoards` (web editor only), `cypressContainer` / `freeroutingDir`
+(older experiments only). Cypress, Docker and a GPU are not needed for the tool, the agents or the
+evaluation. Build the native router once: `cmd /c harness
+ativeuild.cmd` (MSVC; `VCVARS` overrides
+the vcvars64.bat path); without it the JS router is used (same results, slower). Node >= 22.
 
 ## Run
 
