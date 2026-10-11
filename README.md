@@ -13,7 +13,7 @@ and is scored against the human layout (routed nets, vias, HPWL, decoupling, cri
 | docs/ | Slide decks of earlier rounds. |
 
 Setup: Node >= 22, `harness/local.json` from `harness/local.example.json` (only for the benchmark KiCad
-boards and the editor sample boards), `cmd /c harness\native\build.cmd` for the native router (MSVC).
+boards and the editor sample boards), `cmd /c harness\native\build.cmd` for the native router and detail pass (MSVC).
 No GPU, Docker or Cypress is needed.
 
 ## Interactive editor

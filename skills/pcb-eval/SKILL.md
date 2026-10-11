@@ -9,7 +9,7 @@ description: 为一块新 PCB（KiCad 文件或 kicadToIR 输出的 IR JSON）�
 
 ## 0. 环境
 
-仓库自包含：算法代码在 `core/`（问题模型、KiCad/IR 导入、合法化、布线器），不依赖其他 checkout，不需要 Cypress、Docker 或 GPU。本机路径写在 `harness/local.json`（不提交，从 `harness/local.example.json` 复制）或环境变量：`boardsRoot`（`PCB_BOARDS_ROOT`）只在用 `core/bench/kicad-cases.mjs` 里的基准 KiCad 板时需要；`harness/boards.json` 登记的板子自带路径。首次运行前编译 native 布线器：`cmd /c harness\native\build.cmd`（不编译时用 JS 布线器，结果相同但慢）。`npm test` 在 `test/fixtures` 的 IR 上跑回归测试。
+仓库自包含：算法代码在 `core/`（问题模型、KiCad/IR 导入、合法化、布线器），不依赖其他 checkout，不需要 Cypress、Docker 或 GPU。本机路径写在 `harness/local.json`（不提交，从 `harness/local.example.json` 复制）或环境变量：`boardsRoot`（`PCB_BOARDS_ROOT`）只在用 `core/bench/kicad-cases.mjs` 里的基准 KiCad 板时需要；`harness/boards.json` 登记的板子自带路径。首次运行前编译 native 布线器和 detail pass：`cmd /c harness\native\build.cmd`（不编译时用 JS 版本，结果相同但慢约 10 倍；detail pass 预算是每个小器件 20000 次尝试、上限 60 s，JS 版本在上限内做不完，布局质量会下降）。`npm test` 在 `test/fixtures` 的 IR 上跑回归测试。
 
 ## 1. 准备板子文件
 

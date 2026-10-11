@@ -19,7 +19,7 @@ evaluating a board: [skills/pcb-eval](../skills/pcb-eval/SKILL.md).
 | `lib/board.mjs` | Board registry (`core/bench/kicad-cases.mjs` + `boards.json`; KiCad or IR), `loadBoard`, `legalize`, `evaluate` (router at 0.4 mm, board layers, 40 rounds, per-net status), `evaluateRobust` (median over grid phases, worker threads), `toolRouting` / `exactRouting`. |
 | `lib/native-router.mjs`, `native/router.cpp` | Native router loop, bit-identical to `core/src/router/board-router.js`; optional layer-aware A*, cleanup, constraint rules (priority, via cost, layers, keepout). Build: `cmd /c harness\native\build.cmd` (MSVC; `VCVARS` overrides vcvars64.bat). |
 | `lib/start-layout.mjs`, `lib/init.mjs` | Start layout from a partial plan (below). `start-layout.mjs` has no Node imports so the web editor loads it too. |
-| `lib/detail.mjs` | Detail pass: annealed local search on small parts (< 8 pins) for HPWL + routing-channel deficit + decoupling capacitors to their IC + critical nets with limits. |
+| `lib/detail.mjs`, `native/detail.cpp` | Detail pass: annealed local search on small parts (< 8 pins) for HPWL + routing-channel deficit + decoupling capacitors to their IC + critical nets with limits. The native pass (built by `build.cmd`, used when present) gives the same result as the JS one, ~10x faster. |
 | `lib/constraints.mjs`, `constraints/` | Design constraints: decap -> IC assignment, critical nets and limits; `constraints/<board>.json` overrides, `<board>.template.json` defaults, `examples/` test files. |
 | `lib/human-metrics.mjs` | Decoupling / critical-net metrics against the human layout. |
 | `lib/geometry.mjs` | Shared pad / net geometry. |
@@ -71,7 +71,7 @@ Parts not in the agent's plan start as follows, then the legalizer and the detai
 
 ## Time limits (every tool call < 3 min)
 
-Detail pass 30 s (60 s on boards > 1000 parts; `PCB_DETAIL_BUDGET`), then routing until 150 s after the
+Detail pass 20000 tries per small part, at most 60 s (`PCB_DETAIL_TRIES`, `PCB_DETAIL_BUDGET`), then routing until 150 s after the
 start of the call. Boards > 1000 parts (ppc) route with incremental PathFinder (<= 20 rounds) and
 stop after the round that passes the deadline; the result says when routing was cut short. The
 final evaluation of a submitted layout uses the full routing.
