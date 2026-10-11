@@ -1490,3 +1490,36 @@ the agent's own search with more calls and the floorplan-diversity instruction. 
 reach 438 / 441 vias, the best agent layouts so far; pic matches the human vias on average (363 vs
 359) with all nets routed, all USB pairs passing and decaps at their IC. pic session 3 submitted
 c002 (in-session 310 / 359) rather than its best c004 (310 / 352) although the submit note said so; a difference within the routing noise.
+
+## v15 sweep over 14 boards (2026-10-11): no better than v12 overall
+
+Prompt v15 (baseline candidate c000 + 20 place calls), dsh, 3 sessions per board, no constraint files,
+3 boards at a time (9 sessions on 12 logical cores: CPU 92-99 %, so the time-limited detail pass of each
+place call made 1.6-6x fewer tries than on an idle machine). Scored like the v12 sweep
+(results/sweep-eval-v15, 8 grid offsets; `sweep-eval.mjs --dir sweep-eval-v15 --summary`).
+
+| Board | Human: vias (count) | Agent v12: vias, mean of 3 sessions (count) | Agent v15: vias per session (count) | Agent v15: vias, mean (count) | v15 / v12 vias (change, %) | Agent v15: vias / human (x) | Agent v15: clean nets per session (count, of signal nets) |
+|---|---|---|---|---|---|---|---|
+| z3r0 | 32 | 23 | 24 / 22 / 22 | 23 | +0 | 0.71 | 46 / 46 / 46 of 46 |
+| pico | 57 | 54 | 53 / 52 / 54 | 53 | -2 | 0.93 | 86 / 86 / 86 of 86 |
+| edk | 66 | 79 | 75 / 82 / 87 | 81 | +3 | 1.23 | 124 / 124 / 124 of 124 |
+| edu-fpga | 77 | 80 | 86 / 95 / 99 | 93 | +16 | 1.21 | 108 / 108 / 108 of 108 |
+| fsl-mini | 191 | 240 | 238 / 259 / 236 | 244 | +2 | 1.28 | 162 / 162 / 162 of 162 |
+| edu-k60 | 188 | 185 | 176 / 183 / 178 | 179 | -3 | 0.95 | 157 / 157 / 157 of 157 |
+| edu-nxp | 203 | 195 | 198 / 185 / 179 | 187 | -4 | 0.92 | 163 / 163 / 163 of 163 |
+| safety | 227 | 251 | 267 / 272 / 287 | 275 | +10 | 1.21 | 186 / 186 / 186 of 186 |
+| pic | 347 | 452 | 426 / 416 / 397 | 413 | -9 | 1.19 | 310 / 310 / 310 of 310 |
+| nxp | 587 | 689 | 685 / 668 / 677 | 677 | -2 | 1.15 | 370 / 370 / 370 of 370 |
+| rx | 625 | 732 | 715 / 712 / 720 | 716 | -2 | 1.15 | 400 / 400 / 400 of 400 |
+| k60 | 301 | 447 | 447 / 497 / 418 | 454 | +2 | 1.51 | 318 / 314 / 318 of 318 |
+| acc | 2576 | 2737 | 2723 / 2778 / 2742 | 2748 | +0 | 1.07 | 617 / 617 / 617 of 617 |
+| ppc-n3 | 8768 | 9407 | 9643 / 9724 / 9517 | 9628 | +2 | 1.10 | 1607 ×3 of 1607 |
+
+Geometric mean over the 14 boards: agent vias / human 1.091 (v12) -> 1.099 (v15); v15 / v12 = 1.007.
+Clean nets: every v15 session routes every signal net except k60 session 2 (314 of 318). So the full sweep
+does not reproduce the k60 / pic gain of the v15 pilot (pilot k60 / pic means 462 / 363 vs 454 / 413
+here; the pilot ran 3 sessions at a time on an idle machine): per-board changes of -9 % to +16 % are
+of the size of the session-to-session spread (edu-fpga 86-99, safety 267-287). Likely limit: under
+full load each place call's detail pass gets a fraction of its tries, so more calls do not buy more
+search. The native detail pass (C++, 10-19x faster, worktree claude-detail-native) addresses that
+directly; next step is a tries -> quality curve and a tries-based (load-independent) budget.
