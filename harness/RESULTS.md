@@ -1577,3 +1577,35 @@ Geometric mean of vias / human: no-agent JS 1.342 -> native 1.258 (x0.937); agen
 of the native tool equal the JS tool's (pic 290.3 vs 287.0 of 310, k60 316.7 vs 316.0 of 318, every other
 board all nets). The agent still beats the tool on 12 of 14 boards (k60 and safety tie); the next sweep
 gives every place call the faster pass.
+
+## v16 sweep: native detail pass with the tries budget, prompt v15 (2026-10-12)
+
+Same protocol as the v15 sweep (prompt v15, baseline candidate + 20 place calls, 3 boards at a time,
+3 sessions per board, results/sweep-eval-v16, 8 grid offsets); only the tool changed: native detail
+pass, 20000 tries per small part, at most 60 s. Sweep wall time 93 min (v15: ~112 min); small-board
+sessions 5-10 min instead of 15-17 min, while every place call makes 1.5-4x (small boards) to ~10x
+(large boards) more tries than in the v15 sweep.
+
+| Board | Human: vias (count) | Agent v12: vias, mean of 3 (count) | Agent v15: vias, mean of 3 (count) | Agent v16: vias per session (count) | Agent v16: vias, mean of 3 (count) | v16 / v15 vias (change, %) | Agent v16: vias / human (x) |
+|---|---|---|---|---|---|---|---|
+| z3r0 | 32 | 23 | 23 | 25 / 21 / 24 | 23 | +0 | 0.73 |
+| pico | 57 | 54 | 53 | 52 / 51 / 56 | 53 | +0 | 0.93 |
+| edk | 66 | 79 | 81 | 75 / 84 / 79 | 79 | -2 | 1.20 |
+| edu-fpga | 77 | 80 | 93 | 62 / 69 / 70 | 67 | -28 | 0.87 |
+| fsl-mini | 191 | 240 | 244 | 232 / 238 / 228 | 233 | -5 | 1.22 |
+| edu-k60 | 188 | 185 | 179 | 164 / 177 / 173 | 171 | -4 | 0.91 |
+| edu-nxp | 203 | 195 | 187 | 197 / 211 / 193 | 200 | +7 | 0.99 |
+| safety | 227 | 251 | 275 | 235 / 232 / 227 | 231 | -16 | 1.02 |
+| pic | 347 | 452 | 413 | 420 / 420 / 349 | 396 | -4 | 1.14 |
+| nxp | 587 | 689 | 677 | 689 / 653 / 683 | 675 | -0 | 1.15 |
+| rx | 625 | 732 | 716 | 729 / 699 / 692 | 707 | -1 | 1.13 |
+| k60 | 301 | 447 | 454 | 409 / 436 / 412 | 419 | -8 | 1.39 |
+| acc | 2576 | 2737 | 2748 | 2670 / 2775 / 2747 | 2731 | -1 | 1.06 |
+| ppc-n3 | 8768 | 9407 | 9628 | 9181 / 9561 / 9397 | 9380 | -3 | 1.07 |
+
+Every v16 session routes every signal net (42 of 42; v15: 41). Geometric mean of agent vias / human:
+v12 1.091, v15 1.099, v16 1.043 (v16 / v15 = 0.950, v16 / v12 = 0.957); v16 has fewer vias than v15 on
+11 boards, more on 1 (edu-nxp +7 %, within its session spread 193-211). At or below the human count:
+z3r0, pico, edu-fpga, edu-k60, edu-nxp; safety at 1.02. Largest remaining gaps: k60 1.39, fsl-mini
+1.22, edk 1.20. The tool change alone (no-agent: x0.937) carries through to the agent results, so the
+search depth of the detail pass was a real bottleneck of the v15 sweep.
