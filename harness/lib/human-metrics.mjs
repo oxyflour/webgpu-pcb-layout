@@ -11,8 +11,8 @@
 // differ only in the suffix _P/_N, P/N, +/-, DP/DM. Lengths: HPWL (phase-free) and, when a routing
 // perNet list is given, the routed length of the router (one grid phase).
 import { worldPin } from './board.mjs';
+import { padCentre as centreOf, quantile as quant } from './geometry.mjs';
 
-const rq = (x, y, r) => { r = ((r % 4) + 4) % 4; return r === 0 ? [x, y] : r === 1 ? [-y, x] : r === 2 ? [-x, -y] : [y, -x]; };
 const supplyName = /^\+|VDD|VCC|VBAT|VBUS|VIO|^\/?\d+V\d*|\dV\d|V\d+_|_\d?V\d/i;
 
 // Static analysis of a board: decaps, supply nets, IC pads per net, critical-net groups.
@@ -44,11 +44,10 @@ export function boardAnalysis(b) {
   return { decaps, icPadsOn, padOf, groups, pairs, sig };
 }
 
-const padCentre = (b, L, rp) => { const q = L[rp.comp], [rx, ry] = rq(q.side ? -rp.lx : rp.lx, rp.ly, q.rotation); return [q.x + rx, q.y + ry]; };
+const padCentre = (b, L, rp) => centreOf(L, rp);
 const hpwl = (b, L, ni, A) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const pi of b.p.nets[ni].pins) { const [x, y] = worldPin(b.p, L, pi); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   return x1 - x0 + y1 - y0; };
-const quant = (v, f) => { if (!v.length) return null; const s = [...v].sort((a, c) => a - c); return +s[Math.min(s.length - 1, Math.floor(f * s.length))].toFixed(2); };
 
 // Per-layout metrics. A = boardAnalysis(b); human = the human layout (for "same IC as human");
 // perNet = routing perNet list (evaluate / evaluateRobust with detail: true) for routed lengths.

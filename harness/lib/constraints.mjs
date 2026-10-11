@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { HARNESS_ROOT } from './env.mjs';
 import { boardAnalysis } from './human-metrics.mjs';
+import { padCentre, quantile } from './geometry.mjs';
 
 // Footprint blocks of a .kicad_pcb (KiCad 4-8): reference, sheet path; net_class blocks (KiCad <= 5).
 // IR boards (harness/boards.json -> .json): optional footprints[].sheet (schematic sheet path) and
@@ -111,8 +112,7 @@ export function constraintsTemplate(b, C) {
     critical: C.critical.map((c) => ({ name: c.name, kind: c.kind, ...(c.kind === 'pair' ? { pair: c.nets.map(net) } : c.class ? { class: c.class } : { nets: c.nets.map(net) }), ...Object.fromEntries(['maxLengthMm', 'maxVias', 'maxMismatchMm', 'keepoutMm', 'layer', 'priority', 'traceWidth', 'clearance'].filter((k) => c[k] != null).map((k) => [k, c[k]])) })) };
 }
 
-const rq = (x, y, r) => { r = ((r % 4) + 4) % 4; return r === 0 ? [x, y] : r === 1 ? [-y, x] : r === 2 ? [-x, -y] : [y, -x]; };
-const centre = (L, rp) => { const q = L[rp.comp], [rx, ry] = rq(q.side ? -rp.lx : rp.lx, rp.ly, q.rotation); return [q.x + rx, q.y + ry]; };
+const centre = padCentre;
 
 // Distance of a decap's supply pad to the nearest pad of one of its assigned ICs on the same supply.
 export function decapDistance(L, C, d) {
@@ -129,7 +129,7 @@ export function minViasOf(b, L, ni) { let top = false, bot = false;
   return top && bot ? 1 : 0; }
 
 export function evalConstraints(b, L, C, perNet) {
-  const dist = C.decaps.map((d) => decapDistance(L, C, d)), q = (v, f) => { const s = [...v].sort((a, c) => a - c); return s.length ? +s[Math.min(s.length - 1, Math.floor(f * s.length))].toFixed(2) : null; };
+  const dist = C.decaps.map((d) => decapDistance(L, C, d)), q = quantile;
   const decap = { count: dist.length, fromSheet: C.decaps.filter((d) => d.source === 'sheet').length, medianMm: q(dist, 0.5), p90Mm: q(dist, 0.9), within3mm: dist.length ? +(dist.filter((v) => v <= 3).length / dist.length).toFixed(2) : null,
     overMax: C.decaps.filter((d, k) => d.maxMm != null && dist[k] > d.maxMm).map((d) => d.ref) };
   const critical = C.critical.map((c) => { const len = c.nets.map((ni) => perNet[ni].lengthMm), vias = c.nets.reduce((a, ni) => a + perNet[ni].vias, 0), clean = c.nets.every((ni) => perNet[ni].status === 'clean');

@@ -12,6 +12,7 @@
 // experiments/attract.mjs (obj hpwlg) is the offline version; RESULTS.md "Attraction test".
 import { rotatedSize, worldPin } from './board.mjs';
 import { loadConstraints } from './constraints.mjs';
+import { padCentre, padBox as padBoxOf, spanningSegments } from './geometry.mjs';
 // Optional human-practice terms (RESULTS.md "New metrics against the human layout"):
 //   kappa (default 0.5) * distance (mm) of every decoupling capacitor's supply pad to the nearest supply pad of
 //   its assigned IC(s) (lib/constraints.mjs: constraint file, else same schematic sheet, else any IC on the
@@ -53,15 +54,12 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
   const decaps = kappa ? CN.decaps.map((d) => { const ics = new Set(d.ics); return { ...d, ic: HA.icPadsOn[d.net].filter((q) => ics.has(HA.padOf[q].comp)) }; }).filter((d) => d.ic.length) : [];
   const decapOwn = new Int32Array(n).fill(-1); decaps.forEach((d, k) => { decapOwn[d.comp] = k; });
   const decapsBy = Array.from({ length: n }, () => []); decaps.forEach((d, k) => { decapsBy[d.comp].push(k); for (const q of new Set(d.ic.map((q) => HA.padOf[q].comp))) decapsBy[q].push(k); });
-  const centre = (rp) => { const q = L[rp.comp], [rx, ry] = rq(q.side ? -rp.lx : rp.lx, rp.ly, q.rotation); return [q.x + rx, q.y + ry]; };
+  const centre = (rp) => padCentre(L, rp);
   const decapDist = (k) => { const d = decaps[k], [x, y] = centre(HA.padOf[d.pad].rp); let best = Infinity; for (const q of d.ic) { const [u, v] = centre(HA.padOf[q].rp), e = Math.hypot(u - x, v - y); if (e < best) best = e; } return Math.max(0, best - decapFreeMm) + (d.maxMm != null ? 10 * Math.max(0, best - d.maxMm) : 0); };
   const decapOf = (parts) => { if (!kappa) return 0; const ks = new Set(parts.flatMap((i) => decapsBy[i])); let s = 0; for (const k of ks) s += decapDist(k); return s; };
   // Channel deficit (router pad geometry, as src/router/board-router.js rasterizes it).
   const RP = b.a.routing.pads, padsOf = Array.from({ length: n }, () => []); RP.forEach((pad, pi) => padsOf[pad.comp].push(pi));
-  const rq = (x, y, r) => { r = ((r % 4) + 4) % 4; return r === 0 ? [x, y] : r === 1 ? [-y, x] : r === 2 ? [-x, -y] : [y, -x]; };
-  const padBox = (pi) => { const pad = RP[pi], q = L[pad.comp], [rx, ry] = rq(q.side ? -pad.lx : pad.lx, pad.ly, q.rotation), a = pad.rot * Math.PI / 180;
-    let hx = 0.5 * (Math.abs(Math.cos(a)) * pad.w + Math.abs(Math.sin(a)) * pad.h), hy = 0.5 * (Math.abs(Math.sin(a)) * pad.w + Math.abs(Math.cos(a)) * pad.h); if (q.rotation & 1) [hx, hy] = [hy, hx];
-    const x = q.x + rx, y = q.y + ry; return [x - hx, y - hy, x + hx, y + hy, pad.tht || pad.hole ? 3 : q.side === 1 ? 2 : 1]; };
+  const padBox = (pi) => padBoxOf(L, RP[pi]);
   const pairPen = (pi, a, pj, c) => { if (RP[pi].comp === RP[pj].comp || (RP[pi].net >= 0 && RP[pi].net === RP[pj].net) || !(a[4] & c[4])) return 0;
     const ox = Math.min(a[2], c[2]) - Math.max(a[0], c[0]), oy = Math.min(a[3], c[3]) - Math.max(a[1], c[1]);
     const g = ox > 0 && oy <= 0 ? -oy : oy > 0 && ox <= 0 ? -ox : ox > 0 && oy > 0 ? 0 : Infinity; return g < gap ? gap - g : 0; };
@@ -80,9 +78,7 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
   const critOfComp = Array.from({ length: n }, () => new Set()); crit.forEach((c, k) => c.nets.forEach((ni) => p.nets[ni].pins.forEach((pi) => critOfComp[p.pins[pi].componentIndex].add(k))));
   // Layers of a net's pads (sides never change in the pass, so cached).
   const layerCache = new Map(), netLayers = (ni) => { if (!layerCache.has(ni)) { let m = 0; for (let pj = 0; pj < RP.length; pj++) if (RP[pj].net === ni) m |= padBox(pj)[4]; layerCache.set(ni, m); } return layerCache.get(ni); };
-  const segsOf = (ni) => { const pts = p.nets[ni].pins.map((pi) => worldPin(p, L, pi)), inT = pts.map(() => false), best = pts.map((q) => [Math.hypot(q[0] - pts[0][0], q[1] - pts[0][1]), 0]), out = []; inT[0] = true;
-    for (let it = 1; it < pts.length; it++) { let u = -1; for (let k = 0; k < pts.length; k++) if (!inT[k] && (u < 0 || best[k][0] < best[u][0])) u = k; inT[u] = true; out.push([pts[best[u][1]], pts[u]]);
-      for (let k = 0; k < pts.length; k++) if (!inT[k]) { const d = Math.hypot(pts[k][0] - pts[u][0], pts[k][1] - pts[u][1]); if (d < best[k][0]) best[k] = [d, u]; } } return out; };
+  const segsOf = (ni) => spanningSegments(p.nets[ni].pins.map((pi) => worldPin(p, L, pi)));
   const segDist = (x, y, [a, c]) => { const dx = c[0] - a[0], dy = c[1] - a[1], l2 = dx * dx + dy * dy, u = l2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)) : 0; return Math.hypot(a[0] + u * dx - x, a[1] + u * dy - y); };
   const critBox = (c) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const ni of c.nets) for (const pi of p.nets[ni].pins) { const [x, y] = worldPin(p, L, pi); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return [x0 - c.hw - 1, y0 - c.hw - 1, x1 + c.hw + 1, y1 + c.hw + 1]; };
   const critCost = (k) => { const c = crit[k]; let s = 0;
