@@ -1,0 +1,59 @@
+{
+ "note": "Example (not a design input): every USB pair without vias, routed first, 0.4 mm keepout. Used by experiments/constraints-routing.mjs.",
+ "critical": [
+  {
+   "pair": [
+    "/Principal/OneBank/OB_USB0_P",
+    "/Principal/OneBank/OB_USB0_N"
+   ],
+   "maxVias": 0,
+   "priority": 1,
+   "keepoutMm": 0.4
+  },
+  {
+   "pair": [
+    "/Principal/OneBank/OB_USB1_P",
+    "/Principal/OneBank/OB_USB1_N"
+   ],
+   "maxVias": 0,
+   "priority": 1,
+   "keepoutMm": 0.4
+  },
+  {
+   "pair": [
+    "/Principal/BANK_501/USB_P",
+    "/Principal/BANK_501/USB_N"
+   ],
+   "maxVias": 0,
+   "priority": 1,
+   "keepoutMm": 0.4
+  },
+  {
+   "pair": [
+    "/Principal/BANK_0/DBG_USB_B_P",
+    "/Principal/BANK_0/DBG_USB_B_N"
+   ],
+   "maxVias": 0,
+   "priority": 1,
+   "keepoutMm": 0.4
+  },
+  {
+   "pair": [
+    "/Principal/BANK_501/USB_B_P",
+    "/Principal/BANK_501/USB_B_N"
+   ],
+   "maxVias": 0,
+   "priority": 1,
+   "keepoutMm": 0.4
+  },
+  {
+   "pair": [
+    "/Principal/BANK_0/DBG_USB_P",
+    "/Principal/BANK_0/DBG_USB_N"
+   ],
+   "maxVias": 0,
+   "priority": 1,
+   "keepoutMm": 0.4
+  }
+ ]
+}

@@ -8,6 +8,7 @@ const HELP = `pcb <command> [flags]
   pcb info --section parts [--page N]       movable parts (60 per page, most pins first)
   pcb info --section nets [--page N]        signal nets and their pins (ref.pinId)
   pcb info --section part --refs U1,U2      pads (local coords + net) and strongest neighbours
+  pcb info --section constraints            decap -> IC assignment, critical nets and their limits
   pcb map [--candidate c003]                ASCII floorplan of both sides (keepouts, fixed parts, candidate)
   pcb check --input plan.json               fast: are the planned spots free? (no detail pass, no routing)
   pcb place --input plan.json               start layout -> legalize -> detail pass -> route; makes a candidate

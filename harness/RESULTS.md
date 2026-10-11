@@ -1287,3 +1287,42 @@ supply pad of its IC). 13 boards x 3 seeds, same starts, kappa 0 vs default 0.5
 distance e.g. k60 33-38 -> 2.2-2.5 mm, pico 14-19 -> 0.5, acc 16 -> 0.6-0.7; safety 28-32 -> 13-14 and
 fsl-mini 24-32 -> 16-18 stay far), vias x1.026, clean nets equal on 11 boards, k60 +2, pic -25 (-20 on
 one seed: the most congested board).
+
+
+### Router rules for critical nets (native router, 2026-10-11)
+
+`native/router.cpp` takes an optional rule list (`lib/native-router.mjs` option `netRules`, from
+`lib/constraints.mjs routerRules`): nets with a priority route first (lower first, then by span),
+`maxVias` multiplies that net's via cost (0 -> x30, else x4), `layer` restricts its layers (its own
+pads always allowed), `keepoutMm` makes cells within that distance of its path cost other nets +8
+each (~1.3 vias). Without rules the router is bit-identical to the JS router (native-check: pico,
+k60). `place` and the human target route with the rules of the board's constraint file;
+`info --section constraints` shows them to the agent (prompt v13 = v12 + that paragraph).
+
+Test (`experiments/constraints-routing.mjs`, example files harness/constraints/examples/<board>.json:
+every USB differential pair maxVias 0, priority 1, keepout 0.4 mm; not design inputs), fixed layouts
+routed plain and with the rules (5 grid phases; "passing" = routed and within maxVias):
+
+| Board | Constrained pairs (count) | Human, plain -> rules: clean nets (count) | Human: vias (count) | Human: constrained pairs passing (count) | Human: vias on constrained nets (count) | No agent, plain -> rules, mean of 3: clean nets (count) | No agent: vias (count) | No agent: pairs passing (count) | No agent: vias on constrained nets (count) |
+|---|---|---|---|---|---|---|---|---|---|
+| z3r0 | 2 | 46 -> 46 | 33 -> 35 | 0 -> 2 | 4 -> 0 | 46.0 -> 46.0 | 28 -> 28 | 0.0 -> 2.0 | 4.7 -> 0.0 |
+| pico | 1 | 86 -> 86 | 59 -> 56 | 0 -> 0 | 7 -> 2 | 86.0 -> 86.0 | 63 -> 62 | 0.0 -> 0.0 | 4.3 -> 2.3 |
+| edk | 1 | 124 -> 124 | 64 -> 86 | 0 -> 1 | 2 -> 0 | 124.0 -> 124.0 | 101 -> 106 | 0.0 -> 1.0 | 2.7 -> 0.0 |
+| edu-fpga | 1 | 108 -> 108 | 77 -> 82 | 0 -> 1 | 4 -> 0 | 108.0 -> 108.0 | 178 -> 179 | 0.7 -> 1.0 | 0.7 -> 0.0 |
+| fsl-mini | 3 | 162 -> 162 | 204 -> 227 | 2 -> 3 | 12 -> 0 | 162.0 -> 162.0 | 265 -> 286 | 1.3 -> 2.3 | 26.0 -> 4.0 |
+| edu-k60 | 2 | 157 -> 157 | 189 -> 203 | 0 -> 1 | 8 -> 2 | 157.0 -> 157.0 | 244 -> 286 | 0.0 -> 1.3 | 7.7 -> 1.3 |
+| edu-nxp | 3 | 163 -> 163 | 200 -> 216 | 1 -> 2 | 20 -> 4 | 163.0 -> 163.0 | 222 -> 234 | 1.0 -> 2.7 | 16.7 -> 1.3 |
+| pic | 3 | 310 -> 310 | 342 -> 359 | 1 -> 3 | 9 -> 0 | 294.7 -> 294.3 | 526 -> 539 | 1.0 -> 2.7 | 6.3 -> 0.7 |
+| nxp | 3 | 370 -> 370 | 588 -> 611 | 1 -> 2 | 9 -> 6 | 370.0 -> 370.0 | 717 -> 735 | 0.0 -> 1.0 | 17.0 -> 9.3 |
+| rx | 3 | 399 -> 399 | 633 -> 650 | 1 -> 2 | 8 -> 6 | 400.0 -> 400.0 | 761 -> 801 | 0.0 -> 1.0 | 14.7 -> 10.0 |
+| k60 | 2 | 318 -> 318 | 310 -> 332 | 1 -> 2 | 4 -> 0 | 318.0 -> 318.0 | 467 -> 484 | 0.0 -> 1.0 | 12.0 -> 3.3 |
+| acc | 6 | 617 -> 617 | 2600 -> 2602 | 3 -> 4 | 22 -> 20 | 617.0 -> 617.0 | 3098 -> 3125 | 2.0 -> 3.0 | 33.3 -> 22.7 |
+| ppc-n3 | 1 | 1607 -> 1607 | 8768 -> 8660 | 0 -> 0 | 18 -> 18 | 1607.0 -> 1607.0 | 9995 -> 10006 | 0.0 -> 0.0 | 18.0 -> 18.0 |
+
+The rules take the vias off the constrained pairs wherever the placement allows it (human: 4-20 ->
+0-6 per board, every pair passing on z3r0 / edk / edu-fpga / fsl-mini / pic / k60) without losing a
+clean net, for +2 to +23 vias elsewhere on the human layouts (other nets detour around the pairs and
+their keepout; ppc-n3 -108, noise). Pairs that still need vias have their pads on different sides or
+layers (pico, ppc-n3: 18 unchanged) or no via-free path in this placement (no agent passes fewer
+pairs than the human on every board): a failing constraint now points at the placement, which is what
+`place` reports to the agent.

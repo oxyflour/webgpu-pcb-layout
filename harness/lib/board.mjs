@@ -105,12 +105,12 @@ export function placementMetrics(b, layout) {
   const rm = repositoryMetrics(b.p, layout), g = rm.geometry;
   return { hpwlMm: Math.round(rm.metrics.hpwl_mm * 10) / 10, geometry: { overlaps: g.movableOverlapPairs, clearance: g.movableClearancePairs, outside: g.movableOutside, keepout: g.movableMaskViolations, fixedChanged: g.fixed_changed, sideChanged: g.side_changed } };
 }
-export function evaluate(b, layout, { detail = false, fast = false, deadlineS = null, onRound = null, shift = 0, router = 'js', layerHeuristic = false, incremental = false, cleanup = 0, offset = null } = {}) {
+export function evaluate(b, layout, { detail = false, fast = false, deadlineS = null, onRound = null, shift = 0, router = 'js', layerHeuristic = false, incremental = false, cleanup = 0, offset = null, netRules = null } = {}) {
   const pm = placementMetrics(b, layout);
   const sr = shiftedRouting(b, layout, shift, offset), board = sr.board, t = performance.now();
   const route = router === 'native' ? routeBoardNative : routeBoard;
-  if ((layerHeuristic || cleanup) && router !== 'native') throw new Error('layerHeuristic / cleanup need router native');
-  const r = route(board, sr.layout, b.a.sides, { ...evaluationRouting(board), diagnostics: detail, ...(fast === 'weighted' ? { incremental: true, maxRounds: 20, astarWeight: 1.5 } : fast || incremental ? { incremental: true } : {}), ...(layerHeuristic ? { layerHeuristic } : {}), ...(cleanup ? { cleanup } : {}), ...(detail && router === 'native' ? { emitOverflow: true } : {}), ...(deadlineS ? { deadline: t + deadlineS * 1000 } : {}), ...(onRound ? { onRound } : {}) });
+  if ((layerHeuristic || cleanup || netRules?.length) && router !== 'native') throw new Error('layerHeuristic / cleanup / netRules need router native');
+  const r = route(board, sr.layout, b.a.sides, { ...evaluationRouting(board), diagnostics: detail, ...(fast === 'weighted' ? { incremental: true, maxRounds: 20, astarWeight: 1.5 } : fast || incremental ? { incremental: true } : {}), ...(layerHeuristic ? { layerHeuristic } : {}), ...(cleanup ? { cleanup } : {}), ...(netRules?.length ? { netRules } : {}), ...(detail && router === 'native' ? { emitOverflow: true } : {}), ...(deadlineS ? { deadline: t + deadlineS * 1000 } : {}), ...(onRound ? { onRound } : {}) });
   const m = {
     clean: r.clean, nets: r.nets, vias: r.vias, viaSites: r.viaSites, routedLengthMm: Math.round(r.length), hpwlMm: pm.hpwlMm, geometry: pm.geometry,
     routeMs: Math.round(performance.now() - t), routing: `${router}${layerHeuristic ? '-layerh' : ''}-${fast === 'weighted' ? 'incremental-20-astar1.5' : fast || incremental ? 'incremental-40' : 'full-40'}${cleanup ? `-cleanup${cleanup}` : ''}`, ...(shift ? { shift } : {}), routeRounds: r.rounds, routeConverged: r.overflow === 0, ...(r.cleanup ? { cleanup: r.cleanup } : {}),

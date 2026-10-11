@@ -16,6 +16,11 @@
 //   int32  order[orderCount]
 //   int32  padCount; per pad: double cx, cy; int32 n; int32 cells[n]
 //   per net (netCount): int32 n; int32 pads[n]
+//   optional (design constraints, lib/constraints.mjs): int32 ruleCount; per rule: int32 net, double viaMul
+//          (via step cost x viaMul for that net), int32 layerMask (bit l: layer l allowed; pad cells of the
+//          net always allowed), int32 keepout (cells: after the net is routed, cells within this Chebyshev
+//          distance of its path on the same layer cost other nets +keepPen each; 0 = none). Absent = no rules
+//          (bit-identical to the JS router).
 // Output (stdout, JSON): rounds, overflow, nets, complete, clean, vias, viaSites, length, seconds,
 //   roundLog, status[], netVias[], netLen[] (mm)
 #include <cstdio>
@@ -83,7 +88,16 @@ int main(int argc, char** argv) {
   for (int i = 0; i < padCount; i++) { pcx[i] = rd<double>(); pcy[i] = rd<double>(); int n = rd<int32_t>(); rdv(padCells[i], n); for (auto& c : padCells[i]) c = toInt(c); }
   vector<vector<int32_t>> netPads(netCount);
   for (int i = 0; i < netCount; i++) { int n = rd<int32_t>(); rdv(netPads[i], n); }
+  vector<double> viaMul(netCount, 1.0); vector<int32_t> layerMask(netCount, -1), keepNet(netCount, 0);
+  int32_t ruleCount = 0; bool anyKeep = false;
+  if (fread(&ruleCount, sizeof(int32_t), 1, in) == 1) for (int i = 0; i < ruleCount; i++) {
+    const int net = rd<int32_t>(); const double vm = rd<double>(); const int lm = rd<int32_t>(), ko = rd<int32_t>();
+    if (net < 0 || net >= netCount) { fprintf(stderr, "bad rule net %d\n", net); return 2; }
+    viaMul[net] = vm; layerMask[net] = lm; keepNet[net] = ko; if (ko > 0) anyKeep = true;
+  }
   fclose(in);
+  const double keepPen = 8; // cost per keepout cell of another net (~1.3 vias)
+  vector<int32_t> resv(anyKeep ? N : 0, -1); vector<vector<int32_t>> resvCells(anyKeep ? netCount : 0);
 
   vector<SearchS> ss(N, SearchS{0, 0, 0}); vector<int32_t> mark(N, 0);
   vector<int32_t> treeGen(N, 0), takenGen(N, 0);
@@ -111,14 +125,17 @@ int main(int argc, char** argv) {
       if (x < wx1) { nb[k] = c + L; nx[k] = x + 1; ny[k] = y; nbase[k++] = 1; }
       if (y > wy0) { nb[k] = c - WL; nx[k] = x; ny[k] = y - 1; nbase[k++] = 1; }
       if (y < wy1) { nb[k] = c + WL; nx[k] = x; ny[k] = y + 1; nbase[k++] = 1; }
-      if (l > 0) { nb[k] = c - 1; nx[k] = x; ny[k] = y; nbase[k++] = viaCost * tb; }
-      if (l < BOTTOM) { nb[k] = c + 1; nx[k] = x; ny[k] = y; nbase[k++] = viaCost * tb; }
+      const double vc = viaCost * tb * viaMul[net]; const int lmask = layerMask[net];
+      if (l > 0) { nb[k] = c - 1; nx[k] = x; ny[k] = y; nbase[k++] = vc; }
+      if (l < BOTTOM) { nb[k] = c + 1; nx[k] = x; ny[k] = y; nbase[k++] = vc; }
       for (int j = 0; j < k; j++) {
         const int32_t n = nb[j]; const CellS& cn = cs[n];
         if (cn.owner != -1 && cn.owner != net) continue;
         if (hard && cn.usage) continue;
+        if (lmask != -1 && cn.owner != net && !((lmask >> (n % L)) & 1)) continue;
         const double use = cn.usage, hist = cn.hist;
-        const double ng = gc + nbase[j] * (1 + hist) * (1 + pres * use);
+        double ng = gc + nbase[j] * (1 + hist) * (1 + pres * use);
+        if (anyKeep && resv[n] >= 0 && resv[n] != net) ng += keepPen;
         SearchS& sn = ss[n];
         if (sn.gen == curGen && sn.g <= ng) continue;
         sn = { ng, curGen, c };
@@ -167,6 +184,14 @@ int main(int argc, char** argv) {
   };
 
   vector<Route> routes(netCount);
+  // Keepout of net n: cells within keepNet[n] (Chebyshev, same layer) of its paths, not owned by a pad.
+  auto reserve = [&](int n) {
+    for (int32_t c : resvCells[n]) if (resv[c] == n) resv[c] = -1;
+    resvCells[n].clear(); const int k = keepNet[n];
+    for (const auto& path : routes[n].paths) for (int32_t c : path) { const int q = c / L, l = c - q * L, x = q % W, y = q / W;
+      for (int yy = std::max(0, y - k); yy <= std::min(H - 1, y + k); yy++) for (int xx = std::max(0, x - k); xx <= std::min(W - 1, x + k); xx++) {
+        const int32_t m = (yy * W + xx) * L + l; if (resv[m] == -1 && cs[m].owner == -1) { resv[m] = n; resvCells[n].push_back(m); } } }
+  };
   int rounds = 0, overflow = 0; double prevOverflow = INFINITY; bool fullRound = true;
   std::string roundLog = "[";
   auto toJs = [&](int c) { int q = c / L, l = c - q * L; return l * P + q; };
@@ -183,6 +208,7 @@ int main(int argc, char** argv) {
       if (old.has) for (int32_t c : old.cells) cs[c].usage--;
       routes[n] = routeNet(n);
       for (int32_t c : routes[n].cells) cs[c].usage++;
+      if (anyKeep && keepNet[n] > 0) reserve(n);
     }
     if (round == 0 && emitOverflow) ovf1 = overflowCells();
     overflow = 0;

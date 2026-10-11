@@ -292,8 +292,11 @@
  "critical": [
   {
    "name": "class USB",
-   "kind": "class",
-   "class": "USB",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_DP",
+    "/CPU/USB_DM"
+   ],
    "traceWidth": 0.254,
    "clearance": 0.1778
   },
@@ -311,14 +314,6 @@
    "pair": [
     "/JTAG/USB_JTAG_DP",
     "/JTAG/USB_JTAG_DM"
-   ]
-  },
-  {
-   "name": "pair /CPU/USB_DP",
-   "kind": "pair",
-   "pair": [
-    "/CPU/USB_DP",
-    "/CPU/USB_DM"
    ]
   }
  ]

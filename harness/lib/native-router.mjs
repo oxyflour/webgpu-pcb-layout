@@ -21,6 +21,11 @@ export function routeBoardNative(board, layout, sides, options = {}) {
   const order = [...Array(board.netCount).keys()].filter((n) => netPads[n].length >= 2);
   const span = (n) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const p of netPads[n]) { const [x, y] = padCenter[p]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } return x1 - x0 + y1 - y0; };
   order.sort((a, b) => span(a) - span(b));
+  // options.netRules [{net, priority, viaMul, layerMask, keepout}] (lib/constraints.mjs routerRules):
+  // nets with a priority route first (lower value first, then by span), the rest keep the span order.
+  const rules = options.netRules ?? [];
+  if (rules.length) { const pr = new Map(rules.filter((r) => r.priority != null).map((r) => [r.net, r.priority]));
+    order.sort((a, b) => (pr.get(a) ?? Infinity) - (pr.get(b) ?? Infinity) || span(a) - span(b)); }
   const deadlineS = options.deadline ? (options.deadline - performance.now()) / 1000 : 0;
   // Binary input (see router.cpp).
   const parts = [];
@@ -34,6 +39,7 @@ export function routeBoardNative(board, layout, sides, options = {}) {
   i32([padCells.length]);
   padCells.forEach((cells, p) => { f64(padCenter[p]); i32([cells.length]); i32(cells); });
   for (let n = 0; n < board.netCount; n++) { i32([netPads[n].length]); i32(netPads[n]); }
+  if (rules.length) { i32([rules.length]); for (const r of rules) { i32([r.net]); f64([r.viaMul ?? 1]); i32([r.layerMask ?? -1, r.keepout ?? 0]); } }
   const file = path.join(os.tmpdir(), `route-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`);
   fs.writeFileSync(file, Buffer.concat(parts));
   try {

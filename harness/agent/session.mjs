@@ -7,6 +7,7 @@ import path from 'node:path';
 import { loadBoard, legalize, evaluateRobust, legalOk, rotatedSize, worldPin, needsFastRouting, toolRouting } from '../lib/board.mjs';
 import { startLayout } from '../lib/init.mjs';
 import { detailPlace } from '../lib/detail.mjs';
+import { loadConstraints, routerRules, evalConstraints } from '../lib/constraints.mjs';
 import { lib } from '../lib/env.mjs';
 
 const { placementMasks, blockedCells, maskCellRect } = await lib('src/geometry/mask.js');
@@ -17,7 +18,8 @@ const r2 = (v) => Math.round(v * 100) / 100;
 
 export async function initSession(dir, { board, seed = 1, reference = null }) {
   fs.mkdirSync(path.join(dir, 'candidates'), { recursive: true });
-  const b = loadBoard(board), human = await evaluateRobust(b, b.a.originalLayout, toolRouting(b));
+  // Design constraints with routing limits (lib/constraints.mjs) apply to the human target too.
+  const b = loadBoard(board), rules = routerRules(b, loadConstraints(b)), human = await evaluateRobust(b, b.a.originalLayout, { ...toolRouting(b), ...(rules.length ? { netRules: rules } : {}) });
   writeJson(path.join(dir, 'session.json'), { board, seed, next: 0, candidates: {}, best: null, submitted: null, placeCalls: 0, reference,
     target: { clean: human.clean, nets: human.nets, vias: human.vias, viaSites: human.viaSites, hpwlMm: human.hpwlMm, noise: human.noise, margin: human.margin } });
 }
@@ -28,7 +30,7 @@ const better = (a, b) => { for (let k = 0; k < a.length; k++) if (a[k] !== b[k])
 
 export function createSession(dir) {
   const file = path.join(dir, 'session.json'), state = () => readJson(file);
-  const s0 = state(), b = loadBoard(s0.board);
+  const s0 = state(), b = loadBoard(s0.board), C = loadConstraints(b), rules = routerRules(b, C);
   const comps = b.p.components, idx = new Map(comps.map((c, i) => [c.id, i]));
   const fp = new Map(b.a.ir.footprints.map((f) => [f.id, f]));
   const layoutOf = (id) => readJson(path.join(dir, 'candidates', `${id}.json`)).layout;
@@ -104,7 +106,14 @@ export function createSession(dir) {
             neighbours: [...nb].sort((x, y) => y[1] - x[1]).slice(0, 24).map(([r, k]) => ({ ref: r, sharedNets: k, fixed: !!comps[idx.get(r)].fixed })) };
         }), note: 'Pin world position = (x, y) + R_r(sx * lx, ly), sx = -1 on the bottom side else 1, R_0(a,b)=(a,b), R_1=(-b,a), R_2=(-a,-b), R_3=(b,-a); y grows downward.' };
       }
-      throw new Error('section must be summary | ics | parts | nets | part');
+      if (section === 'constraints') {
+        // Design constraints (designer input, not editable here): decap -> IC assignment, critical nets and their limits.
+        const byIc = {}; for (const d of C.decaps) for (const i of d.ics.length <= 3 ? d.ics : []) (byIc[comps[i].id] ??= []).push(d.ref);
+        return { decaps: { count: C.decaps.length, byIc, note: 'Each decoupling capacitor is pulled toward a supply pin of its IC by the detail pass (assigned by the schematic sheet or the constraint file; capacitors with more than 3 candidate ICs are omitted here).' },
+          critical: C.critical.map((c) => ({ name: c.name, kind: c.kind, nets: c.nets.map((ni) => b.p.nets[ni].id), ...Object.fromEntries(['maxLengthMm', 'maxVias', 'maxMismatchMm', 'keepoutMm', 'layer', 'priority'].filter((k) => c[k] != null).map((k) => [k, c[k]])) })),
+          note: 'Critical nets with limits are routed first, with vias made expensive (maxVias), on the allowed layers and with a keepout for other nets. place reports which constraints fail. Keep critical nets short and their parts close: that is the lever.' };
+      }
+      throw new Error('section must be summary | ics | parts | nets | part | constraints');
     },
 
     // ASCII floorplan per side: '#' keepout/outside, fixed bodies as their label, and (with a
@@ -187,17 +196,18 @@ export function createSession(dir) {
         const d = detailPlace(b, leg.layout, { budgetS: big ? 60 : 30, seed: runSeed });
         leg = legalize(b, d.layout); detail = { evals: d.evals, accepted: d.accepted, seconds: d.seconds };
       }
-      const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), deadlineS: Math.max(15, 150 - (performance.now() - t0) / 1000) });
+      const m = await evaluateRobust(b, leg.layout, { detail: true, ...toolRouting(b), ...(rules.length ? { netRules: rules } : {}), deadlineS: Math.max(15, 150 - (performance.now() - t0) / 1000) });
       const moved = comps.map((c, i) => [c.id, Math.hypot(leg.layout[i].x - init[i].x, leg.layout[i].y - init[i].y)]).filter(([ref, d]) => !comps[idx.get(ref)].fixed && d > 0).sort((x, y) => y[1] - x[1]);
       const { perNet, overflowBins, fragileNets = [], ...metrics } = m;
-      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, seed: runSeed, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, detail, metrics, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
+      const ce = evalConstraints(b, leg.layout, C, perNet), constraints = { decap: ce.decap, critical: { count: ce.critical.length, failing: ce.critical.filter((c) => !c.pass).map((c) => ({ name: c.name, fails: c.fails, vias: c.vias, lengthMm: c.lengthMm, ...(c.mismatchMm != null ? { mismatchMm: c.mismatchMm } : {}) })) } };
+      writeJson(path.join(dir, 'candidates', `${id}.json`), { id, from, plan, seed: runSeed, legalizer: { failed: leg.failed, meanDisplacement: leg.meanDisplacement }, detail, metrics, constraints, perNet, overflowBins, fragileNets, layout: leg.layout, start: init });
       s2.candidates[id] = { id, from, planned: Object.keys(plan).length, metrics };
       const prev = s2.best && s2.candidates[s2.best];
       const accepted = !prev || better(rank(metrics, s2.target), rank(prev.metrics, s2.target));
       if (accepted) s2.best = id;
       writeJson(file, s2);
       if (!feedback) delete metrics.margin;
-      return { candidate: id, best: s2.best, newBest: accepted, scoringNote: `clean/vias are medians over ${m.noise.shifts} routing-grid phases; metrics.noise gives their min-max. Two candidates whose clean/vias differ by less than that spread are equal within measurement noise.`, ...(m.margin?.timeLimited ? { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` } : {}), detailSeconds: detail?.seconds ?? 0, metrics, humanTarget: shownTarget(s2.target),
+      return { candidate: id, best: s2.best, newBest: accepted, scoringNote: `clean/vias are medians over ${m.noise.shifts} routing-grid phases; metrics.noise gives their min-max. Two candidates whose clean/vias differ by less than that spread are equal within measurement noise.`, ...(m.margin?.timeLimited ? { routingNote: `routing stopped after ${m.routeRounds} rounds (time limit): clean/vias are a lower-quality estimate` } : {}), detailSeconds: detail?.seconds ?? 0, metrics, constraints, humanTarget: shownTarget(s2.target),
         ...(feedback ? { routingMargin: marginOf(m, s2), congestion: congestion(m, leg.layout, 4), fragileNets: { count: fragileNets.length, nets: fragileNets.slice(0, 12) } } : {}),
         failedNets: perNet.filter((n) => n.status !== 'clean').slice(0, 20).map((n) => n.net),
         mostViaNets: perNet.filter((n) => n.vias > 0).sort((x, y) => y.vias - x.vias).slice(0, 8).map((n) => `${n.net}:${n.vias}`),

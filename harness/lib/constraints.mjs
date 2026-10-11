@@ -66,17 +66,33 @@ export function loadConstraints(b, { file = path.join(HARNESS_ROOT, 'constraints
     const nets = c.nets.map((n) => netIdx.get(n)).filter((i) => i != null); if (!nets.length) continue;
     critical.push({ name: `class ${c.name}`, kind: 'class', class: c.name, nets, traceWidth: c.traceWidth, clearance: c.clearance, source: 'netclass' }); }
   if (A.groups.crystal.length) critical.push({ name: 'crystal nets', kind: 'crystal', nets: A.groups.crystal, source: 'crystal parts' });
-  for (const [p, n] of A.pairs) critical.push({ name: `pair ${b.p.nets[p].id}`, kind: 'pair', nets: [p, n], source: 'net names' });
+  const setKey = (nets) => [...nets].sort((x, y) => x - y).join();
+  for (const [p, n] of A.pairs) { const same = critical.find((c) => setKey(c.nets) === setKey([p, n]));
+    if (same) { same.kind = 'pair'; same.nets = [p, n]; continue; } // a net class that is exactly this pair
+    critical.push({ name: `pair ${b.p.nets[p].id}`, kind: 'pair', nets: [p, n], source: 'net names' }); }
   for (const u of user.critical ?? []) {
     const nets = u.pair ?? u.nets ?? (u.class ? K.netClasses.find((c) => c.name === u.class)?.nets : null);
     if (!nets) throw new Error(`constraints: critical entry needs nets, pair or a known class: ${JSON.stringify(u)}`);
     const ni = nets.map((n) => { if (!netIdx.has(n)) throw new Error(`constraints: unknown net ${n}`); return netIdx.get(n); });
-    const kind = u.kind ?? (u.pair ? 'pair' : 'net'), key = [...ni].sort().join();
-    const k = critical.findIndex((c) => [...c.nets].sort().join() === key);
-    const entry = { ...(k >= 0 ? critical[k] : {}), name: u.name ?? (u.class ? `class ${u.class}` : `${kind} ${nets[0]}`), ...u, kind, nets: ni, source: 'file' };
+    const key = setKey(ni), k = critical.findIndex((c) => setKey(c.nets) === key), base = k >= 0 ? critical[k] : {};
+    const kind = u.kind ?? (u.pair ? 'pair' : base.kind ?? 'net');
+    const entry = { ...base, name: u.name ?? base.name ?? (u.class ? `class ${u.class}` : `${kind} ${nets[0]}`), ...u, kind, nets: ni, source: 'file' };
     if (k >= 0) critical[k] = entry; else critical.push(entry);
   }
   return { board: b.name, decaps, critical, sheets: Object.keys(K.sheetOf).length > 0, netClasses: K.netClasses.map((c) => c.name), analysis: A };
+}
+
+// Router rules of the critical entries that set routing limits (lib/native-router.mjs netRules):
+// priority (default 1 when any limit is set; lower routes first), maxVias 0 -> via cost x30, other
+// maxVias -> x4, layer 'top' / 'bottom' / [layer indices] -> allowed layers, keepoutMm -> cells.
+export function routerRules(b, C, cell = 0.4) {
+  const L = Math.max(2, b.a.routing.layers ?? 2), rules = new Map();
+  for (const c of C.critical) {
+    if (c.priority == null && c.maxVias == null && c.layer == null && c.keepoutMm == null) continue;
+    const mask = c.layer == null ? -1 : c.layer === 'top' ? 1 : c.layer === 'bottom' ? 1 << (L - 1) : c.layer.reduce((m, l) => m | (1 << l), 0);
+    for (const net of c.nets) rules.set(net, { net, priority: c.priority ?? 1, viaMul: c.maxVias === 0 ? 30 : c.maxVias != null ? 4 : 1, layerMask: mask, keepout: c.keepoutMm ? Math.ceil(c.keepoutMm / cell) : 0 });
+  }
+  return [...rules.values()];
 }
 
 // Editable form of the constraints (refs and net names), e.g. as a template for <board>.json.

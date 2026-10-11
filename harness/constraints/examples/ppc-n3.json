@@ -1,0 +1,14 @@
+{
+ "note": "Example (not a design input): every USB pair without vias, routed first, 0.4 mm keepout. Used by experiments/constraints-routing.mjs.",
+ "critical": [
+  {
+   "pair": [
+    "USB2_DP",
+    "USB2_DM"
+   ],
+   "maxVias": 0,
+   "priority": 1,
+   "keepoutMm": 0.4
+  }
+ ]
+}

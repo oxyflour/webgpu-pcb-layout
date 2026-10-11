@@ -107,8 +107,11 @@
  "critical": [
   {
    "name": "class USB diff90",
-   "kind": "class",
-   "class": "USB diff90",
+   "kind": "pair",
+   "pair": [
+    "/CPU/USB_DP",
+    "/CPU/USB_DM"
+   ],
    "traceWidth": 0.3175,
    "clearance": 0.2032
   },
@@ -122,14 +125,6 @@
     "Net-(U10-Pad40)",
     "Net-(C8-Pad1)",
     "Net-(C53-Pad1)"
-   ]
-  },
-  {
-   "name": "pair /CPU/USB_DP",
-   "kind": "pair",
-   "pair": [
-    "/CPU/USB_DP",
-    "/CPU/USB_DM"
    ]
   },
   {
