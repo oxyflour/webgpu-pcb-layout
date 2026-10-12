@@ -28,7 +28,7 @@ for (const board of (arg('boards') ?? ALL.join(',')).split(',')) {
     const best = reps.map((d) => ({ d, f: JSON.parse(fs.readFileSync(path.join(d, 'summary.json'), 'utf8')).final })).sort((x, y) => y.f.clean - x.f.clean || x.f.vias - y.f.vias)[0];
     const s = JSON.parse(fs.readFileSync(path.join(best.d, 'session', 'session.json'), 'utf8')), cf = path.join(best.d, 'session', 'candidates', `${s.submitted ?? s.best}.json`);
     const lf = path.join(out, 'layouts', `${board}-${pre}.json`); fs.mkdirSync(path.dirname(lf), { recursive: true }); fs.writeFileSync(lf, JSON.stringify(JSON.parse(fs.readFileSync(cf, 'utf8')).layout));
-    items.push({ name: `${LABEL[pre] ?? pre} (${path.basename(best.d)})`, file: lf });
+    items.push({ name: `${LABEL[pre] ?? `agent ${pre}, best of 3`} (${path.basename(best.d)})`, file: lf });
   }
   // Notes: robust metrics of every layout.
   const rows = [];

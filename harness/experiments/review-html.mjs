@@ -1,7 +1,7 @@
-// Self-contained HTML review of layouts around one IC: two synchronized panes (any two layouts),
+// Self-contained HTML review of layouts around one IC: up to three synchronized panes (any layouts),
 // parts of both sides, pads, the exact router's routes (native build, grid phase 0) per copper
 // layer and vias, highlighted part groups around the IC, and a net table sorted by the via
-// difference between the two panes. Routes and pads are kept inside a window around the IC.
+// difference between the first and last pane. Routes and pads are kept inside a window around the IC.
 // node harness/experiments/review-html.mjs --board ppc-n3 --ic U1 --out FILE.html [--window 45] [--notes FRAGMENT.html] name=human name=FILE ...
 import fs from 'node:fs';
 import path from 'node:path';

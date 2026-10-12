@@ -35,8 +35,8 @@ th { font-weight: 600; color: var(--muted); font-size: 12px; }
 .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
 .controls label { display: inline-flex; gap: 4px; align-items: center; color: var(--ink); }
 select, input[type=search], button { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
-.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-@media (max-width: 900px) { .panes { grid-template-columns: 1fr; } }
+.panes { display: grid; grid-template-columns: repeat(var(--n, 2), 1fr); gap: 12px; margin-top: 12px; }
+@media (max-width: 1100px) { .panes { grid-template-columns: 1fr; } }
 .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .pane .bar { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .pane .bar .m { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -63,8 +63,7 @@ canvas.drag { cursor: grabbing; }
     <p class="note">Routing: exact PathFinder of the harness (native build, 0.4 mm grid, grid phase 0, board copper layers). Vias, layer steps = every adjacent-layer change; vias, physical = one per stack of layer changes. Routes are grid approximations for review, not DRC-clean copper.</p></div>
   <div class="card">
     <div class="controls">
-      <label>Left <select id="selA"></select></label>
-      <label>Right <select id="selB"></select></label>
+      <span id="sels" class="controls"></span>
       <label><input type="checkbox" id="showTop" checked> top parts</label>
       <label><input type="checkbox" id="showBottom" checked> bottom parts</label>
       <label><input type="checkbox" id="showPads" checked> pads</label>
@@ -76,14 +75,11 @@ canvas.drag { cursor: grabbing; }
     </div>
     <div class="legend" id="legend" style="margin-top:8px"></div>
   </div>
-  <div class="panes">
-    <div class="pane"><div class="bar"><strong id="nameA"></strong><span class="m" id="mA"></span></div><canvas id="cA"></canvas></div>
-    <div class="pane"><div class="bar"><strong id="nameB"></strong><span class="m" id="mB"></span></div><canvas id="cB"></canvas></div>
-  </div>
+  <div class="panes" id="panes"></div>
   <div class="card">
     <div class="controls"><strong>Nets around the IC</strong><input type="search" id="q" placeholder="Filter net or part"><span class="sub" id="netCount"></span></div>
     <div class="scroll tablewrap" style="margin-top:8px"><table id="nets"></table></div>
-    <p class="note">Click a net to highlight its routes and pins in both panes. Sorted by the via difference (right minus left).</p>
+    <p class="note">Click a net to highlight its routes and pins in every pane. Sorted by the via difference of the last pane minus the first pane.</p>
   </div>
 </div>
 <div class="tip" id="tip"></div>
@@ -93,10 +89,15 @@ const $ = (id) => document.getElementById(id);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const LAYER_COLORS = ['#dc2626', '#ea580c', '#ca8a04', '#65a30d', '#059669', '#0891b2', '#2563eb', '#7c3aed', '#c026d3', '#0f766e', '#be123c', '#4d7c0f'];
 const layerColor = (l) => l === 0 ? LAYER_COLORS[0] : l === D.layerNames.length - 1 ? '#2563eb' : LAYER_COLORS[(l + 1) % LAYER_COLORS.length];
-const state = { a: 0, b: Math.min(1, D.layouts.length - 1), layers: D.layerNames.map(() => true), net: -1, view: null };
+// One pane per layout (at most 3: human / tool / agent); each pane can show any layout.
+const NP = Math.min(3, D.layouts.length);
+const state = { sel: [...Array(NP).keys()], layers: D.layerNames.map(() => true), net: -1, view: null };
+document.documentElement.style.setProperty('--n', NP);
+$('panes').innerHTML = state.sel.map((_, k) => `<div class="pane"><div class="bar"><strong id="name${k}"></strong><span class="m" id="m${k}"></span></div><canvas id="c${k}"></canvas></div>`).join('');
+$('sels').innerHTML = state.sel.map((_, k) => `<label>Pane ${k + 1} <select id="sel${k}"></select></label>`).join('');
 
 $('title').textContent = `${D.board}: placement and routing around ${D.ic}`;
-$('subtitle').textContent = `${D.layouts.length} layouts. Drag to pan, wheel to zoom (both panes follow). Window ${(D.window[2] - D.window[0]).toFixed(0)} x ${(D.window[3] - D.window[1]).toFixed(0)} mm around ${D.ic}; routes and pads outside it are not included.`;
+$('subtitle').textContent = `${D.layouts.length} layouts. Drag to pan, wheel to zoom (all panes follow). Window ${(D.window[2] - D.window[0]).toFixed(0)} x ${(D.window[3] - D.window[1]).toFixed(0)} mm around ${D.ic}; routes and pads outside it are not included.`;
 
 // Metrics table.
 {
@@ -104,8 +105,7 @@ $('subtitle').textContent = `${D.layouts.length} layouts. Drag to pan, wheel to 
   const rows = D.layouts.map((L) => [L.name, `${L.metrics.clean} / ${L.metrics.nets}`, L.metrics.vias, L.metrics.viaSites, Math.round(L.metrics.hpwlMm), L.metrics.legal ? 'yes' : 'no']);
   $('metrics').innerHTML = `<thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>`;
 }
-for (const s of ['selA', 'selB']) $(s).innerHTML = D.layouts.map((L, i) => `<option value="${i}">${L.name}</option>`).join('');
-$('selA').value = state.a; $('selB').value = state.b;
+state.sel.forEach((v, k) => { $('sel' + k).innerHTML = D.layouts.map((L, i) => `<option value="${i}">${L.name}</option>`).join(''); $('sel' + k).value = v; });
 $('layerBoxes').innerHTML = D.layerNames.map((n, l) => `<label><input type="checkbox" data-l="${l}" checked><span class="sw" style="background:${layerColor(l)}"></span>${n}</label>`).join('');
 const groupVar = ['', '--g1', '--g2', '--g3', '--g4'];
 function legend() {
@@ -114,16 +114,16 @@ function legend() {
 }
 legend();
 
-// View: mm -> px, shared by both panes.
-const canvases = [$('cA'), $('cB')];
+// View: mm -> px, shared by all panes.
+const canvases = state.sel.map((_, k) => $('c' + k));
 function fit() {
   const c = canvases[0], w = c.clientWidth, h = c.clientHeight, [x0, y0, x1, y1] = D.window;
   const s = Math.min(w / (x1 - x0), h / (y1 - y0));
   state.view = { s, ox: (w - s * (x1 - x0)) / 2 - s * x0, oy: (h - s * (y1 - y0)) / 2 - s * y0 };
 }
 function draw() {
-  canvases.forEach((c, k) => drawPane(c, D.layouts[k ? state.b : state.a]));
-  for (const [k, id] of [[0, 'A'], [1, 'B']]) { const L = D.layouts[k ? state.b : state.a]; $('name' + id).textContent = L.name; $('m' + id).textContent = `clean ${L.metrics.clean}/${L.metrics.nets} · vias ${L.metrics.vias} (layer steps) · ${L.metrics.viaSites} physical · HPWL ${Math.round(L.metrics.hpwlMm)} mm`; }
+  canvases.forEach((c, k) => drawPane(c, D.layouts[state.sel[k]]));
+  for (let k = 0; k < NP; k++) { const L = D.layouts[state.sel[k]]; $('name' + k).textContent = L.name; $('m' + k).textContent = `clean ${L.metrics.clean}/${L.metrics.nets} · vias ${L.metrics.vias} (layer steps) · ${L.metrics.viaSites} physical · HPWL ${Math.round(L.metrics.hpwlMm)} mm`; }
 }
 function drawPane(c, L) {
   const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
@@ -191,7 +191,7 @@ for (const c of canvases) {
   c.addEventListener('pointermove', (e) => {
     if (drag) { state.view.ox = drag.ox + e.clientX - drag.x; state.view.oy = drag.oy + e.clientY - drag.y; schedule(); return; }
     const r = c.getBoundingClientRect(), x = (e.clientX - r.left - state.view.ox) / state.view.s, y = (e.clientY - r.top - state.view.oy) / state.view.s;
-    const L = D.layouts[c === canvases[0] ? state.a : state.b];
+    const L = D.layouts[state.sel[canvases.indexOf(c)]];
     let hit = -1;
     L.parts.forEach((p, i) => { if (x >= p[0] && x <= p[0] + p[2] && y >= p[1] && y <= p[1] + p[3] && ((p[4] ? $('showBottom') : $('showTop')).checked)) { if (hit < 0 || p[2] * p[3] < L.parts[hit][2] * L.parts[hit][3]) hit = i; } });
     const tip = $('tip');
@@ -211,18 +211,17 @@ const schedule = () => { if (!pending) { pending = true; requestAnimationFrame((
 
 // Net table.
 function netTable() {
-  const A = D.layouts[state.a], B = D.layouts[state.b], q = $('q').value.trim().toLowerCase();
-  const st = ['', 'clean', 'overflow', 'open'];
+  const Ls = state.sel.map((i) => D.layouts[i]), A = Ls[0], Z = Ls[Ls.length - 1], q = $('q').value.trim().toLowerCase();
+  const st = ['', 'clean', 'overflow', 'open'], sign = (d) => `<td class="${d > 0 ? 'pos' : d < 0 ? 'neg' : ''}">${d > 0 ? '+' : ''}${d}</td>`;
   const rows = D.tableNets.filter((n) => !q || D.nets[n].id.toLowerCase().includes(q) || D.nets[n].parts.some((p) => p.toLowerCase().includes(q)))
-    .map((n) => ({ n, d: B.netVias[n] - A.netVias[n] })).sort((x, y) => y.d - x.d || D.nets[x.n].id.localeCompare(D.nets[y.n].id));
+    .map((n) => ({ n, d: Z.netVias[n] - A.netVias[n] })).sort((x, y) => y.d - x.d || D.nets[x.n].id.localeCompare(D.nets[y.n].id));
   $('netCount').textContent = `${rows.length} nets`;
-  $('nets').innerHTML = `<thead><tr><th>Net</th><th>Parts on net</th><th>${A.name}: vias, layer steps (count)</th><th>${B.name}: vias, layer steps (count)</th><th>Difference, right - left (count)</th><th>${A.name}: vias, physical (count)</th><th>${B.name}: vias, physical (count)</th><th>${A.name}: status</th><th>${B.name}: status</th></tr></thead><tbody>` +
-    rows.map(({ n, d }) => `<tr data-n="${n}" class="${n === state.net ? 'sel' : ''}"><td>${D.nets[n].id}</td><td>${D.nets[n].parts.slice(0, 6).join(' ')}${D.nets[n].parts.length > 6 ? ' …' : ''}</td><td>${A.netVias[n]}</td><td>${B.netVias[n]}</td><td class="${d > 0 ? 'pos' : d < 0 ? 'neg' : ''}">${d > 0 ? '+' : ''}${d}</td><td>${A.netSites[n]}</td><td>${B.netSites[n]}</td><td>${st[A.netStatus[n]]}</td><td>${st[B.netStatus[n]]}</td></tr>`).join('') + '</tbody>';
+  $('nets').innerHTML = `<thead><tr><th>Net</th><th>Parts on net</th>${Ls.map((L) => `<th>${L.name}: vias, layer steps (count)</th>`).join('')}${Ls.slice(1).map((L) => `<th>${L.name} minus ${A.name}: vias (count)</th>`).join('')}${Ls.map((L) => `<th>${L.name}: vias, physical (count)</th>`).join('')}${Ls.map((L) => `<th>${L.name}: status</th>`).join('')}</tr></thead><tbody>` +
+    rows.map(({ n }) => `<tr data-n="${n}" class="${n === state.net ? 'sel' : ''}"><td>${D.nets[n].id}</td><td>${D.nets[n].parts.slice(0, 6).join(' ')}${D.nets[n].parts.length > 6 ? ' …' : ''}</td>${Ls.map((L) => `<td>${L.netVias[n]}</td>`).join('')}${Ls.slice(1).map((L) => sign(L.netVias[n] - A.netVias[n])).join('')}${Ls.map((L) => `<td>${L.netSites[n]}</td>`).join('')}${Ls.map((L) => `<td>${st[L.netStatus[n]]}</td>`).join('')}</tr>`).join('') + '</tbody>';
 }
 $('nets').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-n]'); if (!tr) return; const n = Number(tr.dataset.n); state.net = state.net === n ? -1 : n; netTable(); draw(); });
 $('q').addEventListener('input', netTable);
-$('selA').addEventListener('change', (e) => { state.a = Number(e.target.value); netTable(); draw(); });
-$('selB').addEventListener('change', (e) => { state.b = Number(e.target.value); netTable(); draw(); });
+state.sel.forEach((_, k) => $('sel' + k).addEventListener('change', (e) => { state.sel[k] = Number(e.target.value); netTable(); draw(); }));
 for (const id of ['showTop', 'showBottom', 'showPads', 'showRoutes', 'showVias']) $(id).addEventListener('change', draw);
 $('layerBoxes').addEventListener('change', (e) => { const l = Number(e.target.dataset.l); state.layers[l] = e.target.checked; draw(); });
 $('fit').addEventListener('click', () => { fit(); draw(); });
