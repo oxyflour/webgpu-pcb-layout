@@ -1683,3 +1683,90 @@ Geometric mean over the 14 earlier boards: v17 / v16 vias 0.952; no-agent vias /
 only on edu-k60 (+8.9 %: seeds 228 / 270.5 / 261.5 vs 234 / 235.5 / 228.5; two seeds with a wide phase range,
 237-305) and rx (+0.6 %, noise). Next: start layout that attaches series parts to one end; agent sessions with
 the new pass.
+
+## v18: anchor free radius; start-layout snap (rejected); agent sweep (2026-10-13)
+
+edu-k60 was the one board where the v17 detail pass lost (no-agent +8.9 %). Six seeds from the no-agent
+start (median of 3 grid phases):
+
+| Detail pass (edu-k60) | Vias per seed (count) | Vias, mean of 6 (count) |
+|---|---|---|
+| old (lam 0, mu 0, relocateEnd 0) | 221 / 230 / 231 / 221 / 243 / 218 | 227 |
+| v17 (lam 1, mu 5, relocateEnd 0.5) | 236 / 247 / 290 / 245 / 227 / 251 | 249 |
+| v17, mu 0 | 227 / 215 / 232 / 247 / 241 / 231 | 232 |
+| v17, lam 0 | 235 / 231 / 242 / 231 / 228 / 245 | 235 |
+| v17, anchorFreeMm 2 (v18) | 237 / 230 / 228 / 240 / 218 / 261 | 236 |
+
+On this sparse 2-layer board humans do not put series parts tight against a pin (2-pin parts, distance of
+the nearer end to its partner pin: human p50 2.46 / p90 5.15 mm, v17 1.83 / 2.70 mm, librem5 human p90 2.0 mm).
+The anchor now charges only the distance beyond anchorFreeMm = 2 mm (a hinge: 1 mm changes nothing on
+edu-k60, few parts get closer than that). From the human IC poses (3 seeds) anchorFreeMm 0 / 1 / 2 / 3 mm:
+librem5 3248 / 3217 / 3241 / 3255, k60 385 / 384 / 390 / 383, pic 323 / 331 / 335 / 322 vias (within the seed
+spread, pic seeds 305-344).
+
+Start-layout snap (a free small part moves from its weighted centre next to the positioned partner pin
+nearest to it) did not help and was removed: human IC poses librem5 3241 -> 3262, k60 390 -> 432, pic 335 ->
+330; no-agent librem5 4155 -> 4081, edu-k60 236 -> 235 (6 seeds). Which end humans anchor is weakly
+predictable: over 1763 2-pin parts on 15 boards the anchored end has the partner with fewer pins in 64 % of
+1342 comparable cases; the big partner 46 % (of 833), the 2-part net 37 % (of 685).
+
+Detail budget 30 s instead of 60 s (librem5, human IC poses, 3 jobs): 3279 vs 3238 vias (2.3 M vs 4.7 M tries),
+so the 60 s cap stays. The v15 librem5 sessions were time-bound, not early stops: c000 takes 1.4 min, reading
+and `check` ~4-5 min, then one `place` every 75-80 s; all three submitted at 18.7-19.4 of 20 minutes.
+
+No-agent tool, all boards (3 seeds, 8 grid offsets; results/sweep-eval-v18):
+
+| Board | Human: vias (count) | No agent v16: tool vias, mean of 3 (count) | No agent v18: tool vias, mean of 3 (count) | No agent v18 / No agent v16 (change, %) | No agent v18: tool clean nets, mean (count of nets) |
+|---|---|---|---|---|---|
+| z3r0 | 32.5 | 27 | 22 | -17.8 | 46.0 of 46 |
+| pico | 57.5 | 65 | 60 | -7.0 | 86.0 of 86 |
+| edk | 66.5 | 99 | 88 | -10.8 | 124.0 of 124 |
+| edu-fpga | 77.5 | 155 | 156 | 1.0 | 108.0 of 108 |
+| fsl-mini | 192 | 268 | 258 | -3.7 | 162.0 of 162 |
+| edu-k60 | 193 | 233 | 239 | 2.8 | 157.0 of 157 |
+| edu-nxp | 203.5 | 212 | 204 | -4.1 | 163.0 of 163 |
+| safety | 229 | 280 | 255 | -9.1 | 186.0 of 186 |
+| pic | 348.5 | 512 | 461 | -10.1 | 303.8 of 310 |
+| nxp | 588 | 699 | 680 | -2.8 | 370.0 of 370 |
+| rx | 626 | 737 | 732 | -0.7 | 400.0 of 400 |
+| k60 | 301.5 | 452 | 411 | -9.1 | 318.0 of 318 |
+| acc | 2588 | 3028 | 2946 | -2.7 | 617.0 of 617 |
+| ppc-n3 | 8768 | 9823 | 9823 | 0.0 | 1607.0 of 1607 |
+
+Geometric mean over the 14 earlier boards: no-agent v18 / v16 vias 0.946 (v17 0.952); no-agent vias / human 1.256 -> 1.187. librem5 no-agent v18: 4208 / 4080.5 / 4139 (mean 4142; v17 4086, old tool 5031).
+
+librem5 agent sessions with the new tool (prompt v15, 20 min, 20 place calls; 8 grid offsets; human 2781.5):
+
+| Agent sessions (librem5) | Clean nets (count, of 807) | Vias per session (count) | Vias, mean (count) | Vias / human (x) |
+|---|---|---|---|---|
+| old tool (results/l5s-librem5) | 807 / 807 / 807 | 3516.5 / 3726.5 / 3582 | 3608 | 1.30 |
+| v18 tool (results/l5v18s-librem5) | 807 / 807 / 807 | 3418 / 3373 / 3571 | 3454 | 1.24 |
+
+The agents' floorplans are still far from the human one: of the 37 big parts (>= 8 pins) 8-10 are within 3 mm
+of the human pose, median displacement 6.7-9.1 mm (U1 PMIC 27-44 mm, U601 28-37 mm). With the human IC poses
+the tool reaches 3241, so the floorplan is worth ~6 % on this board and the small-part placement ~14 %
+(3241 vs the legalized human 2838).
+
+Agent sweep v18 (prompt v15, baseline candidate + 20 place calls, 20 min, 3 boards at a time, 3 sessions per board, 02:16-03:48; results/sweep-eval-v18, 8 grid offsets; librem5 = the l5v18s sessions above):
+
+| Board | Human: vias (count) | Agent v16: vias, mean of 3 (count) | Agent v18: vias per session (count) | Agent v18: vias, mean of 3 (count) | v18 / v16 (change, %) | Agent v18: vias / human (x) | Agent v18: clean nets, mean (count of signal nets) |
+|---|---|---|---|---|---|---|---|
+| z3r0 | 32.5 | 24 | 20 / 19 / 19 | 19 | -17.7 | 0.59 | 46.0 of 46 |
+| pico | 57.5 | 54 | 55.5 / 53 / 55.5 | 55 | 1.9 | 0.95 | 86.0 of 86 |
+| edk | 66.5 | 81 | 59.5 / 66.5 / 71.5 | 66 | -18.7 | 0.99 | 124.0 of 124 |
+| edu-fpga | 77.5 | 68 | 76 / 80.5 / 75 | 77 | 13.8 | 1.00 | 108.0 of 108 |
+| fsl-mini | 192 | 234 | 253.5 / 237 / 223 | 238 | 1.5 | 1.24 | 162.0 of 162 |
+| edu-k60 | 193 | 172 | 153.5 / 152.5 / 169 | 158 | -7.9 | 0.82 | 157.0 of 157 |
+| edu-nxp | 203.5 | 201 | 171.5 / 169 / 185.5 | 175 | -12.6 | 0.86 | 163.0 of 163 |
+| safety | 229 | 232 | 233.5 / 223 / 238.5 | 232 | -0.3 | 1.01 | 186.0 of 186 |
+| pic | 348.5 | 398 | 341.5 / 328 / 327.5 | 332 | -16.4 | 0.95 | 310.0 of 310 |
+| nxp | 588 | 675 | 649 / 618 / 638.5 | 635 | -5.9 | 1.08 | 370.0 of 370 |
+| rx | 626 | 708 | 705 / 687.5 / 688.5 | 694 | -2.0 | 1.11 | 400.0 of 400 |
+| k60 | 301.5 | 422 | 362.5 / 376.5 / 386 | 375 | -11.2 | 1.24 | 318.0 of 318 |
+| acc | 2588 | 2732 | 2667 / 2663.5 / 2672.5 | 2668 | -2.3 | 1.03 | 617.0 of 617 |
+| librem5 | 2781.5 | - (old tool: 3608) | 3418 / 3373 / 3571 | 3454 | - | 1.24 | 807.0 of 807 |
+| ppc-n3 | 8768 | 9380 | 9239 / 9145 / 9370 | 9251 | -1.4 | 1.06 | 1607.0 of 1607 |
+
+Geometric mean over the 14 earlier boards: agent v18 / v16 vias 0.939; agent vias / human 1.044 (v16) -> 0.981 (v18).
+
+The agent is at or below the human via count on 7 of 15 boards (z3r0, pico, edk, edu-fpga, edu-k60, edu-nxp, pic) and within 3 % on safety and acc; every session routes every signal net. Largest remaining gaps: k60 1.24, fsl-mini 1.24, librem5 1.24, rx 1.11. edu-fpga got worse (all three v18 sessions 75-80.5 vs v16 63.5-70; no-agent +1.0 %), still at the human count (77.5).
