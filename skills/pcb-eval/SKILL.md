@@ -15,7 +15,7 @@ description: 为一块新 PCB（KiCad 文件或 kicadToIR 输出的 IR JSON）�
 
 两种输入都可以：
 
-- **KiCad**：`.kicad_pcb`（KiCad 4–8）。原理图子页（封装的 `path`）和网络类会被自动读取。
+- **KiCad**：`.kicad_pcb`（KiCad 4–10）。原理图子页（封装的 `path`）和网络类会被自动读取。
 - **IR JSON**：`kicadToIR` 的输出（`core/src/kicad/adapter.js`），即 `{format, yAxis, name, source, board, nets, footprints}`。
   - `footprints[].placement` 是**人工布局**（所有"对标人工"的指标都以它为参照；没有人工布局的板子只能看绝对值）。
   - 可选字段（约束推断用）：`footprints[].sheet`（原理图子页路径，同一子页的 IC 被认为是该页去耦电容的服务对象）、`nets[].netclass`（网络类名）、顶层 `netClasses: [{name, clearance, traceWidth, viaDia}]`。没有它们时，去耦电容退回"同电源上的任一 IC"，关键网络只按命名（晶振、`_P/_N`、`DP/DM`、`+/-`）识别。
@@ -28,6 +28,8 @@ description: 为一块新 PCB（KiCad 文件或 kicadToIR 输出的 IR JSON）�
 ```json
 { "_note": "...", "myboard": "boards/myboard-ir.json" }
 ```
+
+密集板（手机等 HDI 板，人工器件间距 < 0.5 mm）要写成 `"myboard": { "file": "...", "bodyMargin": 0.05 }`：没有 courtyard 的器件体 = 焊盘框外扩 `bodyMargin`（默认 0.25 mm），太大时合法化会把人工布局推散（librem5 默认值下中位位移 0.75 mm、最大 22 mm）。取能让"合法化后的人工布局"几乎不动（p90 位移 ~0.1 mm）的值；`PCB_BODY_MARGIN` 环境变量可临时覆盖做扫描。
 
 登记后的板子自动进入所有评测脚本的默认板单（`EVAL_BOARDS`）。验证：`node -e "import('./harness/lib/board.mjs').then(m=>console.log(m.loadBoard('myboard').format))"`。
 

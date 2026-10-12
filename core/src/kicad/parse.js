@@ -57,9 +57,15 @@ function parseSize(block) {
   return m ? [Math.abs(Number(m[1])), Math.abs(Number(m[2]))] : [0.8, 0.8];
 }
 
-function parseNet(block) {
+// KiCad <= 8: (net 12 "name"); KiCad >= 9: (net "name"), ids given in order of appearance.
+function parseNet(block, idsByName) {
   const m = block.match(/\(net\s+(\d+)(?:\s+("(?:\\.|[^"])*"|[^\s\)]+))?/);
-  return m ? { id: Number(m[1]), name: unquote(m[2] || '') } : { id: 0, name: '' };
+  if (m) return { id: Number(m[1]), name: unquote(m[2] || '') };
+  const named = block.match(/\(net\s+("(?:\\.|[^"])*")\s*\)/);
+  const name = named ? unquote(named[1]) : '';
+  if (!name) return { id: 0, name: '' };
+  if (!idsByName.has(name)) idsByName.set(name, idsByName.size + 1);
+  return { id: idsByName.get(name), name };
 }
 
 function parseReference(block, fallback) {
@@ -174,6 +180,7 @@ export function parseKicadPCB(text, name = 'KiCad PCB') {
   const footprints = [];
   const pads = [];
   const rawNetNames = new Map();
+  const netIdsByName = new Map();
 
   rawBlocks.forEach((block, fi) => {
     const libName = footprintLibraryName(block);
@@ -197,7 +204,7 @@ export function parseKicadPCB(text, name = 'KiCad PCB') {
     for (const pb of padBlocks) {
       let [px, py, prot] = parseAt(pb);
       const [pw, ph] = parseSize(pb);
-      const net = parseNet(pb);
+      const net = parseNet(pb, netIdsByName);
       if (net.id !== 0 && net.name) rawNetNames.set(net.id, net.name);
       if (side < 0) { px = -px; prot = -prot; }
       const aa = prot * Math.PI / 180;

@@ -80,8 +80,10 @@ export function copperLayerTable(text) {
   const table = start < 0 ? '' : text.slice(start, start + 4000).split(/\n\s*\)\s*\n/)[0];
   const byNumber = new Map();
   for (const m of table.matchAll(/\((\d+)\s+"?([^"\s)]+)"?\s+(signal|power|mixed|jumper)/g)) byNumber.set(+m[1], { name: m[2], type: m[3] });
+  // KiCad >= 9 numbers copper 0 (front), 2 (back), 4, 6, ... (inner, top to bottom).
+  const v9 = !byNumber.has(31) && !byNumber.has(15) && byNumber.has(0) && byNumber.has(2) && byNumber.get(2).name !== 'In1.Cu';
   const modern = byNumber.has(31) || !byNumber.has(15);
-  const front = modern ? 0 : 15, back = modern ? 31 : 0;
+  const front = modern ? 0 : 15, back = v9 ? 2 : modern ? 31 : 0;
   const inner = [...byNumber.keys()].filter((k) => k !== front && k !== back).sort((a, b) => a - b);
   return [front, ...inner, back].filter((k) => byNumber.has(k)).map((k) => {
     const { name, type } = byNumber.get(k);

@@ -29,7 +29,13 @@ export const { normalizeProblem, rotatedSize, worldPin } = P;
 // registry harness/boards.json {"name": "path"} (a .kicad_pcb or an IR .json = kicadToIR output; paths
 // relative to the repository root or absolute). EVAL_BOARDS: the default board list of the sweeps.
 const LOCAL = (() => { const f = path.join(HARNESS_ROOT, 'boards.json'); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {}; })();
-export const BOARDS = { ...Object.fromEntries(KICAD_CASES.map(([k, v]) => [k, BOARDS_ROOT ? path.join(BOARDS_ROOT, v) : null])), ...Object.fromEntries(Object.entries(LOCAL).filter(([k]) => !k.startsWith('_')).map(([k, v]) => [k, path.resolve(REPO_ROOT, v)])) };
+// An entry is a path or {file, bodyMargin}: bodyMargin (mm) = courtyard margin around the pads of parts
+// without a courtyard (default 0.25; dense boards where humans pack parts closer need less, so that the
+// human layout stays legal). PCB_BODY_MARGIN overrides it for every board (experiments).
+const LOCAL_BOARDS = Object.entries(LOCAL).filter(([k]) => !k.startsWith('_')).map(([k, v]) => [k, typeof v === 'string' ? { file: v } : v]);
+export const BOARDS = { ...Object.fromEntries(KICAD_CASES.map(([k, v]) => [k, BOARDS_ROOT ? path.join(BOARDS_ROOT, v) : null])), ...Object.fromEntries(LOCAL_BOARDS.map(([k, v]) => [k, path.resolve(REPO_ROOT, v.file)])) };
+const BODY_MARGIN = Object.fromEntries(LOCAL_BOARDS.filter(([, v]) => v.bodyMargin != null).map(([k, v]) => [k, v.bodyMargin]));
+export const bodyMargin = (name) => process.env.PCB_BODY_MARGIN ? +process.env.PCB_BODY_MARGIN : BODY_MARGIN[name];
 export const EVAL_BOARDS = [...new Set(['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'safety', 'pic', 'nxp', 'rx', 'k60', 'acc', 'ppc-n3', ...Object.keys(LOCAL).filter((k) => !k.startsWith('_'))])];
 
 // Register a board file (.kicad_pcb or IR .json) under a name in this process (tests, tools).
@@ -45,7 +51,8 @@ export function loadBoard(name, { locks = {}, only = null } = {}) {
   if (!parsed.has(name)) { const text = fs.readFileSync(file, 'utf8'); parsed.set(name, { text, sha256: crypto.createHash('sha256').update(text).digest('hex'), ir: isIr ? JSON.parse(text) : kicadToIR(parseKicadBoard(text, name)) }); }
   const { text, sha256, ir } = parsed.get(name), copy = () => JSON.parse(JSON.stringify(ir));
   // An IR file goes through irToProblem (same problem as the KiCad path: checked on k60).
-  const a = only ? irToProblem({ ...copy(), footprints: copy().footprints.filter((f) => only.has(f.id)) }, { preplace: true, sides: 'original' }) : isIr ? irToProblem(copy(), { preplace: true, sides: 'original' }) : designToProblem(parseKicadBoard(text, name), { preplace: true, sides: 'original' });
+  const opts = { preplace: true, sides: 'original', bodyMargin: bodyMargin(name) };
+  const a = only ? irToProblem({ ...copy(), footprints: copy().footprints.filter((f) => only.has(f.id)) }, opts) : isIr ? irToProblem(copy(), opts) : designToProblem(parseKicadBoard(text, name), opts);
   // Through-hole parts stay at their input pose (benchmark protocol: mechanical + THT fixed).
   a.input.components.forEach((c, i) => { if (c.twoSided && !c.fixed) c.fixed = { ...a.originalLayout[i] }; });
   const fixedByInput = new Set(a.input.components.filter((c) => c.fixed).map((c) => c.id));

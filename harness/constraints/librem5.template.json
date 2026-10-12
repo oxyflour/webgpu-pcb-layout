@@ -1,0 +1,2126 @@
+{
+ "board": "librem5",
+ "note": "Defaults derived from the KiCad files (decaps: ICs in the same schematic sheet on the same supply; critical: net classes, crystal nets, differential pairs by name). Save as <board>.json and edit: a decap value is one IC ref (or {ic, maxMm}); critical entries take nets / pair / class plus kind, maxLengthMm, maxVias, maxMismatchMm, keepoutMm, layer, priority.",
+ "decaps": {
+  "C98": "U32",
+  "C123": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C399": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C185": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C346": "J12",
+  "C414": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C226": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C34": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C607": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C428": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C87": "U32",
+  "C10": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C146": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C329": "J12",
+  "C202": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C131": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C336": "J12",
+  "C440": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C174": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C8": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C159": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C441": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C603": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C419": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C189": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C178": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C334": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C27": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C225": {
+   "candidates": [
+    "U5",
+    "U101"
+   ],
+   "source": "supply"
+  },
+  "C127": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C18": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C388": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C126": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C136": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C206": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C180": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C418": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C351": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C396": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C158": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C412": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C290": "J12",
+  "C610": "U601",
+  "C190": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C211": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C151": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C429": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C186": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C33": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C335": "J12",
+  "C207": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C175": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C147": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C352": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C325": "U31",
+  "C221": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C420": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C247": "J12",
+  "C173": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C417": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C214": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C23": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C212": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C172": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C415": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C149": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C102": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C152": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C398": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C416": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C434": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C397": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C217": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C105": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C17": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C410": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C135": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C128": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C406": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C306": "J12",
+  "C215": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C107": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C606": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C13": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C9": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C101": {
+   "candidates": [
+    "U3",
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C427": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C157": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C161": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C144": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C356": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C125": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C170": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C901": "U24",
+  "C164": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C1323": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C439": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C435": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C154": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C104": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C852": "U24",
+  "C205": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C145": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C223": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C199": {
+   "candidates": [
+    "U5",
+    "U101"
+   ],
+   "source": "supply"
+  },
+  "C28": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C283": "J12",
+  "C209": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C330": "J12",
+  "C1251": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C501": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C138": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C423": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C22": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C116": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C115": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C134": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C433": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C184": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C139": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C168": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C11": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C92": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C163": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C413": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C156": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C604": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C21": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C130": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C96": "U32",
+  "C421": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C395": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C601": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C204": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C208": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C120": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C299": "J12",
+  "C32": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C132": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C409": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C179": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C400": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C605": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C446": {
+   "candidates": [
+    "U3",
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C119": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C155": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C121": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C111": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C213": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C26": "U31",
+  "C103": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C162": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C112": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C424": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C100": "U32",
+  "C14": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C394": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C602": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C176": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C210": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C169": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C16": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C106": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C231": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C411": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C118": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C408": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C422": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C5": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C188": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C117": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C12": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C108": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C611": "U601",
+  "C4": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C137": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C113": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C133": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C274": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C29": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C187": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C114": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C407": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C122": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C24": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C109": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C201": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C148": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C182": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C272": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C432": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C153": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C452": "U32",
+  "C203": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C110": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C1": {
+   "candidates": [
+    "U5",
+    "U101"
+   ],
+   "source": "supply"
+  },
+  "C31": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C129": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C431": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C140": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C166": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C281": "J12",
+  "C124": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C430": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C171": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C165": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C150": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C277": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C72": "U2",
+  "C758": "U1",
+  "C314": "U2",
+  "C58": "U24",
+  "C229": "J12",
+  "C751": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C69": "U17",
+  "C47": "U24",
+  "C759": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C381": {
+   "candidates": [
+    "U3",
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C722": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C309": "U2",
+  "C741": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C737": "U1",
+  "C59": "U31",
+  "C234": "U27",
+  "C523": "U1",
+  "C443": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C717": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C743": "U1",
+  "C746": "U1",
+  "C177": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C258": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C40": "U24",
+  "C442": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C15": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C375": "U27",
+  "C39": "U24",
+  "C383": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C744": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C545": "U17",
+  "C740": "U1",
+  "C729": "U1",
+  "C222": {
+   "candidates": [
+    "F3",
+    "J3",
+    "J7"
+   ],
+   "source": "supply"
+  },
+  "C775": "U1",
+  "C521": "U1",
+  "C338": "U2",
+  "C732": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C389": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C36": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C384": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C71": "U2",
+  "C382": "U2",
+  "C233": "U27",
+  "C142": {
+   "candidates": [
+    "F3",
+    "J3",
+    "J7"
+   ],
+   "source": "supply"
+  },
+  "C376": "U27",
+  "C337": "U2",
+  "C70": "J12",
+  "C444": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C253": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C745": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C232": "U27",
+  "C269": "J12",
+  "C750": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C542": "U1",
+  "C55": "U27",
+  "C35": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C167": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C317": "J12",
+  "C747": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C393": {
+   "candidates": [
+    "U27",
+    "U147",
+    "J12"
+   ],
+   "source": "supply"
+  },
+  "C250": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C285": "U1",
+  "C73": "J12",
+  "C237": "U27",
+  "C280": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C353": "U2",
+  "C160": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C385": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C311": "U1",
+  "C436": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C341": "U17",
+  "C736": "U1",
+  "C757": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C731": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C753": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C752": {
+   "candidates": [
+    "U101",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C236": "U27",
+  "C355": "U2",
+  "C754": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C284": {
+   "candidates": [
+    "U185",
+    "U601",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C282": "U1",
+  "C230": "J12",
+  "C749": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C738": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C312": "U1",
+  "C322": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C739": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C710": "U1",
+  "C289": "J12",
+  "C519": "U27",
+  "C742": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C437": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C480": {
+   "candidates": [
+    "U68",
+    "U185",
+    "U5",
+    "U3",
+    "U601",
+    "U201",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C725": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C242": "U27",
+  "C240": {
+   "candidates": [
+    "U27",
+    "U147",
+    "J12"
+   ],
+   "source": "supply"
+  },
+  "C235": "U27",
+  "C310": "U24",
+  "C293": "U2",
+  "C279": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C728": {
+   "candidates": [
+    "U3",
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C45": "U24",
+  "C723": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C769": {
+   "candidates": [
+    "U101",
+    "U1"
+   ],
+   "source": "supply"
+  },
+  "C755": "U1"
+ },
+ "critical": [
+  {
+   "name": "crystal nets",
+   "kind": "crystal",
+   "nets": [
+    "$$$30802",
+    "$$$30801",
+    "XTALI_25M",
+    "$$$21048",
+    "$$$21047",
+    "$$$14812",
+    "XTALI_27M",
+    "XTALO_27M",
+    "XTALO_25M",
+    "$$$14811"
+   ]
+  },
+  {
+   "name": "pair CSI_P2_CKP",
+   "kind": "pair",
+   "pair": [
+    "CSI_P2_CKP",
+    "CSI_P2_CKN"
+   ]
+  },
+  {
+   "name": "pair VOL+",
+   "kind": "pair",
+   "pair": [
+    "VOL+",
+    "VOL-"
+   ]
+  },
+  {
+   "name": "pair HDMI_REFCLKP",
+   "kind": "pair",
+   "pair": [
+    "HDMI_REFCLKP",
+    "HDMI_REFCLKN"
+   ]
+  },
+  {
+   "name": "pair DSI_CKP",
+   "kind": "pair",
+   "pair": [
+    "DSI_CKP",
+    "DSI_CKN"
+   ]
+  },
+  {
+   "name": "pair DP_TX1P",
+   "kind": "pair",
+   "pair": [
+    "DP_TX1P",
+    "DP_TX1N"
+   ]
+  },
+  {
+   "name": "pair SPKOUTRP",
+   "kind": "pair",
+   "pair": [
+    "SPKOUTRP",
+    "SPKOUTRN"
+   ]
+  },
+  {
+   "name": "pair USB1_TXP",
+   "kind": "pair",
+   "pair": [
+    "USB1_TXP",
+    "USB1_TXN"
+   ]
+  },
+  {
+   "name": "pair USB1_RXP",
+   "kind": "pair",
+   "pair": [
+    "USB1_RXP",
+    "USB1_RXN"
+   ]
+  },
+  {
+   "name": "pair DP_AUXP",
+   "kind": "pair",
+   "pair": [
+    "DP_AUXP",
+    "DP_AUXN"
+   ]
+  },
+  {
+   "name": "pair HDMI_AUXP",
+   "kind": "pair",
+   "pair": [
+    "HDMI_AUXP",
+    "HDMI_AUXN"
+   ]
+  },
+  {
+   "name": "pair CPVOUTP",
+   "kind": "pair",
+   "pair": [
+    "CPVOUTP",
+    "CPVOUTN"
+   ]
+  },
+  {
+   "name": "pair DP_TX2P",
+   "kind": "pair",
+   "pair": [
+    "DP_TX2P",
+    "DP_TX2N"
+   ]
+  },
+  {
+   "name": "pair SPKOUTLP",
+   "kind": "pair",
+   "pair": [
+    "SPKOUTLP",
+    "SPKOUTLN"
+   ]
+  },
+  {
+   "name": "pair DP_TX0P",
+   "kind": "pair",
+   "pair": [
+    "DP_TX0P",
+    "DP_TX0N"
+   ]
+  },
+  {
+   "name": "pair CSI_P1_CKP",
+   "kind": "pair",
+   "pair": [
+    "CSI_P1_CKP",
+    "CSI_P1_CKN"
+   ]
+  },
+  {
+   "name": "pair HDMI_CLKP",
+   "kind": "pair",
+   "pair": [
+    "HDMI_CLKP",
+    "HDMI_CLKN"
+   ]
+  },
+  {
+   "name": "pair DP_TX3P",
+   "kind": "pair",
+   "pair": [
+    "DP_TX3P",
+    "DP_TX3N"
+   ]
+  }
+ ]
+}
