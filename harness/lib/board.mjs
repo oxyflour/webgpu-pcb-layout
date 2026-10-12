@@ -29,13 +29,20 @@ export const { normalizeProblem, rotatedSize, worldPin } = P;
 // registry harness/boards.json {"name": "path"} (a .kicad_pcb or an IR .json = kicadToIR output; paths
 // relative to the repository root or absolute). EVAL_BOARDS: the default board list of the sweeps.
 const LOCAL = (() => { const f = path.join(HARNESS_ROOT, 'boards.json'); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {}; })();
-// An entry is a path or {file, bodyMargin}: bodyMargin (mm) = courtyard margin around the pads of parts
+// An entry is a path or {file, bodyMargin, fixedRefs}: bodyMargin (mm) = courtyard margin around the pads of parts
 // without a courtyard (default 0.25; dense boards where humans pack parts closer need less, so that the
 // human layout stays legal). PCB_BODY_MARGIN overrides it for every board (experiments).
 const LOCAL_BOARDS = Object.entries(LOCAL).filter(([k]) => !k.startsWith('_')).map(([k, v]) => [k, typeof v === 'string' ? { file: v } : v]);
 export const BOARDS = { ...Object.fromEntries(KICAD_CASES.map(([k, v]) => [k, BOARDS_ROOT ? path.join(BOARDS_ROOT, v) : null])), ...Object.fromEntries(LOCAL_BOARDS.map(([k, v]) => [k, path.resolve(REPO_ROOT, v.file)])) };
 const BODY_MARGIN = Object.fromEntries(LOCAL_BOARDS.filter(([, v]) => v.bodyMargin != null).map(([k, v]) => [k, v.bodyMargin]));
 export const bodyMargin = (name) => process.env.PCB_BODY_MARGIN ? +process.env.PCB_BODY_MARGIN : BODY_MARGIN[name];
+// fixedRefs (entry field): regex of references held at their input pose besides the adapter's mechanical
+// parts, for enclosure-bound SMD parts (librem5: side buttons, antenna clips, screw pads, clips).
+const FIXED_REFS = Object.fromEntries(LOCAL_BOARDS.filter(([, v]) => v.fixedRefs).map(([k, v]) => [k, new RegExp(v.fixedRefs)]));
+// Benchmark protocol: through-hole parts and the board's fixedRefs stay at their input pose.
+function holdInputPose(name, a) {
+  a.input.components.forEach((c, i) => { if (!c.fixed && (c.twoSided || FIXED_REFS[name]?.test(c.id))) c.fixed = { ...a.originalLayout[i] }; });
+}
 export const EVAL_BOARDS = [...new Set(['z3r0', 'pico', 'edk', 'edu-fpga', 'fsl-mini', 'edu-k60', 'edu-nxp', 'safety', 'pic', 'nxp', 'rx', 'k60', 'acc', 'ppc-n3', ...Object.keys(LOCAL).filter((k) => !k.startsWith('_'))])];
 
 // Register a board file (.kicad_pcb or IR .json) under a name in this process (tests, tools).
@@ -53,8 +60,7 @@ export function loadBoard(name, { locks = {}, only = null } = {}) {
   // An IR file goes through irToProblem (same problem as the KiCad path: checked on k60).
   const opts = { preplace: true, sides: 'original', bodyMargin: bodyMargin(name) };
   const a = only ? irToProblem({ ...copy(), footprints: copy().footprints.filter((f) => only.has(f.id)) }, opts) : isIr ? irToProblem(copy(), opts) : designToProblem(parseKicadBoard(text, name), opts);
-  // Through-hole parts stay at their input pose (benchmark protocol: mechanical + THT fixed).
-  a.input.components.forEach((c, i) => { if (c.twoSided && !c.fixed) c.fixed = { ...a.originalLayout[i] }; });
+  holdInputPose(name, a);
   const fixedByInput = new Set(a.input.components.filter((c) => c.fixed).map((c) => c.id));
   for (const [ref, pose] of Object.entries(locks)) {
     const c = a.input.components.find((c) => c.id === ref);

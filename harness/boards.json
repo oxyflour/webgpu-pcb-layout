@@ -1,5 +1,5 @@
 {
  "_note": "Local boards: name -> .kicad_pcb or IR .json (kicadToIR output), path relative to the repository root or absolute. Keys starting with _ are comments. See skills/pcb-eval/SKILL.md.",
  "_librem5": "Purism Librem 5 mainboard v1.0.6.1 (KiCad 10, 10 copper layers, HDI), https://github.com/gralco/l5-schematic CAD/KiCad/librem5_mainboard",
- "librem5": { "file": "../boards-ext/l5-schematic/CAD/KiCad/librem5_mainboard/librem5_mainboard.kicad_pcb", "bodyMargin": 0.05 }
+ "librem5": { "file": "../boards-ext/l5-schematic/CAD/KiCad/librem5_mainboard/librem5_mainboard.kicad_pcb", "bodyMargin": 0.05, "fixedRefs": "^(SW|ANT|TS|JV)[0-9]" }
 }

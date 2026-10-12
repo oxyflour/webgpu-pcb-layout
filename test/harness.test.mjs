@@ -54,9 +54,9 @@ test('detail pass: legal, fixed parts untouched, deterministic when greedy, lowe
 
 test('native detail pass is identical to the JS one (greedy and annealed, fixed tries)', { skip: !nativeDetailAvailable() && 'native detail pass not built' }, () => {
   for (const name of ['t-z3r0', 't-pico']) { const b = loadBoard(name), L0 = legalize(b, startLayout(b, {}, { seed: 1 })).layout;
-    for (const T0 of [0, 3]) { const o = { T0, evals: 5000, budgetS: 1e9, seed: 2 };
+    for (const [T0, lam, mu, relocateEnd] of [[0, 0, 0, 0], [3, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0.5]]) { const o = { T0, lam, mu, relocateEnd, evals: 5000, budgetS: 1e9, seed: 2 };
       const js = detailPlace(b, L0, { ...o, engine: 'js' }), na = detailPlace(b, L0, { ...o, engine: 'native' });
-      assert.equal(na.engine, 'native'); assert.equal(na.accepted, js.accepted); assert.deepEqual(na.layout, js.layout, `${name} T0 ${T0}`); } }
+      assert.equal(na.engine, 'native'); assert.equal(na.accepted, js.accepted); assert.deepEqual(na.layout, js.layout, `${name} T0 ${T0} lam ${lam} mu ${mu} end ${relocateEnd}`); } }
   // Critical-net terms: pairs with keepout, length and mismatch limits.
   for (const name of ['t-z3r0', 't-pico']) { const b = loadBoard(name), L0 = legalize(b, startLayout(b, {}, { seed: 1 })).layout, f = path.join(tmp(), 'c.json');
     const pairs = loadConstraints(b, { file: f }).critical.filter((c) => c.kind === 'pair'); assert.ok(pairs.length, name);

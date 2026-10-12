@@ -5,7 +5,7 @@
 //
 // Input (binary, little endian), path in argv[1] (written by harness/lib/detail.mjs):
 //   int32  n, netCount, pinCount, padCount, decapCount, seed
-//   double W, H, clearance, nu, T0, relocate, budgetS, gap, kappa, decapFreeMm, evals (may be +inf), rho
+//   double W, H, clearance, nu, T0, relocate, budgetS, gap, kappa, decapFreeMm, evals (may be +inf), rho, lam, mu, relocateEnd
 //   per component: double width, height, x, y; int32 rotation, side, twoSided, rotatable, small, key0, key1
 //   per pin: int32 comp; double x, y
 //   per net: int32 count, sig; double weight; int32 pins[count]
@@ -13,6 +13,7 @@
 //   per decap: int32 comp, pad, hasMax; double maxMm; int32 icCount; int32 icPads[icCount]
 //   int32 critCount; per critical constraint: int32 netCount, isPair, hasMaxLen, hasMaxMismatch;
 //     double hw, maxLengthMm, maxMismatchMm; int32 nets[netCount]
+//   int32 demandCount; double demand[demandCount]   (0.4 mm cells, ceil(W / 0.4) per row; mu term)
 // Output (stdout, JSON): {"evals", "accepted", "costDelta", "seconds", "layout": [[x, y, rotation], ...]}
 #include <cstdio>
 #include <cstdlib>
@@ -38,7 +39,7 @@ int main(int argc, char** argv) {
   if (argc < 2 || !(in = fopen(argv[1], "rb"))) { fprintf(stderr, "usage: detail input.bin\n"); return 2; }
   const int n = rd<int32_t>(), netCount = rd<int32_t>(), pinCount = rd<int32_t>(), padCount = rd<int32_t>(), decapCount = rd<int32_t>();
   uint32_t s = (uint32_t)rd<int32_t>();
-  const double W = rd<double>(), H = rd<double>(), clearance = rd<double>(), nu = rd<double>(), T0 = rd<double>(), relocate = rd<double>(), budgetS = rd<double>(), gap = rd<double>(), kappa = rd<double>(), decapFreeMm = rd<double>(), evals = rd<double>(), rho = rd<double>();
+  const double W = rd<double>(), H = rd<double>(), clearance = rd<double>(), nu = rd<double>(), T0 = rd<double>(), relocate = rd<double>(), budgetS = rd<double>(), gap = rd<double>(), kappa = rd<double>(), decapFreeMm = rd<double>(), evals = rd<double>(), rho = rd<double>(), lam = rd<double>(), mu = rd<double>(), relocateEnd = rd<double>();
   vector<Comp> C(n);
   for (auto& c : C) { c.w = rd<double>(); c.h = rd<double>(); c.x = rd<double>(); c.y = rd<double>(); c.rot = rd<int32_t>(); c.side = rd<int32_t>(); c.twoSided = rd<int32_t>(); c.rotatable = rd<int32_t>(); c.small = rd<int32_t>(); c.key[0] = rd<int32_t>(); c.key[1] = rd<int32_t>(); }
   vector<Pin> P(pinCount);
@@ -51,6 +52,7 @@ int main(int argc, char** argv) {
   for (auto& d : D) { d.comp = rd<int32_t>(); d.pad = rd<int32_t>(); d.hasMax = rd<int32_t>(); d.maxMm = rd<double>(); const int c = rd<int32_t>(); d.ic.resize(c); for (auto& v : d.ic) v = rd<int32_t>(); }
   vector<Crit> CR(rd<int32_t>());
   for (auto& c : CR) { const int m = rd<int32_t>(); c.pair = rd<int32_t>(); c.hasLen = rd<int32_t>(); c.hasMis = rd<int32_t>(); c.hw = rd<double>(); c.maxLen = rd<double>(); c.maxMis = rd<double>(); c.nets.resize(m); for (auto& v : c.nets) v = rd<int32_t>(); }
+  vector<double> dem(rd<int32_t>()); for (auto& v : dem) v = rd<double>();
   fclose(in);
   const double readS = elapsed();
 
@@ -95,6 +97,16 @@ int main(int argc, char** argv) {
   auto hp = [&](int k) { const auto& ps = netPins[k]; if (ps.size() < 2) return 0.0; double x0 = INFINITY, y0 = INFINITY, x1 = -INFINITY, y1 = -INFINITY;
     for (int pi : ps) { double x, y; worldPin(pi, x, y); if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return x1 - x0 + y1 - y0; };
   vector<double> hpN(netCount); for (int k = 0; k < netCount; k++) hpN[k] = hp(k);
+  // Anchor (lam): distance of a small part's best-attached signal pin to the nearest same-net pin of another part (detail.mjs anc).
+  vector<int> netOfPin(pinCount, -1); for (int k = 0; k < netCount; k++) for (int pi : netPins[k]) netOfPin[pi] = k;
+  vector<vector<int>> sigPins(n); for (int pi = 0; pi < pinCount; pi++) { const int k = netOfPin[pi]; if (k >= 0 && sig[k]) sigPins[P[pi].comp].push_back(pi); }
+  vector<vector<int>> ancNb(n);
+  if (lam) for (int i = 0; i < n; i++) for (int k : netsOf[i]) { if (!sig[k]) continue; for (int pj : netPins[k]) { const int c = P[pj].comp; if (c != i && C[c].small && !sigPins[c].empty() && std::find(ancNb[i].begin(), ancNb[i].end(), c) == ancNb[i].end()) ancNb[i].push_back(c); } }
+  auto anc = [&](int i) { if (!lam || !C[i].small || sigPins[i].empty()) return 0.0; double best = INFINITY;
+    for (int pi : sigPins[i]) { double x, y; worldPin(pi, x, y); for (int pj : netPins[netOfPin[pi]]) { if (P[pj].comp == i) continue; double u, v; worldPin(pj, u, v); const double e = std::sqrt((u - x) * (u - x) + (v - y) * (v - y)); if (e < best) best = e; } }
+    return best < INFINITY ? best : 0.0; };
+  vector<double> ancN(n); for (int i = 0; i < n; i++) ancN[i] = anc(i);
+  vector<int> AS;
 
   // Pads (geometry.mjs padCentre / padBox).
   vector<vector<int>> padsOf(n); for (int k = 0; k < padCount; k++) padsOf[RP[k].comp].push_back(k);
@@ -138,6 +150,12 @@ int main(int argc, char** argv) {
   auto decapDist = [&](int k) { const Decap& d = D[k]; double x, y; centre(d.pad, x, y); double best = INFINITY;
     for (int q : d.ic) { double u, v; centre(q, u, v); const double e = std::sqrt((u - x) * (u - x) + (v - y) * (v - y)); if (e < best) best = e; }
     return std::max(0.0, best - decapFreeMm) + (d.hasMax ? 10 * std::max(0.0, best - d.maxMm) : 0); };
+  // Routing demand under small parts (detail.mjs demOf).
+  const double DG = 0.4; const int dgw = (int)std::ceil(W / DG), dgh = (int)std::ceil(H / DG);
+  auto demOf = [&](const int* parts, int np) { if (!mu) return 0.0; double sum = 0;
+    for (int t = 0; t < np; t++) for (int pk : padsOf[parts[t]]) { const Box a = padBox(pk); const int gx = std::min(dgw - 1, std::max(0, (int)std::floor((a.b[0] + a.b[2]) / 2 / DG))), gy = std::min(dgh - 1, std::max(0, (int)std::floor((a.b[1] + a.b[3]) / 2 / DG)));
+      sum += dem[gy * dgw + gx] * (a.b[2] - a.b[0]) * (a.b[3] - a.b[1]); }
+    return sum; };
   vector<int> ks;
   auto decapOf = [&](const int* parts, int np) { if (!kappa) return 0.0; ks.clear();
     for (int t = 0; t < np; t++) for (int k : decapsBy[parts[t]]) if (std::find(ks.begin(), ks.end(), k) == ks.end()) ks.push_back(k);
@@ -178,6 +196,9 @@ int main(int argc, char** argv) {
       double a[4]; boxOf(i, a); for (int k = 0; k < nc; k++) { if (std::find(cks.begin(), cks.end(), k) != cks.end()) continue; double c[4]; critBox(k, c); if (a[0] < c[2] && c[0] < a[2] && a[1] < c[3] && c[1] < a[3]) cks.push_back(k); } } };
   auto critOf = [&]() { double s = 0; for (int k : cks) s += critCost(k); return s; };
 
+  vector<int> pps;
+  auto partnerPin = [&](int i, double& mx, double& my) { pps.clear(); for (int ni : netsOf[i]) { if (!sig[ni]) continue; for (int pi : netPins[ni]) if (P[pi].comp != i) pps.push_back(pi); }
+    if (pps.empty()) return false; worldPin(pps[pick((int)pps.size())], mx, my); return true; };
   auto partnerMean = [&](int i, double& mx, double& my) { double sx = 0, sy = 0; int k = 0;
     for (int ni : netsOf[i]) { if (!sig[ni]) continue; for (int pi : netPins[ni]) { if (P[pi].comp == i) continue; double x, y; worldPin(pi, x, y); sx += x; sy += y; k++; } }
     if (!k) return false; mx = sx / k; my = sy / k; return true; };
@@ -186,12 +207,13 @@ int main(int argc, char** argv) {
   static const double steps[4] = { 0.4, 0.8, 1.2, 2 }; static const int dirs[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
   // DETAIL_PROFILE=1: seconds per section on stderr.
   const bool prof = getenv("DETAIL_PROFILE") != nullptr; double tm[6] = { 0 }; auto tick = [&]() { return prof ? elapsed() : 0.0; };
-  long tried = 0, accepted = 0; double delta = 0; vector<int> A; vector<double> oldH; vector<int> others;
+  long tried = 0, accepted = 0; double delta = 0; vector<int> A; vector<double> oldH, oldA; vector<int> others;
   while (tried < evals && elapsed() < budgetS) {
     const int i = small[pick((int)small.size())]; const Comp old = C[i]; const double kind = rnd(); int j = -1; Comp oldJ{};
     if (kind < relocate) {
       const int own = decapOwn[i]; double mx, my;
       if (own >= 0) { const int q = D[own].ic[pick((int)D[own].ic.size())]; centre(q, mx, my); }
+      else if (relocateEnd && rnd() < relocateEnd) { if (!partnerPin(i, mx, my)) continue; }
       else if (!partnerMean(i, mx, my)) continue;
       const double ux = (rnd() * 2 - 1) * 1.5; C[i].x = mx + ux; const double uy = (rnd() * 2 - 1) * 1.5; C[i].y = my + uy;
     } else if (kind < relocate + (1 - relocate) * 0.55) {
@@ -214,17 +236,19 @@ int main(int argc, char** argv) {
     C[i] = old; if (j >= 0) C[j] = oldJ;
     ta = tick(); const double g0 = nu ? chanOf(parts, np) : 0;
     C[i] = nwI; if (j >= 0) C[j] = nwJ;
-    const double g1 = nu ? chanOf(parts, np) : 0; tm[1] += tick() - ta; ta = tick(); const double c1 = decapOf(parts, np); cks.clear(); if (nc) critTouched(parts, np);
-    C[i] = old; if (j >= 0) C[j] = oldJ; const double c0 = decapOf(parts, np); if (nc) critTouched(parts, np); const double k0 = cks.empty() ? 0 : critOf();
+    const double g1 = nu ? chanOf(parts, np) : 0; tm[1] += tick() - ta; ta = tick(); const double m1 = demOf(parts, np), c1 = decapOf(parts, np); cks.clear(); if (nc) critTouched(parts, np);
+    C[i] = old; if (j >= 0) C[j] = oldJ; const double m0 = demOf(parts, np), c0 = decapOf(parts, np); if (nc) critTouched(parts, np); const double k0 = cks.empty() ? 0 : critOf();
     C[i] = nwI; if (j >= 0) C[j] = nwJ; const double k1 = cks.empty() ? 0 : critOf(); tm[2] += tick() - ta; ta = tick();
     A.clear(); for (int t = 0; t < np; t++) for (int k : netsOf[parts[t]]) if (std::find(A.begin(), A.end(), k) == A.end()) A.push_back(k);
     oldH.clear(); for (int k : A) oldH.push_back(hpN[k]);
     double dh = 0; for (int k : A) { const double v = hp(k); dh += (v - hpN[k]) * wN[k]; hpN[k] = v; }
+    double da = 0; if (lam) { AS.clear(); for (int t = 0; t < np; t++) AS.push_back(parts[t]); for (int t = 0; t < np; t++) for (int c : ancNb[parts[t]]) if (std::find(AS.begin(), AS.end(), c) == AS.end()) AS.push_back(c);
+      oldA.clear(); for (int k : AS) { oldA.push_back(ancN[k]); const double v = anc(k); da += v - ancN[k]; ancN[k] = v; } }
     tm[3] += tick() - ta;
-    const double d = dh + nu * (g1 - g0) + kappa * (c1 - c0) + (k1 - k0);
+    const double d = dh + nu * (g1 - g0) + kappa * (c1 - c0) + (k1 - k0) + lam * da + mu * (m1 - m0);
     const double T = T0 ? T0 * std::pow(1e-3, std::min(1.0, std::max(std::isfinite(evals) ? tried / evals : 0.0, elapsed() / budgetS))) : 0;
     if (d < -1e-6 || (T > 0 && rnd() < std::exp(-d / T))) { accepted++; delta += d; for (int t = 0; t < np; t++) { remove(parts[t]); insert(parts[t]); invalidate(parts[t]); } }
-    else { for (size_t t = 0; t < A.size(); t++) hpN[A[t]] = oldH[t]; C[i] = old; if (j >= 0) C[j] = oldJ; }
+    else { for (size_t t = 0; t < A.size(); t++) hpN[A[t]] = oldH[t]; if (lam) for (size_t t = 0; t < AS.size(); t++) ancN[AS[t]] = oldA[t]; C[i] = old; if (j >= 0) C[j] = oldJ; }
   }
   if (prof) fprintf(stderr, "{\"legal\":%.3f,\"channel\":%.3f,\"decapCrit\":%.3f,\"hpwl\":%.3f,\"total\":%.3f}\n", tm[0], tm[1], tm[2], tm[3], elapsed());
   out(tried, accepted, delta);
