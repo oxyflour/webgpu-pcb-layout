@@ -20,32 +20,32 @@ const anims = new Map(), flashes = new Map();
 let drag = null, box = null, pan = null, pointer = null, spaceDown = false, activeModule = -1;
 let pendingSource = null;      // {name, text} waiting for the Load button
 
-// ---- routing (web/route-worker.js) ------------------------------------------------------------
-// The placement is routed in its own worker whenever the editor worker goes idle after a
-// change. A new edit terminates a routing run that has not finished (it would be stale).
-let routeWorker = null, routeSeq = 0, routeRun = null, routes = null, routesStale = false, layoutDirty = false, routeTimer = 0;
+// ---- routing (server: harness/ui/tool-route.mjs) ----------------------------------------------
+// The placement is routed under the evaluation protocol (0.1 mm legalization, native router, median
+// over grid phases) by the server whenever the editor worker goes idle after a change. A new edit
+// aborts a routing request that has not finished (it would be stale).
+let routeAbort = null, routeSeq = 0, routeRun = null, routes = null, routesStale = false, layoutDirty = false, routeTimer = 0;
+let loadedSource = null;       // {name, text} of the loaded board (sent with every routing request)
+let fileLayout = false;        // the layout is still the file's own (routed as is, like the human layout)
 const LAYER_COLORS = ['#e5484d', '#3b82f6', '#f59e0b', '#22c55e', '#a855f7', '#14b8a6', '#ec4899', '#84cc16', '#f97316', '#6366f1'];
 const layerColor = (l, L) => l === 0 ? LAYER_COLORS[0] : l === L - 1 ? LAYER_COLORS[1] : LAYER_COLORS[2 + ((l - 1) % (LAYER_COLORS.length - 2))];
 let layerVisible = [];
 
 function stopRouting() {
-  if (routeRun) { routeWorker?.terminate(); routeWorker = null; routeRun = null; }
+  if (routeRun) { routeAbort?.abort(); routeAbort = null; routeRun = null; }
   clearTimeout(routeTimer);
 }
 
 function startRouting() {
   if (!vm) return;
   stopRouting();
-  if (!routeWorker) {
-    routeWorker = new Worker('./route-worker.js', { type: 'module' });
-    routeWorker.postMessage({ type: 'init', routing: vm.routing, sides: vm.sides });
-    routeWorker.onmessage = onRouteMessage;
-    routeWorker.onerror = (e) => { $('#routeStatus').textContent = `布线出错：${e.message}`; routeRun = null; };
-  }
-  routeRun = { seq: ++routeSeq, t0: performance.now(), round: 0, maxRounds: 0 };
+  const run = routeRun = { seq: ++routeSeq, t0: performance.now() }, abort = routeAbort = new AbortController();
   routeCancelled = false;
   layoutDirty = false;
-  routeWorker.postMessage({ type: 'route', seq: routeRun.seq, layout: layout.map((p) => ({ ...p })), cell: $('#routeCell').value });
+  fetch('/api/tool-route', { method: 'POST', signal: abort.signal, body: JSON.stringify({ name: loadedSource.name, text: loadedSource.text, layout: layout.map((p) => ({ ...p })), asIs: fileLayout }) })
+    .then(async (r) => { if (!r.ok) throw new Error(await r.text()); return r.json(); })
+    .then((m) => onRouteResult(run, m))
+    .catch((e) => { if (abort.signal.aborted || routeRun !== run) return; routeRun = null; $('#routeStatus').innerHTML = `<span class="bad">布线出错：${esc(e.message.slice(0, 300))}</span>`; });
   renderRouteStatus();
 }
 
@@ -59,17 +59,18 @@ function maybeAutoRoute() {
 /** The placement changed: drawn routes are out of date, a running route is cancelled. */
 let routeCancelled = false;
 function layoutChanged() {
-  layoutDirty = true;
+  layoutDirty = true; fileLayout = false;
   if (routes) routesStale = true;
   if (routeRun) routeCancelled = true;
   stopRouting();
   renderRouteStatus();
 }
 
-function onRouteMessage({ data: m }) {
-  if (!routeRun || m.seq !== routeRun.seq) return;
-  if (m.type === 'progress') { Object.assign(routeRun, { round: m.round, maxRounds: m.maxRounds, overflow: m.overflow }); renderRouteStatus(); return; }
-  routes = m; routesStale = layoutDirty; routeRun = null;
+function onRouteResult(run, m) {
+  if (routeRun !== run) return;
+  m.layers = m.layers.map((L) => ({ coords: Float32Array.from(L.coords), starts: Uint32Array.from(L.starts), nets: Int32Array.from(L.nets) }));
+  m.vias = Float32Array.from(m.vias); m.status = Uint8Array.from(m.status);
+  routes = m; routesStale = layoutDirty; routeRun = null; routeAbort = null;
   if (layerVisible.length !== m.stats.layers) { layerVisible = Array(m.stats.layers).fill(true); renderLayerToggles(); }
   renderRouteStatus(); requestDraw();
 }
@@ -79,19 +80,23 @@ function renderRouteStatus() {
   clearTimeout(renderRouteStatus.timer);
   if (routeRun) {
     const t = ((performance.now() - routeRun.t0) / 1000).toFixed(1);
-    el.innerHTML = `<span class="busy">布线中 ${t} s${routeRun.round ? ` · 第 ${routeRun.round} 轮，冲突格 ${routeRun.overflow}` : ''}</span>`;
+    el.innerHTML = `<span class="busy">布线中（评测口径）${t} s</span>`;
     renderRouteStatus.timer = setTimeout(renderRouteStatus, 500);
   } else if (routes) {
     el.innerHTML = routesStale ? `<span class="bad">布局已改动，走线已过期${routeCancelled && !$('#autoRoute').checked ? '（进行中的布线已取消）' : ''}</span>` : `已完成，${(routes.ms / 1000).toFixed(1)} s`;
   } else el.innerHTML = routeCancelled && !$('#autoRoute').checked ? '<span class="bad">布局有改动，布线已取消</span>' : $('#autoRoute').checked ? '等待布线' : '未布线';
   if (!routes) { $('#routeInfo').innerHTML = ''; return; }
-  const st = routes.stats, conflict = st.complete - st.clean, open = st.nets - st.complete;
+  const st = routes.stats, pr = routes.protocol, rp = pr.representative, conflict = st.complete - rp.clean, open = st.nets - st.complete;
   $('#routeInfo').innerHTML = kv([
-    ['布通且无冲突的网络 (个)', `<span class="${st.clean === st.nets ? 'good' : ''}">${st.clean} / ${st.nets}</span>`],
-    ['连通但与其他网络共用格子 (个)', `<span class="${conflict ? 'bad' : ''}">${conflict}</span>`],
-    ['未连通的网络 (个)', `<span class="${open ? 'bad' : ''}">${open}</span>`],
-    ['过孔 (个)', st.vias], ['走线总长 (mm)', Math.round(st.length)],
+    ['布通且无冲突的网络，各相位中位数 (个)', `<span class="${st.clean === st.nets ? 'good' : ''}">${st.clean} / ${st.nets}</span>（${pr.noise.clean[0]}–${pr.noise.clean[1]}）`],
+    ['过孔，各相位中位数 (个)', `${st.vias}（${pr.noise.vias[0]}–${pr.noise.vias[1]}）`],
+    ['网格相位 (个) / 布线器', `${pr.phases} / ${pr.routing}`],
+    ['所有相位都收敛 (个)', `${st.converged} / ${pr.phases}`],
+    ['显示的相位：无冲突网络 / 过孔 (个)', `${rp.clean} / ${rp.vias}`],
+    ['显示的相位：连通但共用格子 / 未连通 (个)', `<span class="${conflict ? 'bad' : ''}">${conflict}</span> / <span class="${open ? 'bad' : ''}">${open}</span>`],
+    ['走线总长，中位数 (mm)', Math.round(st.length)],
     ['布线层 / 网格 (mm)', `${st.layers} / ${st.cell}`],
+    ['评分前 0.1 mm 合法化移动的器件 (个)', pr.asIs ? '不合法化（文件里的布局，同评测的人工布局）' : `<span class="${pr.legalizeMoved ? 'bad' : ''}">${pr.legalizeMoved}</span>`],
   ]);
 }
 
@@ -122,7 +127,7 @@ worker.onerror = (e) => { $('#error').textContent = `Worker 出错：${e.message
 function send(type, data = {}) {
   const msg = { type, seq: ++seq, budgetMs: +$('#budget').value, ...data };
   if (type !== 'load' && type !== 'export') inFlight++;
-  if (type === 'move' || type === 'assign' || type === 'relayoutModule' || type === 'undo') layoutChanged();
+  if (type === 'move' || type === 'assign' || type === 'relayoutModule' || type === 'relayoutSelection' || type === 'undo') layoutChanged();
   worker.postMessage(msg);
   hud();
   return msg.seq;
@@ -138,11 +143,11 @@ function onLoaded(m) {
   compNets = vm.components.map(() => []);
   vm.nets.forEach((n, k) => { for (const pi of n.pins) { const c = vm.pins[pi][0]; if (compNets[c].at(-1) !== k) compNets[c].push(k); } });
   selection.clear(); anims.clear(); flashes.clear(); lastOp = null; lastCleanup = null; inFlight = 0;
-  stopRouting(); routeWorker?.terminate(); routeWorker = null; routes = null; routesStale = false; layerVisible = [];
+  stopRouting(); routes = null; routesStale = false; layerVisible = [];
   $('#layerToggles').innerHTML = '';
-  // Routing a large board takes minutes: automatic re-routing only below 1000 parts.
-  $('#autoRoute').checked = m.components.length < 1000;
-  layoutDirty = true;
+  // Server routing (native): seconds on boards up to ~1300 parts; ppc-sized boards take minutes.
+  $('#autoRoute').checked = m.components.length < 2000;
+  layoutDirty = true; fileLayout = m.mode === 'original';
   $('#drop').classList.add('hidden');
   for (const id of ['#boardSection', '#modSection', '#routeSection', '#viewSection']) $(id).hidden = false;
   $('#load').disabled = false;
@@ -216,10 +221,10 @@ function renderLastOp() {
     el.innerHTML = kv([['上次操作', '<span class="bad">重排结果未采用</span>'], ['原因', `重叠对会从 ${lastOp.overlapsBefore} 增加到 ${lastOp.overlapsAfter}`], ['耗时 (ms)', lastOp.totalMs.toFixed(0)], ['建议', '附近空间不足：先移开周围器件，或把模块拆小']]);
     return;
   }
-  const what = { move: '移动 / 旋转 / 换面后重排', assign: '划入模块后重排', module: '模块重排' }[lastOp.reason] ?? lastOp.reason;
+  const what = { move: '移动 / 旋转 / 换面后重排', assign: '划入模块后重排', module: '模块重排', selection: '重排选中' }[lastOp.reason] ?? lastOp.reason;
   const budget = +$('#budget').value;
-  const cls = lastOp.reason === 'module' || lastOp.totalMs <= budget + 20 ? 'good' : 'bad';
-  // (a module relayout has its own, size-dependent budget)
+  const cls = lastOp.reason === 'module' || lastOp.reason === 'selection' || lastOp.totalMs <= budget + 20 ? 'good' : 'bad';
+  // (a module or selection relayout has its own, size-dependent budget)
   const dOv = lastOp.overlapsAfter - lastOp.overlapsBefore;
   el.innerHTML = kv([
     ['上次操作', what],
@@ -282,6 +287,7 @@ $('#assign').onclick = () => {
 $('#lockBtn').onclick = () => toggleLock();
 $('#rotateBtn').onclick = () => rotateSelection();
 $('#flipBtn').onclick = () => flipSelection();
+$('#relayoutSel').onclick = () => relayoutSelection();
 $('#undo').onclick = () => send('undo');
 $('#export').onclick = () => send('export');
 $('#fit').onclick = () => fit();
@@ -296,7 +302,6 @@ for (const [id, key] of [['#sideSeg', 'side'], ['#ratsSeg', 'rats']]) {
 }
 $('#routeNow').onclick = () => startRouting();
 $('#autoRoute').onchange = () => { renderRouteStatus(); maybeAutoRoute(); };
-$('#routeCell').onchange = () => { layoutDirty = true; if ($('#autoRoute').checked) startRouting(); };
 $('#showRoutes').onchange = (e) => { opts.routes = e.target.checked; requestDraw(); };
 $('#layerToggles').addEventListener('change', (e) => { const l = e.target.dataset.layer; if (l !== undefined) { layerVisible[+l] = e.target.checked; requestDraw(); } });
 $('#labels').onchange = (e) => { opts.labels = e.target.checked; requestDraw(); };
@@ -333,6 +338,7 @@ function startLoad() {
   $('#load').disabled = true; $('#error').textContent = '';
   $('#loadStatus').textContent = '载入中';
   const placement = document.querySelector('input[name=placement]:checked').value;
+  loadedSource = pendingSource;
   send('load', { name: pendingSource.name, text: pendingSource.text, placement });
   const tick = () => { if (!loading) return; $('#hud').innerHTML = `<span class="busy">载入中 ${((performance.now() - loadStart) / 1000).toFixed(0)} s</span>`; setTimeout(tick, 500); };
   tick();
@@ -373,6 +379,14 @@ function rotateSelection() {
   for (const m of moves) { layout[m.i] = { ...layout[m.i], rotation: m.rotation }; disp[m.i] = { ...disp[m.i], rotation: m.rotation }; locked.add(m.i); }
   send('move', { moves, around: moves[0].i });
   requestDraw();
+}
+
+/** Re-place the selected parts; locked and fixed ones stay (they are obstacles). */
+function relayoutSelection() {
+  const sel = [...selection], free = sel.filter((i) => !locked.has(i) && !vm.components[i].fixed);
+  if (!sel.length) return;
+  if (!free.length) { lastOp = null; $('#lastOp').innerHTML = kv([['重排选中', `<span class="bad">选中的 ${sel.length} 个器件都已固定，没有可重排的器件</span>`]]); return; }
+  send('relayoutSelection', { indices: free });
 }
 
 function flipSelection() {
@@ -509,6 +523,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'r') rotateSelection();
   else if (k === 'f') flipSelection();
   else if (k === 'l') toggleLock();
+  else if (k === 'e') relayoutSelection();
 });
 window.addEventListener('keyup', (e) => { if (e.key === ' ') spaceDown = false; });
 

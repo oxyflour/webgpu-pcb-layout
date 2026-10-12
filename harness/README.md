@@ -18,18 +18,18 @@ evaluating a board: [skills/pcb-eval](../skills/pcb-eval/SKILL.md).
 | `lib/env.mjs` | Repository paths (`core/`) and machine-specific locations from env variables or `harness/local.json`. |
 | `lib/board.mjs` | Board registry (`core/bench/kicad-cases.mjs` + `boards.json`; KiCad or IR), `loadBoard`, `legalize`, `evaluate` (router at 0.4 mm, board layers, 40 rounds, per-net status), `evaluateRobust` (median over grid phases, worker threads), `toolRouting` / `exactRouting`. |
 | `lib/native-router.mjs`, `native/router.cpp` | Native router loop, bit-identical to `core/src/router/board-router.js`; optional layer-aware A*, cleanup, constraint rules (priority, via cost, layers, keepout). Build: `cmd /c harness\native\build.cmd` (MSVC; `VCVARS` overrides vcvars64.bat). |
-| `lib/start-layout.mjs`, `lib/init.mjs` | Start layout from a partial plan (below). `start-layout.mjs` has no Node imports so the web editor loads it too. |
+| `lib/start-layout.mjs`, `lib/init.mjs` | Start layout from a partial plan (below). `start-layout.mjs` has no Node imports (geometry passed in). |
 | `lib/detail.mjs`, `native/detail.cpp` | Detail pass: annealed local search on small parts (< 8 pins) for HPWL + routing-channel deficit + decoupling capacitors to their IC + critical nets with limits. The native pass (built by `build.cmd`, used when present) gives the same result as the JS one, ~10x faster. |
 | `lib/constraints.mjs`, `constraints/` | Design constraints: decap -> IC assignment, critical nets and limits; `constraints/<board>.json` overrides, `<board>.template.json` defaults, `examples/` test files. |
 | `lib/human-metrics.mjs` | Decoupling / critical-net metrics against the human layout. |
 | `lib/geometry.mjs` | Shared pad / net geometry. |
-| `lib/uncross.mjs` | Crossing removal (used by the web editor's auto layout). |
+| `lib/uncross.mjs` | Crossing removal. |
 | `lib/kicad-export.mjs` | KiCad export of a layout with the router's tracks (review). |
 | `agent/session.mjs` | Tool commands: `info`, `map`, `check`, `place`, `inspect`, `status`, `submit`. |
 | `agent/cli.mjs`, `agent/run-agent.mjs`, `agent/batch.mjs`, `agent/trace.mjs` | Sandbox client `pcb`; one agent session (gateway, prompt, audit, trajectory, final re-evaluation); 3 repetitions; readable trajectory. |
 | `prompts/v*.md` | Agent prompts (v14 current). |
 | `experiments/` | Current evaluation workflow (`eval-board.mjs` and the scripts it runs), objective / constraint studies; `experiments/archive/` = scripts of earlier RESULTS sections. |
-| `ui/server.mjs` | Static server of the web editor (`../ui`). |
+| `ui/server.mjs` | Static server of the web editor (`../ui`); `POST /api/tool-place` / `tool-route` run `ui/tool-place.mjs` (the editor's 自动布局 = the no-agent tool layout) / `ui/tool-route.mjs` (routing under the evaluation protocol) in child processes; `ui/editor-board.mjs` builds the evaluation board of the editor's file. |
 
 Results go to `harness/results/` (git-ignored).
 

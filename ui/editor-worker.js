@@ -6,17 +6,10 @@ import { requestWebGpuDevice } from '../src/gpu/device.js';
 import { parseKicadBoard, kicadToIR } from '../src/kicad/adapter.js';
 import { irToProblem, placementResult, toYDown } from '../src/ir/to-problem.js';
 import { validateBoardIR } from '../src/ir/validate.js';
-import { normalizeProblem, worldPin, rotatedSize } from '../src/problem.js';
+import { normalizeProblem } from '../src/problem.js';
 import { PlacementSession } from '../src/session.js';
 import { autoModules } from '../src/optimizer/modules.js';
 import { memberOverlaps } from '../src/optimizer/relayout.js';
-import { parseOptions, placeBoard } from '../bench/pipeline.mjs';
-// Served by harness/ui/server.mjs from the harness (same start layout as the agent tool).
-import { createStartLayout } from '../harness/lib/start-layout.mjs';
-import { createUncross } from '../harness/lib/uncross.mjs';
-
-const { startLayout } = createStartLayout({ worldPin, rotatedSize });
-const uncross = createUncross({ worldPin, rotatedSize });
 
 const post = (type, data = {}) => self.postMessage({ type, ...data });
 let device = null, board = null, session = null, cleanup = null;
@@ -49,40 +42,29 @@ async function load({ name, text, placement, seed = 1 }) {
   await ensureDevice();
   post('progress', { message: '解析文件' });
   const ir = toIR(name, text);
-  const adapted = irToProblem(ir, { preplace: true, sides: 'ir' });
-  const problem = normalizeProblem(adapted.input);
+  let adapted = irToProblem(ir, { preplace: true, sides: 'ir' });
+  let problem = normalizeProblem(adapted.input);
   const unplaced = adapted.originalLayout.filter((p) => !p).length;
   let mode = placement, layout, modules, timing = {};
   if (mode === 'original' && unplaced) mode = 'auto';
-  if (mode === 'original') {
-    post('progress', { message: '模块划分' });
-    layout = adapted.originalLayout.map((p) => ({ ...p }));
-    modules = autoModules(problem, { seed }).modules;
-  } else {
-    // The pipeline of bench/place-board.mjs: automatic modules, module-level placement,
-    // multi-start global placement, LNS, legalization.
-    // Module cohesion 3 (bench default 0.4) keeps modules together: on edk/pic/k60/ppc-n1
-    // it about halves the share of other modules' parts inside a module's box at +0..6% HPWL.
-    const o = parseOptions(['--quality', '--modules', 'auto', '--cohesion', '3'], { backend: 'gpu', budget: 'same' });
-    const plan = autoModules(problem, { resolution: o.moduleResolution, seed });
-    plan.modules.forEach((m) => { m.side = 'auto'; m.cohesion = o.cohesion; });
-    // The global stage starts from the harness tool start layout (lib/start-layout.mjs: parts at
-    // the weighted centre of the pins they connect to, anchored on the fixed parts) instead of
-    // random multi-starts: harness/experiments/editor-init.mjs.
-    post('progress', { message: `工具初始布局：${problem.components.length} 个器件` });
-    const initLayout = startLayout({ p: problem, a: { ...adapted, ir } }, {}, { seed });
-    post('progress', { message: `自动布局：${problem.components.length} 个器件、${plan.modules.length} 个模块` });
-    const out = await placeBoard(adapted, o, { device, seed, plan, initLayout, initMode: 'global' });
-    layout = out.layout; timing = out.timing;
-    // Crossing removal of the harness tool (lib/uncross.mjs): 180 deg turns of 2-pin parts and
-    // same-size swaps inside a module; keeps legality; k60 0.2 s, ppc-n3 ~5 s per pass.
-    post('progress', { message: '去除网络交叉' });
-    const group = new Int32Array(problem.components.length).fill(-1);
-    plan.modules.forEach((m, k) => m.members.forEach((i) => { group[i] = k; }));
-    const u = uncross({ p: problem }, layout, { deadlineMs: 5000, group });
-    layout = u.layout; timing = { ...timing, uncross: { ms: u.ms, flips: u.flips, swaps: u.swaps, crossings: u.crossings } };
-    modules = plan.modules.map((m) => ({ members: [...m.members] }));
-  }
+  if (mode === 'auto') {
+    // The evaluation's no-agent tool layout, run by the server (harness/ui/tool-place.mjs: the
+    // native detail pass needs Node): start layout -> 0.1 mm legalizer -> detail pass (20000 tries
+    // per small part, at most 60 s) -> legalizer. Its problem is the evaluation's too: original
+    // sides, through-hole parts fixed, the registered body margin (boards.json) of a known file.
+    post('progress', { message: `评测流程布局：${adapted.input.components.length} 个器件（初始布局 → 合法化 → detail pass ≤ 60 s → 合法化）` });
+    const r = await fetch('/api/tool-place', { method: 'POST', body: JSON.stringify({ name, text, seed }) });
+    if (!r.ok) throw new Error(`自动布局失败（/api/tool-place ${r.status}）：${await r.text()}`);
+    const out = await r.json();
+    adapted = irToProblem(ir, { preplace: true, sides: 'original', ...(out.bodyMargin != null ? { bodyMargin: out.bodyMargin } : {}) });
+    adapted.input.components.forEach((c, i) => { if (c.twoSided && !c.fixed) c.fixed = { ...adapted.originalLayout[i] }; });
+    problem = normalizeProblem(adapted.input);
+    if (out.ids.length !== problem.components.length || out.ids.some((id, i) => id !== problem.components[i].id)) throw new Error('自动布局失败：服务器的器件顺序与页面不一致');
+    layout = out.layout.map((p) => ({ ...p }));
+    timing = { ...out.timing, board: out.board, bodyMargin: out.bodyMargin };
+  } else layout = adapted.originalLayout.map((p) => ({ ...p }));
+  post('progress', { message: '模块划分' });
+  modules = autoModules(problem, { seed }).modules;
   modules.forEach((m, k) => { m.name = moduleName(problem, m, k); });
   post('progress', { message: '编译 GPU 管线' });
   session = await PlacementSession.create(problem, layout, { device, modules });
@@ -151,13 +133,14 @@ function reply(seq, reason, r, extraChanged = []) {
 async function handle(msg) {
   if (msg.type === 'load') return load(msg);
   if (!session) throw new Error('还没有载入板子');
-  const budgetMs = msg.budgetMs ?? 150;
+  const budgetMs = msg.budgetMs ?? 300;
   switch (msg.type) {
     case 'move': {
       snapshot();
       for (const m of msg.moves) session.move(m.i, { x: m.x, y: m.y, ...(m.rotation !== undefined ? { rotation: m.rotation } : {}), ...(m.side !== undefined ? { side: m.side } : {}) });
       session.lock(msg.moves.map((m) => m.i));
-      const r = await session.relayout({ around: msg.around ?? msg.moves[0].i, budgetMs, seed: msg.seq });
+      // Re-place the module of the moved part and every module the moved parts now overlap.
+      const r = await session.relayout({ around: msg.around ?? msg.moves[0].i, moved: msg.moves.map((m) => m.i), budgetMs, seed: msg.seq });
       return reply(msg.seq, 'move', r, msg.moves.map((m) => m.i));
     }
     case 'lock': {
@@ -187,6 +170,13 @@ async function handle(msg) {
       // An explicit module relayout may take longer than a drag: 4 ms per part, 0.4-1.5 s.
       const r = members.length ? await session.relayout({ members, budgetMs: Math.min(1500, Math.max(400, 4 * members.length)), seed: msg.seq }) : null;
       return reply(msg.seq, 'module', r);
+    }
+    case 'relayoutSelection': {
+      // The selected parts (locked and fixed ones stay), same size-dependent budget as a module relayout.
+      snapshot();
+      const members = msg.indices.filter((i) => !session.isLocked(i));
+      const r = members.length ? await session.relayout({ members, budgetMs: Math.min(1500, Math.max(400, 4 * members.length)), seed: msg.seq }) : null;
+      return reply(msg.seq, 'selection', r);
     }
     case 'undo': {
       const s = history.pop();

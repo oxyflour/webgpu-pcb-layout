@@ -11,8 +11,7 @@ import { normalizeProblem, worldPin, rotatedSize } from '../core/src/problem.js'
 const boardFile = UI_BOARDS && path.join(UI_BOARDS, 'edk.board.json');
 const skip = !(boardFile && fs.existsSync(boardFile)) && 'uiBoards / UI_BOARDS not set or edk.board.json missing';
 
-test('editor worker start layout: fixed parts kept, movable parts inside the board, deterministic per seed', { skip }, () => {
-  // As in ui/editor-worker.js load(), mode 'auto'.
+test('start layout on the editor sample board: fixed parts kept, movable parts inside the board, deterministic per seed', { skip }, () => {
   const ir = JSON.parse(fs.readFileSync(boardFile, 'utf8')), adapted = irToProblem(ir, { preplace: true, sides: 'ir' });
   const problem = normalizeProblem(adapted.input), { startLayout } = createStartLayout({ worldPin, rotatedSize });
   const b = { p: problem, a: { ...adapted, ir } }, L = startLayout(b, {}, { seed: 1 });

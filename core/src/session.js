@@ -1,4 +1,4 @@
-import { normalizeProblem, rotatedSize } from './problem.js';
+import { normalizeProblem, rotatedSize, sharesSide } from './problem.js';
 import { autoModules } from './optimizer/modules.js';
 import { relayoutMembers, moduleHpwl, memberOverlaps } from './optimizer/relayout.js';
 import { PriorityGpuBatchScorer } from './gpu/batch-scorer.js';
@@ -95,7 +95,8 @@ export class PlacementSession {
 
   /**
    * Re-place `members`, or the module of part `around` (its `maxParts` parts nearest to
-   * it when the module is larger). Locked and fixed parts stay put. Stays within
+   * it when the module is larger). With `moved` (the parts the user just dropped), also every
+   * module the moved parts now overlap (see #aroundMoved). Locked and fixed parts stay put. Stays within
    * `budgetMs`: GPU LNS stops early, and when parts cannot be legalized the region is
    * doubled while time remains. `legalizeOnly` skips global placement and LNS (a cheap
    * clean-up pass for parts a budgeted relayout left overlapping).
@@ -103,9 +104,9 @@ export class PlacementSession {
    * A result that adds overlaps is `rejected` and not applied unless `allowWorse`.
    * @returns {changed:number[], timing, attempts, before, after, applied, rejected}
    */
-  async relayout({ members = null, around = null, budgetMs = this.options.budgetMs, scatter = false, seed = 1, apply = true, legalizeOnly = false, allowWorse = false } = {}) {
+  async relayout({ members = null, around = null, moved = null, budgetMs = this.options.budgetMs, scatter = false, seed = 1, apply = true, legalizeOnly = false, allowWorse = false } = {}) {
     const t0 = performance.now(), deadline = t0 + budgetMs;
-    let set = members ? [...members] : this.#around(around);
+    let set = members ? [...members] : moved?.length ? this.#aroundMoved(moved, around ?? moved[0]) : this.#around(around);
     set = set.filter((i) => !this.isLocked(i));
     if (!set.length) return { changed: [], timing: { totalMs: 0 }, attempts: [], applied: false };
     const before = { hpwl: moduleHpwl(this.problem, this.state, set), overlaps: memberOverlaps(this.problem, this.state, set) };
@@ -148,6 +149,32 @@ export class PlacementSession {
     if (!t || t.mcells < 0.02) return;
     const v = t.totalMs / t.mcells, cur = this.legalizeMsPerMcell;
     this.legalizeMsPerMcell = cur === undefined ? v : v > cur ? 0.5 * cur + 0.5 * v : 0.9 * cur + 0.1 * v;
+  }
+
+  /**
+   * Parts to re-place after the user dropped `moved`: the module around `around` (#around) and,
+   * for every movable part a moved part now overlaps (bodies on a shared side closer than
+   * `clearance` mm), that part and its module's members around it (#around). So a drop onto
+   * another module pushes that module aside instead of being rejected for its overlaps.
+   */
+  #aroundMoved(moved, around, clearance = 0.1) {
+    const C = this.problem.components, S = this.state, movedSet = new Set(moved);
+    const box = (j) => { const q = S[j], [w, h] = rotatedSize(C[j], q.rotation); return [q.x - w / 2, q.y - h / 2, q.x + w / 2, q.y + h / 2]; };
+    const out = new Set(this.#around(around)), done = new Set([this.moduleOfPart[around]]);
+    for (const i of moved) {
+      const a = box(i);
+      for (let j = 0; j < C.length; j++) {
+        if (movedSet.has(j) || this.isLocked(j) || !sharesSide(this.problem, i, S[i], j, S[j])) continue;
+        const c = box(j);
+        if (Math.min(a[2], c[2]) - Math.max(a[0], c[0]) <= -clearance || Math.min(a[3], c[3]) - Math.max(a[1], c[1]) <= -clearance) continue;
+        out.add(j);
+        const k = this.moduleOfPart[j];
+        if (k < 0 || done.has(k)) continue;
+        done.add(k);
+        for (const x of this.#around(j)) out.add(x);
+      }
+    }
+    return [...out];
   }
 
   /**

@@ -107,7 +107,7 @@
       <dl class="kv" id="boardInfo"></dl>
       <div class="row">
         <span>重排预算</span>
-        <select id="budget"><option>100</option><option selected>150</option><option>200</option><option>300</option></select><span>ms</span>
+        <select id="budget"><option>100</option><option>150</option><option>200</option><option selected>300</option><option>500</option></select><span>ms</span>
         <button id="undo" title="Ctrl+Z">撤销</button>
       </div>
       <dl class="kv" id="lastOp"></dl>
@@ -124,6 +124,7 @@
         <button id="lockBtn">固定</button>
         <button id="rotateBtn" title="R">旋转 90°</button>
         <button id="flipBtn" title="F">换面</button>
+        <button id="relayoutSel" title="E">重排选中</button>
       </div>
     </section>
 
@@ -140,7 +141,6 @@
       </div>
       <div class="row">
         <label><input type="checkbox" id="showRoutes" checked> 显示走线</label>
-        <span>网格</span><select id="routeCell"><option value="pitch" selected>按板子线距</option><option value="0.4">0.4</option><option value="0.3">0.3</option><option value="0.25">0.25</option></select><span>mm</span>
       </div>
       <p class="sub" id="routeStatus">未布线</p>
       <dl class="kv" id="routeInfo"></dl>
@@ -158,11 +158,12 @@
     <section>
       <h2>操作</h2>
       <div class="keys">
-        <span>拖动器件</span><span>移动并固定，模块内自动重排</span>
+        <span>拖动器件</span><span>移动并固定，所在模块和压到的模块自动重排</span>
         <span>拖动空白</span><span>框选（<kbd>Shift</kbd> 追加）</span>
         <span>双击器件</span><span>选中整个模块</span>
         <span>右键或中键拖动</span><span>平移；滚轮缩放</span>
         <span><kbd>R</kbd> <kbd>F</kbd> <kbd>L</kbd></span><span>旋转 / 换面 / 固定切换</span>
+        <span><kbd>E</kbd></span><span>重排选中（固定的器件不动）</span>
         <span><kbd>Ctrl</kbd>+<kbd>Z</kbd></span><span>撤销</span>
         <span><kbd>Esc</kbd></span><span>取消选择</span>
       </div>

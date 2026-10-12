@@ -1,5 +1,5 @@
 // Multi-layer PathFinder router used to evaluate placements on real boards (benchmarks)
-// and to show routing in the editor (web/route-worker.js).
+// and by the harness (the editor's routing runs it in Node: harness/ui/tool-route.mjs).
 //
 // Grid model: square cells of `cell` mm on L routing layers (board.layers, default 2):
 // layer 0 is the top copper, L-1 the bottom, the rest inner signal layers. Pads are the

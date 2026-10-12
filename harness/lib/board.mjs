@@ -72,6 +72,28 @@ export function loadBoard(name, { locks = {}, only = null } = {}) {
   return { name, file, format: isIr ? 'ir' : 'kicad', sha256, a, p, fixedByInput, ...(only ? { only } : {}) };
 }
 
+// Registered board of an uploaded file (the editor's server): {name, exact} when the file has the
+// same text (sha256: exact, use loadBoard) or the board has the same name (an exported IR of it:
+// lay out the uploaded IR with the registered body margin), else null.
+const fileSha = new Map();
+export function registeredBoardOf(text, irName = null) {
+  const sha = crypto.createHash('sha256').update(text).digest('hex');
+  for (const [name, file] of Object.entries(BOARDS)) {
+    if (!file || !fs.existsSync(file)) continue;
+    if (!fileSha.has(file)) fileSha.set(file, crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'));
+    if (fileSha.get(file) === sha) return { name, exact: true };
+  }
+  return irName && BOARDS[irName] ? { name: irName, exact: false } : null;
+}
+
+// Board from an IR: loadBoard's problem for an IR file (original sides, through-hole parts fixed)
+// with the body margin of the registered board `name` (default margin when not registered).
+export function boardFromIR(name, ir) {
+  const a = irToProblem(JSON.parse(JSON.stringify(ir)), { preplace: true, sides: 'original', bodyMargin: bodyMargin(name) });
+  holdInputPose(name, a);
+  return { name, format: 'ir', a, p: normalizeProblem(a.input), fixedByInput: new Set(a.input.components.filter((c) => c.fixed).map((c) => c.id)) };
+}
+
 export function legalize(b, layout) {
   const t = performance.now(), r = legalizeLayout(b.p, layout, { clearance: 0.1 });
   const nudged = nudgeTinyOverlaps(b, r.layout);
@@ -127,12 +149,13 @@ export function placementMetrics(b, layout) {
   const rm = repositoryMetrics(b.p, layout), g = rm.geometry;
   return { hpwlMm: Math.round(rm.metrics.hpwl_mm * 10) / 10, geometry: { overlaps: g.movableOverlapPairs, clearance: g.movableClearancePairs, outside: g.movableOutside, keepout: g.movableMaskViolations, fixedChanged: g.fixed_changed, sideChanged: g.side_changed } };
 }
-export function evaluate(b, layout, { detail = false, fast = false, deadlineS = null, onRound = null, shift = 0, router = 'js', layerHeuristic = false, incremental = false, cleanup = 0, offset = null, netRules = null } = {}) {
+// paths (native router): also return the routed paths (cell ids l * P + q) and the grid (editor drawing).
+export function evaluate(b, layout, { detail = false, fast = false, deadlineS = null, onRound = null, shift = 0, router = 'js', layerHeuristic = false, incremental = false, cleanup = 0, offset = null, netRules = null, paths = false } = {}) {
   const pm = placementMetrics(b, layout);
   const sr = shiftedRouting(b, layout, shift, offset), board = sr.board, t = performance.now();
   const route = router === 'native' ? routeBoardNative : routeBoard;
   if ((layerHeuristic || cleanup || netRules?.length) && router !== 'native') throw new Error('layerHeuristic / cleanup / netRules need router native');
-  const r = route(board, sr.layout, b.a.sides, { ...evaluationRouting(board), diagnostics: detail, ...(fast === 'weighted' ? { incremental: true, maxRounds: 20, astarWeight: 1.5 } : fast || incremental ? { incremental: true } : {}), ...(layerHeuristic ? { layerHeuristic } : {}), ...(cleanup ? { cleanup } : {}), ...(netRules?.length ? { netRules } : {}), ...(detail && router === 'native' ? { emitOverflow: true } : {}), ...(deadlineS ? { deadline: t + deadlineS * 1000 } : {}), ...(onRound ? { onRound } : {}) });
+  const r = route(board, sr.layout, b.a.sides, { ...evaluationRouting(board), diagnostics: detail, ...(fast === 'weighted' ? { incremental: true, maxRounds: 20, astarWeight: 1.5 } : fast || incremental ? { incremental: true } : {}), ...(layerHeuristic ? { layerHeuristic } : {}), ...(cleanup ? { cleanup } : {}), ...(netRules?.length ? { netRules } : {}), ...(detail && router === 'native' ? { emitOverflow: true } : {}), ...(paths ? { emitPaths: true } : {}), ...(deadlineS ? { deadline: t + deadlineS * 1000 } : {}), ...(onRound ? { onRound } : {}) });
   const m = {
     clean: r.clean, nets: r.nets, vias: r.vias, viaSites: r.viaSites, routedLengthMm: Math.round(r.length), hpwlMm: pm.hpwlMm, geometry: pm.geometry,
     routeMs: Math.round(performance.now() - t), routing: `${router}${layerHeuristic ? '-layerh' : ''}-${fast === 'weighted' ? 'incremental-20-astar1.5' : fast || incremental ? 'incremental-40' : 'full-40'}${cleanup ? `-cleanup${cleanup}` : ''}`, ...(shift ? { shift } : {}), routeRounds: r.rounds, routeConverged: r.overflow === 0, ...(r.cleanup ? { cleanup: r.cleanup } : {}),
@@ -143,6 +166,7 @@ export function evaluate(b, layout, { detail = false, fast = false, deadlineS = 
     const ro = r.roundOverflow, z = ro.indexOf(0);
     m.margin = { overflowRound1: ro[0], overflowRound5: ro[Math.min(4, ro.length - 1)], roundsToZero: z < 0 ? null : z + 1, timeLimited: z < 0 && r.rounds < (evaluationRouting(board).maxRounds ?? 40) && !!deadlineS };
   }
+  if (paths) Object.assign(m, { paths: r.paths, grid: r.grid });
   if (r.overflowCells) m.overflowBins = overflowBins(b, r, offset ?? [shift * SHIFT_MM, shift * SHIFT_MM]);
   if (detail) {
     if (board.netCount !== b.p.nets.length) throw new Error('router net indexing differs from problem nets');
