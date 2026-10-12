@@ -31,6 +31,8 @@ description: 为一块新 PCB（KiCad 文件或 kicadToIR 输出的 IR JSON）�
 
 密集板（手机等 HDI 板，人工器件间距 < 0.5 mm）要写成 `"myboard": { "file": "...", "bodyMargin": 0.05 }`：没有 courtyard 的器件体 = 焊盘框外扩 `bodyMargin`（默认 0.25 mm），太大时合法化会把人工布局推散（librem5 默认值下中位位移 0.75 mm、最大 22 mm）。取能让"合法化后的人工布局"几乎不动（p90 位移 ~0.1 mm）的值；`PCB_BODY_MARGIN` 环境变量可临时覆盖做扫描。
 
+位置由外壳决定的贴片件（侧键、天线弹片、螺丝位、夹子等）不在适配器的机械件规则里（只认连接器、测试点、安装孔等位号/封装），会被当成普通小器件搬走。登记时检查可动器件的位号前缀，用 `"fixedRefs": "^(SW|ANT|TS|JV)[0-9]"`（正则，JSON 里不要写 `\d`）把它们固定在人工位置。
+
 登记后的板子自动进入所有评测脚本的默认板单（`EVAL_BOARDS`）。验证：`node -e "import('./harness/lib/board.mjs').then(m=>console.log(m.loadBoard('myboard').format))"`。
 
 ## 3. 约束（可选，但建议先看）

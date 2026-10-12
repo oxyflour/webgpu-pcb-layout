@@ -5,7 +5,7 @@
 //
 // Input (binary, little endian), path in argv[1] (written by harness/lib/detail.mjs):
 //   int32  n, netCount, pinCount, padCount, decapCount, seed
-//   double W, H, clearance, nu, T0, relocate, budgetS, gap, kappa, decapFreeMm, evals (may be +inf), rho, lam, mu, relocateEnd
+//   double W, H, clearance, nu, T0, relocate, budgetS, gap, kappa, decapFreeMm, evals (may be +inf), rho, lam, mu, relocateEnd, anchorFreeMm
 //   per component: double width, height, x, y; int32 rotation, side, twoSided, rotatable, small, key0, key1
 //   per pin: int32 comp; double x, y
 //   per net: int32 count, sig; double weight; int32 pins[count]
@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
   if (argc < 2 || !(in = fopen(argv[1], "rb"))) { fprintf(stderr, "usage: detail input.bin\n"); return 2; }
   const int n = rd<int32_t>(), netCount = rd<int32_t>(), pinCount = rd<int32_t>(), padCount = rd<int32_t>(), decapCount = rd<int32_t>();
   uint32_t s = (uint32_t)rd<int32_t>();
-  const double W = rd<double>(), H = rd<double>(), clearance = rd<double>(), nu = rd<double>(), T0 = rd<double>(), relocate = rd<double>(), budgetS = rd<double>(), gap = rd<double>(), kappa = rd<double>(), decapFreeMm = rd<double>(), evals = rd<double>(), rho = rd<double>(), lam = rd<double>(), mu = rd<double>(), relocateEnd = rd<double>();
+  const double W = rd<double>(), H = rd<double>(), clearance = rd<double>(), nu = rd<double>(), T0 = rd<double>(), relocate = rd<double>(), budgetS = rd<double>(), gap = rd<double>(), kappa = rd<double>(), decapFreeMm = rd<double>(), evals = rd<double>(), rho = rd<double>(), lam = rd<double>(), mu = rd<double>(), relocateEnd = rd<double>(), anchorFreeMm = rd<double>();
   vector<Comp> C(n);
   for (auto& c : C) { c.w = rd<double>(); c.h = rd<double>(); c.x = rd<double>(); c.y = rd<double>(); c.rot = rd<int32_t>(); c.side = rd<int32_t>(); c.twoSided = rd<int32_t>(); c.rotatable = rd<int32_t>(); c.small = rd<int32_t>(); c.key[0] = rd<int32_t>(); c.key[1] = rd<int32_t>(); }
   vector<Pin> P(pinCount);
@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
   if (lam) for (int i = 0; i < n; i++) for (int k : netsOf[i]) { if (!sig[k]) continue; for (int pj : netPins[k]) { const int c = P[pj].comp; if (c != i && C[c].small && !sigPins[c].empty() && std::find(ancNb[i].begin(), ancNb[i].end(), c) == ancNb[i].end()) ancNb[i].push_back(c); } }
   auto anc = [&](int i) { if (!lam || !C[i].small || sigPins[i].empty()) return 0.0; double best = INFINITY;
     for (int pi : sigPins[i]) { double x, y; worldPin(pi, x, y); for (int pj : netPins[netOfPin[pi]]) { if (P[pj].comp == i) continue; double u, v; worldPin(pj, u, v); const double e = std::sqrt((u - x) * (u - x) + (v - y) * (v - y)); if (e < best) best = e; } }
-    return best < INFINITY ? best : 0.0; };
+    return best < INFINITY ? std::max(0.0, best - anchorFreeMm) : 0.0; };
   vector<double> ancN(n); for (int i = 0; i < n; i++) ancN[i] = anc(i);
   vector<int> AS;
 

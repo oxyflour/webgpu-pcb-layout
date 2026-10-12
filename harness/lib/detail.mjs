@@ -52,7 +52,7 @@ export function demandMap(b, L, cell, gw, gh) {
   return D;
 }
 
-export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals = Infinity, budgetS = 30, seed = 1, gap = 0.8, clearance = 0.1, kappa = 0.5, decapFreeMm = 0, chi = 0, critW = 3, rho = 4, lam = 1, mu = 5, relocateEnd = 0.5, constraints = null, engine = 'auto' } = {}) {
+export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals = Infinity, budgetS = 30, seed = 1, gap = 0.8, clearance = 0.1, kappa = 0.5, decapFreeMm = 0, chi = 0, critW = 3, rho = 4, lam = 1, mu = 5, relocateEnd = 0.5, anchorFreeMm = 2, constraints = null, engine = 'auto' } = {}) {
   const p = b.p, C = p.components, n = C.length, L = layout.map((q) => ({ ...q })), t0 = performance.now();
   let s = seed * 2654435761 >>> 0; const rnd = () => ((s = Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9 >>> 0) / 4294967296), pickOf = (a) => a[Math.floor(rnd() * a.length)];
   const small = [...Array(n).keys()].filter((i) => !C[i].fixed && C[i].pins.length < 8);
@@ -129,7 +129,7 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
   // Anchor (lam): per small part with signal pins, the distance of its best-attached pin to the nearest pin
   // of the same net on another part. Humans put one end of a series part right at the pin it serves and run
   // the long trace from the other end; HPWL is flat along the line between both partners (librem5, 2-pin
-  // parts, near end: human p90 2.0 mm, tool 7.5 mm).
+  // parts, near end: human p90 2.0 mm, tool 7.5 mm). anchorFreeMm: distance not charged.
   const isSmall = new Uint8Array(n); for (const i of small) isSmall[i] = 1;
   const netOfPin = new Int32Array(p.pins.length).fill(-1); p.nets.forEach((net, ni) => { for (const pi of net.pins) netOfPin[pi] = ni; });
   const sigPins = C.map(() => []); p.pins.forEach((q, pi) => { const ni = netOfPin[pi]; if (ni >= 0 && sig[ni]) sigPins[q.componentIndex].push(pi); });
@@ -137,7 +137,7 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
   if (lam) for (let i = 0; i < n; i++) for (const ni of netsOf[i]) { if (!sig[ni]) continue; for (const pj of p.nets[ni].pins) { const c = p.pins[pj].componentIndex; if (c !== i && isSmall[c] && sigPins[c].length && !ancNb[i].includes(c)) ancNb[i].push(c); } }
   const anc = (i) => { if (!lam || !isSmall[i] || !sigPins[i].length) return 0; let best = Infinity;
     for (const pi of sigPins[i]) { const [x, y] = worldPin(p, L, pi); for (const pj of p.nets[netOfPin[pi]].pins) { if (p.pins[pj].componentIndex === i) continue; const [u, v] = worldPin(p, L, pj), e = dist(u - x, v - y); if (e < best) best = e; } }
-    return best < Infinity ? best : 0; };
+    return best < Infinity ? Math.max(0, best - anchorFreeMm) : 0; };
   const ancN = C.map((_, i) => anc(i));
   // Parts whose anchor can change when `parts` move: the parts and the small parts sharing a signal net.
   const ancSet = (parts) => { const S = [...parts]; for (const i of parts) for (const c of ancNb[i]) if (!S.includes(c)) S.push(c); return S; };
@@ -154,7 +154,7 @@ export function detailPlace(b, layout, { nu = 2, T0 = 3, relocate = 0.15, evals 
   const partnerMean = (i) => { let sx = 0, sy = 0, k = 0; for (const ni of netsOf[i]) { if (!sig[ni]) continue; for (const pi of p.nets[ni].pins) { if (p.pins[pi].componentIndex === i) continue; const [x, y] = worldPin(p, L, pi); sx += x; sy += y; k++; } } return k ? [sx / k, sy / k] : null; };
   const sizeKey = (i, r) => rotatedSize(C[i], r).map((v) => v.toFixed(2)).join();
   if (engine === 'native' || (engine === 'auto' && nativeDetailAvailable()))
-    return runNative({ b, L, small, sizeKey, wN, decaps, crit, sig, RP, dem, opts: { nu, T0, relocate, evals, budgetS, seed, gap, clearance, kappa, decapFreeMm, rho, lam, mu, relocateEnd } });
+    return runNative({ b, L, small, sizeKey, wN, decaps, crit, sig, RP, dem, opts: { nu, T0, relocate, evals, budgetS, seed, gap, clearance, kappa, decapFreeMm, rho, lam, mu, relocateEnd, anchorFreeMm } });
   let tried = 0, accepted = 0, delta = 0;
   while (tried < evals && (performance.now() - t0) / 1000 < budgetS) {
     const i = pickOf(small), old = { ...L[i] }, kind = rnd(); let j = -1, oldJ = null;
@@ -195,7 +195,7 @@ function runNative({ b, L, small, sizeKey, wN, decaps, crit, sig, RP, dem, opts 
   const f64 = (a) => { const x = Buffer.alloc(a.length * 8); a.forEach((v, k) => x.writeDoubleLE(v, k * 8)); parts.push(x); };
   const isSmall = new Uint8Array(n); for (const i of small) isSmall[i] = 1;
   i32([n, p.nets.length, p.pins.length, RP.length, decaps.length, opts.seed * 2654435761 >>> 0 | 0]);
-  f64([p.canvas.width, p.canvas.height, opts.clearance, opts.nu, opts.T0, opts.relocate, opts.budgetS, opts.gap, opts.kappa, opts.decapFreeMm, opts.evals, opts.rho, opts.lam, opts.mu, opts.relocateEnd]);
+  f64([p.canvas.width, p.canvas.height, opts.clearance, opts.nu, opts.T0, opts.relocate, opts.budgetS, opts.gap, opts.kappa, opts.decapFreeMm, opts.evals, opts.rho, opts.lam, opts.mu, opts.relocateEnd, opts.anchorFreeMm]);
   C.forEach((c, i) => { f64([c.width, c.height, L[i].x, L[i].y]); i32([L[i].rotation, L[i].side ? 1 : 0, c.twoSided ? 1 : 0, c.rotatable === false ? 0 : 1, isSmall[i], key(sizeKey(i, 0)), key(sizeKey(i, 1))]); });
   p.pins.forEach((q) => { i32([q.componentIndex]); f64([q.x, q.y]); });
   p.nets.forEach((net, ni) => { i32([net.pins.length, sig[ni] ? 1 : 0]); f64([wN[ni]]); i32(net.pins); });
