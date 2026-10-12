@@ -1609,3 +1609,77 @@ v12 1.091, v15 1.099, v16 1.043 (v16 / v15 = 0.950, v16 / v12 = 0.957); v16 has 
 z3r0, pico, edu-fpga, edu-k60, edu-nxp; safety at 1.02. Largest remaining gaps: k60 1.39, fsl-mini
 1.22, edk 1.20. The tool change alone (no-agent: x0.937) carries through to the agent results, so the
 search depth of the detail pass was a real bottleneck of the v15 sweep.
+
+## Librem 5 mainboard; v17 detail pass: anchor, one-end relocate, routing demand (2026-10-13)
+
+New board `librem5` (Purism Librem 5 mainboard, KiCad 10, 1296 parts, 807 signal nets, 10 copper
+layers, parts on both sides, HDI). Import fixes: KiCad >= 9 net syntax `(net "X")` and copper numbering
+(B.Cu = 2). At the default body margin (pads + 0.25 mm) legalizing the human layout moves parts by 0.75 mm
+median / 22 mm max; with `bodyMargin` 0.05 (boards.json) p90 0.11 mm, and the legalized human routes with
+2838 vias vs 2810. `fixedRefs` holds the enclosure-bound SMD parts (SW, ANT, TS, JV).
+
+First round (old detail pass, prompt v15, 20 min, 20 place calls; 8 grid offsets):
+
+| Layout | Routed nets (count, of 807) | Vias (count) | Vias / human (x) |
+|---|---|---|---|
+| Human | 807 | 2776 | 1.00 |
+| No agent, mean of 3 seeds | 804.3 | 5031 | 1.81 |
+| Agent v15, per session | 807 / 807 / 807 | 3501 / 3725 / 3578 | 1.26 / 1.34 / 1.29 |
+| 37 ICs (>= 8 pins) at the human pose, tool for the rest (3 phases) | 806 | 3362 | 1.21 |
+
+Diagnosis (librem5, human IC poses):
+- The old detail objective ranks the human layout worst (cost 14198 vs tool 11781) and adds 16 % vias to it.
+- Swapping one class of small parts from the tool layout into the legalized human one: 2-signal-pin parts
+  (294) 2838 -> 3507 vias, 1-pin parts (578) -> 3318, decaps (262) -> 2926.
+- 2-pin parts: humans put one end at its partner pin (near end p50 0.82 / p90 2.0 mm), the tool leaves
+  them between both partners (1.28 / 7.5 mm) or at the wrong end (20-50 mm from the human pose): HPWL is
+  flat along the line between the partners and relocate jumped to the partners' mean.
+- Small-part pads sit on routing demand (RUDY of the nets between big parts) 1.32 in the human layout, 2.04 in the tool's.
+- More detail tries do not help (130 s, 9.6 M tries: 3388 vs 3362).
+
+New detail-pass terms (lib/detail.mjs, native/detail.cpp; JS and native identical): `lam` anchor (distance of
+a small part's best-attached signal pin to its nearest partner pin), `relocateEnd` (relocate next to one random
+partner pin), `mu` routing demand under small-part pads. Sweeps from the human IC poses, 3 seeds, median of 3
+grid phases:
+
+| Detail pass (librem5) | Vias per seed (count) | Vias, mean (count) |
+|---|---|---|
+| old default | 3438 / 3432 / 3410 | 3427 |
+| lam 1 | 3337 / 3429 / 3327 | 3364 |
+| lam 1, relocateEnd 0.5 | 3275 / 3244 / 3247 | 3255 |
+| lam 1, mu 5, relocateEnd 0.5 (new default) | 3222 / 3233 / 3290 | 3248 |
+| (lam 3 / lam 10 / mu 20 / gap 0.4 / nu 0: worse than lam 1 / mu 5 / default) | | |
+
+| Board, human IC poses | Human: vias (count) | Old pass: vias, mean of 3 (count) | New pass: vias, mean of 3 (count) |
+|---|---|---|---|
+| librem5 | 2838 | 3427 | 3248 |
+| k60 | 301 | 425 | 385 |
+| pic | 347 | 371 | 323 |
+
+From the human layout itself the new pass adds 6 % vias (old 16 %; greedy 4 %).
+
+No-agent tool from scratch, all boards (3 seeds, 8 grid offsets; results/sweep-eval-v17; librem5 v16 column =
+old pass and fixed set, results/l5):
+
+| Board | Human: vias (count) | No agent v16: vias, mean of 3 (count) | No agent v17: vias, mean of 3 (count) | v17 / v16 (change, %) | No agent v17: clean nets, mean (count of signal nets) |
+|---|---|---|---|---|---|
+| z3r0 | 32.5 | 27 | 24 | -12.3 | 46.0 of 46 |
+| pico | 57.5 | 65 | 63 | -3.1 | 86.0 of 86 |
+| edk | 66.5 | 99 | 85 | -14.5 | 124.0 of 124 |
+| edu-fpga | 77.5 | 155 | 151 | -2.2 | 108.0 of 108 |
+| fsl-mini | 192 | 268 | 254 | -5.4 | 162.0 of 162 |
+| edu-k60 | 193 | 233 | 253 | +8.9 | 157.0 of 157 |
+| edu-nxp | 203.5 | 212 | 207 | -2.4 | 163.0 of 163 |
+| safety | 229 | 280 | 246 | -12.2 | 186.0 of 186 |
+| pic | 348.5 | 512 | 460 | -10.2 | 302.7 of 310 (v16 292.5) |
+| nxp | 588 | 699 | 677 | -3.2 | 370.0 of 370 |
+| rx | 626 | 737 | 741 | +0.6 | 400.0 of 400 |
+| k60 | 301.5 | 452 | 429 | -5.2 | 318.0 of 318 (v16 317.0) |
+| acc | 2588 | 3028 | 2934 | -3.1 | 617.0 of 617 |
+| ppc-n3 | 8768 | 9823 | 9821 | -0.0 | 1607.0 of 1607 |
+| librem5 | 2781.5 | 5041 | 4086 | -19.0 | 807.0 of 807 (old 804.8) |
+
+Geometric mean over the 14 earlier boards: v17 / v16 vias 0.952; no-agent vias / human 1.256 -> 1.196. Worse
+only on edu-k60 (+8.9 %: seeds 228 / 270.5 / 261.5 vs 234 / 235.5 / 228.5; two seeds with a wide phase range,
+237-305) and rx (+0.6 %, noise). Next: start layout that attaches series parts to one end; agent sessions with
+the new pass.
