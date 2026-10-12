@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>k60 Agent 轨迹</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1d1d1b;--mute:#6b6b66;--line:#d8d6cf;--card:#fff;--agent:#2f6fb5;--agentbg:#e8f0fa;--tool:#2e8a5a;--toolbg:#e6f4ec;--warn:#b5532f;--warnbg:#fbece5;--best:#7a4fb5;--bestbg:#f1eafa}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#e9e8e4;--mute:#9a9993;--line:#3a3a3f;--card:#202024;--agent:#7fb0ea;--agentbg:#1d2a3a;--tool:#6ccf98;--toolbg:#18302a;--warn:#ec9a7a;--warnbg:#3a2620;--best:#c4a2f0;--bestbg:#2c2240}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#e9e8e4;--mute:#9a9993;--line:#3a3a3f;--card:#202024;--agent:#7fb0ea;--agentbg:#1d2a3a;--tool:#6ccf98;--toolbg:#18302a;--warn:#ec9a7a;--warnbg:#3a2620;--best:#c4a2f0;--bestbg:#2c2240}
+body{background:var(--bg);color:var(--fg);font:15px/1.65 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;margin:0}
+main{max-width:1020px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:19px;margin:36px 0 10px;border-bottom:1px solid var(--line);padding-bottom:4px}h3{font-size:16px;margin:22px 0 6px}
+.sub{color:var(--mute);margin:0 0 18px}
+code{font:13px Consolas,monospace;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.fig{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;overflow-x:auto}
+svg text{fill:var(--fg);font-family:inherit}
+svg .m{fill:var(--mute)}
+svg .a{fill:var(--agentbg);stroke:var(--agent)}svg .t{fill:var(--toolbg);stroke:var(--tool)}svg .w{fill:var(--warnbg);stroke:var(--warn)}svg .b{fill:var(--bestbg);stroke:var(--best)}
+svg .ln{stroke:var(--mute);fill:none;stroke-width:1.4}
+svg .grp{fill:none;stroke:var(--line);stroke-dasharray:5 4}
+.legend span{display:inline-block;margin-right:14px;font-size:13px}.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}th,td{border:1px solid var(--line);padding:5px 7px;text-align:left;vertical-align:top}th{background:var(--card)}
+td.n{text-align:right;font-variant-numeric:tabular-nums}tr.best td{background:var(--bestbg)}
+.tw{overflow-x:auto}
+.note{background:var(--warnbg);border-left:3px solid var(--warn);padding:8px 12px;border-radius:4px;margin:12px 0}
+ol li,ul li{margin:3px 0}
+</style>
+</head>
+<body><main>
+<h1>一次真实 agent 轨迹：k60，prompt v15，rep1</h1>
+<p class="sub">来源 <code>harness/results/v15s-k60/rep1</code>（dsh / DeepSeek Flash，预算 20 min、20 次 place）。用时 16.4 min，16 次 place，最终提交 c012。</p>
+
+<div class="legend"><span><i style="background:var(--agentbg);border:1px solid var(--agent)"></i>agent 自己做的事（思考、写 plan）</span><span><i style="background:var(--toolbg);border:1px solid var(--tool)"></i><code>pcb</code> 工具算法</span><span><i style="background:var(--bestbg);border:1px solid var(--best)"></i>新最优 / 提交</span><span><i style="background:var(--warnbg);border:1px solid var(--warn)"></i>比最优差，回退</span></div>
+
+<h2>1. 整体流程</h2>
+<div class="fig">
+<svg viewBox="0 0 980 760" width="980" role="img" aria-label="Agent 轨迹流程图">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="currentColor" style="color:var(--mute)"/></marker></defs>
+<!-- Phase 1 -->
+<rect class="grp" x="10" y="10" width="440" height="230" rx="10"/>
+<text x="24" y="32" font-weight="600">① 摸底（0–150 s，只读）</text>
+<rect class="t" x="30" y="46" width="190" height="40" rx="6"/><text x="125" y="64" text-anchor="middle" font-size="13">info / status</text><text x="125" y="79" text-anchor="middle" font-size="11" class="m">板子尺寸、人工目标、c000 基线</text>
+<rect class="t" x="240" y="46" width="190" height="40" rx="6"/><text x="335" y="64" text-anchor="middle" font-size="13">info --section ics · map</text><text x="335" y="79" text-anchor="middle" font-size="11" class="m">8 颗 IC 及连接、ASCII 平面图</text>
+<rect class="t" x="30" y="100" width="190" height="40" rx="6"/><text x="125" y="118" text-anchor="middle" font-size="13">inspect c000 --congestion</text><text x="125" y="133" text-anchor="middle" font-size="11" class="m">基线拥塞区、各区涉及的 IC</text>
+<rect class="t" x="240" y="100" width="190" height="40" rx="6"/><text x="335" y="118" text-anchor="middle" font-size="13">info constraints / part</text><text x="335" y="133" text-anchor="middle" font-size="11" class="m">关键网络、去耦电容、引脚朝向</text>
+<rect class="a" x="30" y="156" width="400" height="66" rx="6"/><text x="230" y="176" text-anchor="middle" font-size="13">agent 结论（11 s）：c000 已布通 318/318</text><text x="230" y="194" text-anchor="middle" font-size="13">过孔 487，人工 310 → 任务 = 改 IC 平面布局来降过孔</text><text x="230" y="212" text-anchor="middle" font-size="11" class="m">它只决定 8 颗 IC（≥8 引脚）的位置与转角；396 个小件交给工具</text>
+<!-- Phase 2 -->
+<rect class="grp" x="470" y="10" width="500" height="230" rx="10"/>
+<text x="484" y="32" font-weight="600">② 试算（check，不布线，约 1 s）</text>
+<rect class="a" x="490" y="46" width="460" height="40" rx="6"/><text x="720" y="64" text-anchor="middle" font-size="13">写 plan.json：{from, plan: {U201: {x, y, rotation}, …}}</text><text x="720" y="79" text-anchor="middle" font-size="11" class="m">from = centroid（从零生成）或已有候选 cXXX（在其版图上改）</text>
+<rect class="t" x="490" y="100" width="460" height="56" rx="6"/><text x="720" y="118" text-anchor="middle" font-size="13">pcb check：起始布局 + 合法化，不跑 detail、不布线</text><text x="720" y="135" text-anchor="middle" font-size="11" class="m">返回 shiftMm（想放的位置撞了别人要挪多少）</text><text x="720" y="149" text-anchor="middle" font-size="11" class="m">和 anchoredHpwlByRotation[0..3]（四个转角下的线长）</text>
+<rect class="a" x="490" y="170" width="460" height="52" rx="6"/><text x="720" y="190" text-anchor="middle" font-size="13">agent 据此修正坐标 / 转角</text><text x="720" y="208" text-anchor="middle" font-size="11" class="m">轨迹里用了 3 次：Plan A 前、c002 后各确认一次转角最优</text>
+<!-- arrows phase1->2 -->
+<path class="ln" d="M450,190 L470,190" marker-end="url(#ar)"/>
+<!-- Phase 3: place pipeline -->
+<rect class="grp" x="10" y="258" width="960" height="250" rx="10"/>
+<text x="24" y="280" font-weight="600">③ place：一次调用 = 一个候选 cNNN（每次约 35–70 s，本轨迹 16 次）</text>
+<rect class="t" x="30" y="300" width="170" height="92" rx="6"/><text x="115" y="320" text-anchor="middle" font-size="13" font-weight="600">a. 起始布局</text><text x="115" y="338" text-anchor="middle" font-size="11">plan 里的 IC 放到指定位姿</text><text x="115" y="353" text-anchor="middle" font-size="11">from cXXX：其余件沿用</text><text x="115" y="368" text-anchor="middle" font-size="11">from centroid：小件放到</text><text x="115" y="383" text-anchor="middle" font-size="11">所连引脚的加权质心</text>
+<rect class="t" x="220" y="300" width="140" height="92" rx="6"/><text x="290" y="320" text-anchor="middle" font-size="13" font-weight="600">b. 合法化</text><text x="290" y="340" text-anchor="middle" font-size="11">0.1 mm 间距</text><text x="290" y="355" text-anchor="middle" font-size="11">消除重叠、出界</text><text x="290" y="370" text-anchor="middle" font-size="11">平均位移 ≈0.06 mm</text>
+<rect class="b" x="380" y="300" width="200" height="92" rx="6"/><text x="480" y="320" text-anchor="middle" font-size="13" font-weight="600">c. detail pass</text><text x="480" y="338" text-anchor="middle" font-size="11">只动 396 个小件（&lt;8 引脚）</text><text x="480" y="353" text-anchor="middle" font-size="11">模拟退火 21–38 万次尝试</text><text x="480" y="368" text-anchor="middle" font-size="11">本轨迹：30 s 时间预算</text><text x="480" y="383" text-anchor="middle" font-size="11">之后再合法化一次</text>
+<rect class="t" x="600" y="300" width="170" height="92" rx="6"/><text x="685" y="320" text-anchor="middle" font-size="13" font-weight="600">d. 布线评估</text><text x="685" y="338" text-anchor="middle" font-size="11">原生网格布线器 0.4 mm</text><text x="685" y="353" text-anchor="middle" font-size="11">5 个网格相位并行</text><text x="685" y="368" text-anchor="middle" font-size="11">取中位数（每相位 ≈2 s）</text><text x="685" y="383" text-anchor="middle" font-size="11">+ 约束检查</text>
+<rect class="t" x="790" y="300" width="160" height="92" rx="6"/><text x="870" y="320" text-anchor="middle" font-size="13" font-weight="600">e. 回报 agent</text><text x="870" y="338" text-anchor="middle" font-size="11">clean / vias / HPWL</text><text x="870" y="353" text-anchor="middle" font-size="11">噪声区间 min–max</text><text x="870" y="368" text-anchor="middle" font-size="11">overflowRound1、收敛相位</text><text x="870" y="383" text-anchor="middle" font-size="11">newBest、关键网络失败</text>
+<path class="ln" d="M200,346 L220,346" marker-end="url(#ar)"/><path class="ln" d="M360,346 L380,346" marker-end="url(#ar)"/><path class="ln" d="M580,346 L600,346" marker-end="url(#ar)"/><path class="ln" d="M770,346 L790,346" marker-end="url(#ar)"/>
+<rect class="a" x="300" y="420" width="380" height="70" rx="6"/><text x="490" y="442" text-anchor="middle" font-size="13">agent 读结果：更好 → 以它为 from 继续；</text><text x="490" y="460" text-anchor="middle" font-size="13">更差 → 回到当前最优，换一个 IC 改动</text><text x="490" y="478" text-anchor="middle" font-size="11" class="m">平局时按 prompt 规则看 overflowRound1 和收敛相位数</text>
+<path class="ln" d="M870,392 L870,455 L680,455" marker-end="url(#ar)"/>
+<path class="ln" d="M300,455 L115,455 L115,392" marker-end="url(#ar)"/>
+<path class="ln" d="M720,240 L720,258" marker-end="url(#ar)"/>
+<!-- Phase 4: candidate tree -->
+<rect class="grp" x="10" y="526" width="960" height="224" rx="10"/>
+<text x="24" y="548" font-weight="600">④ 本轨迹的候选树（过孔中位数，括号内为 5 个相位 min–max）</text>
+<rect class="t" x="30" y="566" width="150" height="44" rx="6"/><text x="105" y="585" text-anchor="middle" font-size="12">c000 工具基线</text><text x="105" y="601" text-anchor="middle" font-size="11">487 (483–500)</text>
+<rect class="w" x="30" y="630" width="150" height="44" rx="6"/><text x="105" y="649" text-anchor="middle" font-size="12">c001 全量 Plan A</text><text x="105" y="665" text-anchor="middle" font-size="11">475，但 clean 316</text>
+<rect class="b" x="220" y="566" width="170" height="44" rx="6"/><text x="305" y="585" text-anchor="middle" font-size="12">c002 只修 3 颗 IC 转角</text><text x="305" y="601" text-anchor="middle" font-size="11">447 (423–467) 新最优</text>
+<rect class="w" x="220" y="630" width="170" height="104" rx="6"/><text x="305" y="648" text-anchor="middle" font-size="11">c003 U201 西南移 471</text><text x="305" y="663" text-anchor="middle" font-size="11">c004 U701/702 南移 447</text><text x="305" y="678" text-anchor="middle" font-size="11">c005 U201 南移 464</text><text x="305" y="693" text-anchor="middle" font-size="11">c006 DIN 缓冲贴近 500</text><text x="305" y="708" text-anchor="middle" font-size="11">c007 U201 转 180° 551</text><text x="305" y="723" text-anchor="middle" font-size="11">c008–c011 452–475</text>
+<rect class="b" x="430" y="566" width="190" height="44" rx="6"/><text x="525" y="585" text-anchor="middle" font-size="12">c012 U302 → (26.5, 46)</text><text x="525" y="601" text-anchor="middle" font-size="11">447 (433–487)，收敛 4/5</text>
+<rect class="w" x="430" y="630" width="190" height="74" rx="6"/><text x="525" y="649" text-anchor="middle" font-size="11">c013 U302 y=44.8 → 468</text><text x="525" y="664" text-anchor="middle" font-size="11">c014 U302 x=28 → 490</text><text x="525" y="679" text-anchor="middle" font-size="11">c015 同 plan 重跑 → 444</text><text x="525" y="694" text-anchor="middle" font-size="11">c016 U302 x=26 → 449</text>
+<rect class="b" x="660" y="566" width="290" height="68" rx="6"/><text x="805" y="586" text-anchor="middle" font-size="13" font-weight="600">submit c012 → 最终评估</text><text x="805" y="604" text-anchor="middle" font-size="12">clean 318/318，过孔 447，HPWL 5256 mm</text><text x="805" y="622" text-anchor="middle" font-size="11" class="m">人工：318，过孔 310，HPWL 5799 mm</text>
+<path class="ln" d="M180,588 L220,588" marker-end="url(#ar)"/><path class="ln" d="M105,610 L105,630" marker-end="url(#ar)"/>
+<path class="ln" d="M305,610 L305,630" marker-end="url(#ar)"/><path class="ln" d="M390,588 L430,588" marker-end="url(#ar)"/>
+<path class="ln" d="M525,610 L525,630" marker-end="url(#ar)"/><path class="ln" d="M620,588 L660,588" marker-end="url(#ar)"/>
+<path class="ln" d="M490,508 L490,526" marker-end="url(#ar)"/>
+</svg>
+</div>
+
+<h2>2. 逐步说明</h2>
+<h3>① 摸底：agent 只读不改</h3>
+<p>会话开始前，工具已经用空 plan 生成了 <b>c000</b>（不占 agent 预算）。agent 第 11 秒就看清了局面：c000 已经布通全部 318 个信号网络，但过孔 487，人工 310。所以后面所有尝试都围绕“降过孔”展开。它随后读了 8 颗 IC 的引脚分布（哪一侧引脚连到谁）、c000 的拥塞区和设计约束（3 组关键网络、55 个去耦电容）。</p>
+<p>关键分工：agent 只给 <b>8 颗大件</b>（≥8 引脚：U201 MCU、U302 以太网 PHY、U1301/U1302、U402 RS232、U901、U701/U702 DIN 缓冲）定位置和转角。另外 396 个小件全部由工具算法摆放。</p>
+
+<h3>② check：便宜的试算</h3>
+<p><code>pcb check</code> 只做“起始布局 + 合法化”，约 1 s，不跑 detail pass，也不布线。它回答两件事：<code>shiftMm</code> 表示想放的位置是否撞到固定件、禁布区或其他 IC，撞到时要挪多远；<code>anchoredHpwlByRotation</code> 是这颗 IC 在 4 个转角下连到已定位件的线长。agent 用它在 Plan A 之前修正了 U302/U901/U1301 的坐标，又在 c002 之后确认所有 IC 的转角都已最优。</p>
+
+<h3>③ place：一次调用的流水线</h3>
+<ol>
+<li><b>起始布局</b>（<code>lib/start-layout.mjs</code>）：plan 里的 IC 放到指定位姿。<code>from: cXXX</code> 时，其余所有件沿用该候选的版图。<code>from: centroid</code> 时，每个小件放到它所连引脚的加权平均位置，权重为 1/对方引脚数（人工习惯把小件放在引脚较少的那个伙伴旁边），再朝伙伴转 90° 的倍数。</li>
+<li><b>合法化</b>：0.1 mm 间距，消除重叠和出界。本轨迹每次平均只挪 0.05–0.19 mm。</li>
+<li><b>detail pass</b>：见第 3 节。</li>
+<li><b>布线评估</b>：原生网格布线器（0.4 mm 网格，PathFinder 式协商，最多 40 轮）。布线器对网格相位很敏感，所以同一版图在 5 个相位偏移下各布一次，取中位数，并报告 min–max 噪声区间。k60 每个相位约 2 s，5 个并行。</li>
+<li><b>回报</b>：clean / vias / HPWL、噪声区间、<code>overflowRound1</code>（第 1 轮拥塞总量，越低说明余量越大）、收敛相位数、失败的关键网络、去耦电容距离。工具自动判定是否为新最优。</li>
+</ol>
+
+<h3>④ 搜索过程</h3>
+<ul>
+<li><b>c001</b>：从零按 agent 自己的完整平面图（Plan A）摆放。过孔降到 475，但掉了 2 个网络。agent 随即换策略：在 c000 上只改一个因素。</li>
+<li><b>c002</b>：只把 U1302/U901/U702 的转角改对，过孔 487 → 447。这是整条轨迹里唯一一次大幅提升。</li>
+<li><b>c003–c011</b>：在 c002 上逐个试 IC 平移和转角（U201 移动或转 180°，DIN 缓冲、PHY、RS232 搬家），全部变差。最差的是 U201 转 180°，过孔 551，丢了 15 个网络。</li>
+<li><b>c012</b>：U302 微移到 (26.5, 46)。过孔同样 447，但 overflowRound1 从 595 降到 574，收敛相位从 3/5 升到 4/5，按平局规则成为新最优。</li>
+<li><b>c013–c016</b>：围绕 U302 微调，外加一次原 plan 重跑（c015：444），都没有明显胜出。agent 提交了 c012。</li>
+</ul>
+
+<h2>3. detail pass 在干嘛</h2>
+<p>代码：<code>harness/lib/detail.mjs</code>（JS 版）和 <code>harness/native/detail.cpp</code>（C++ 版，结果一致，快约 10 倍）。它是位于合法化和布线之间的<b>小件局部优化器</b>，对象是 396 个可动、少于 8 引脚的件（电阻、电容、二极管等）。IC、固定件和通孔件都不动。</p>
+
+<h3>每次尝试：随机挑一个小件，做一种动作</h3>
+<div class="tw"><table>
+<tr><th>动作</th><th>每次尝试中被选中的概率（%）</th><th>具体做法</th></tr>
+<tr><td>relocate（跳到伙伴旁）</td><td class="n">15</td><td>跳到它所连其他引脚的均值 ±1.5 mm。去耦电容则跳到其所属 IC 的电源引脚旁。</td></tr>
+<tr><td>shift（平移）</td><td class="n">47</td><td>上下左右走 0.4 / 0.8 / 1.2 / 2 mm</td></tr>
+<tr><td>rotate（旋转）</td><td class="n">21</td><td>转 90° / 180° / 270°</td></tr>
+<tr><td>swap（交换）</td><td class="n">17</td><td>与 6 mm 内同尺寸的小件互换位置</td></tr>
+</table></div>
+<p>只接受合法的动作（不重叠、保持 0.1 mm 间距、不出界）。接受与否看代价变化 Δ：</p>
+<p style="text-align:center"><code>cost = Σ 加权 HPWL + 2 × 通道缺口 + 0.5 × 去耦电容距离 + 关键网络走廊罚分</code></p>
+<ul>
+<li><b>HPWL</b>：所有网络的半周长线长（mm）。有约束的关键网络权重 ×4。</li>
+<li><b>通道缺口</b>：这一项最关键，直接针对过孔。对每对相邻、属于不同件和不同网络、在同一层的焊盘，若间隙小于 0.8 mm，就记 (0.8 − 间隙)。0.4–0.8 mm 的缝在 0.4 mm 布线网格上能否穿过一根线取决于网格相位，所以这些缝正是布线器被迫打孔绕行的地方。参考：人工 k60 有 161 对这样的焊盘，早期工具版图有 598 对。</li>
+<li><b>去耦电容距离</b>：电容电源焊盘到所属 IC 最近电源焊盘的距离（mm）。</li>
+<li><b>关键网络走廊</b>：关键网络引脚之间直线走廊里每出现一个异网焊盘，罚 4 分，目的是让 USB 等网络能不打孔直连。</li>
+</ul>
+<p>Δ &lt; 0 就接受；Δ &gt; 0 时以 exp(−Δ/T) 的概率接受（模拟退火）。T 从 3 几何降到 0.003，按尝试次数或时间预算的进度计算。之后再合法化一次。</p>
+
+<h3>在这条轨迹上它实际做了多少</h3>
+<p>我把同一 candidate 的“合法化后、未跑 detail”版图和最终版图用相同的 5 相位评估重新布了一遍：</p>
+<div class="tw"><table>
+<tr><th>候选与阶段</th><th>布通网络（个，共 318）</th><th>过孔中位数（个）</th><th>过孔 5 相位 min–max（个）</th><th>HPWL（mm）</th><th>第 1 轮拥塞 overflowRound1（格次）</th><th>收敛相位（个，共 5）</th></tr>
+<tr><td>c000（从零）：合法化后，无 detail pass</td><td class="n">314</td><td class="n">581</td><td class="n">575–618</td><td class="n">6531</td><td class="n">900</td><td class="n">1</td></tr>
+<tr class="best"><td>c000（从零）：detail pass 后</td><td class="n">318</td><td class="n">487</td><td class="n">483–500</td><td class="n">5529</td><td class="n">662</td><td class="n">3</td></tr>
+<tr><td>c012（from c002）：合法化后，无 detail pass</td><td class="n">316</td><td class="n">462</td><td class="n">436–465</td><td class="n">5312</td><td class="n">604</td><td class="n">2</td></tr>
+<tr class="best"><td>c012（from c002）：detail pass 后</td><td class="n">318</td><td class="n">447</td><td class="n">433–487</td><td class="n">5256</td><td class="n">574</td><td class="n">4</td></tr>
+</table></div>
+<div class="tw"><table>
+<tr><th>候选</th><th>小件总数（个）</th><th>被 detail pass 移动的小件（个，位移 &gt; 0.05 mm）</th><th>位移 &gt; 2 mm 的小件（个）</th><th>转角改变的小件（个）</th><th>平均位移（mm）</th><th>尝试次数（万次）</th><th>接受次数（万次）</th></tr>
+<tr><td>c000（从质心起步）</td><td class="n">396</td><td class="n">383</td><td class="n">295</td><td class="n">239</td><td class="n">10.9</td><td class="n">21.3</td><td class="n">7.2</td></tr>
+<tr><td>c012（从 c002 已优化版图起步）</td><td class="n">396</td><td class="n">372</td><td class="n">227</td><td class="n">201</td><td class="n">4.2</td><td class="n">21.0</td><td class="n">7.3</td></tr>
+</table></div>
+<p>结论：从零起步时，detail pass 自己就贡献了 −94 个过孔、+4 个布通网络、−1000 mm HPWL。c000 基线的质量几乎全部来自它。agent 的 IC 改动在此之上又降了 40 个（487 → 447）。</p>
+
+<div class="note"><b>值得注意的一点：</b>即使 <code>from: c002</code>，detail pass 也会从高温重新退火，把 c002 里已经优化好的小件重新洗一遍（372/396 个被移动，201 个改了转角）。所以两个候选的差异 = IC 改动 + 小件重新退火的随机性 + 布线相位噪声。同一个 plan 重跑（c012 → c015）就差了 3 个过孔，c012 自己 5 个相位之间更是跨 54 个。agent 的大部分微调（c013–c016）落在这个噪声里，很难判断真假。可能的改进：<code>from</code> 已有候选时，detail pass 用低起始温度，或只在被改动的 IC 附近重排，让 agent 的比较更干净。</div>
+
+<h2>4. 一次 place 调用的耗时（本轨迹）</h2>
+<div class="tw"><table>
+<tr><th>阶段</th><th>耗时（s）</th><th>说明</th></tr>
+<tr><td>起始布局 + 合法化 ×2</td><td class="n">&lt;1</td><td></td></tr>
+<tr><td>detail pass</td><td class="n">30</td><td>本轨迹（v15s）用的是旧的 30 s 时间预算。现在默认是每个小件 20000 次尝试、上限 60 s；原生版在 k60 上约 7.8M 次 / 42–45 s。</td></tr>
+<tr><td>布线评估（5 相位并行）</td><td class="n">2–7</td><td>c000 6.4 s（40 轮未收敛），c012 约 2 s</td></tr>
+<tr><td>整次 place 调用（agent 侧计时）</td><td class="n">35–72</td><td>16 次全部 &lt; 3 min，最长一次 pcb 调用 39.9 s（summary.json）</td></tr>
+</table></div>
+</main></body></html>
